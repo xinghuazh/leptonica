@@ -35,7 +35,6 @@
  *      Two-image grayscale arithmetic operations (8, 16, 32 bpp)
  *           PIX        *pixAddGray()
  *           PIX        *pixSubtractGray()
- *           PIX        *pixMultiplyGray()
  *
  *      Grayscale threshold operation (8, 16, 32 bpp)
  *           PIX        *pixThresholdToValue()
@@ -88,13 +87,10 @@
  * </pre>
  */
 
-#ifdef HAVE_CONFIG_H
-#include <config_auto.h>
-#endif  /* HAVE_CONFIG_H */
-
 #include <string.h>
 #include <math.h>
 #include "allheaders.h"
+
 
 /*-------------------------------------------------------------*
  *          One-image grayscale arithmetic operations          *
@@ -102,8 +98,8 @@
 /*!
  * \brief   pixAddConstantGray()
  *
- * \param[in]    pixs   8, 16 or 32 bpp
- * \param[in]    val    amount to add to each pixel
+ * \param[in]    pixs 8, 16 or 32 bpp
+ * \param[in]    val  amount to add to each pixel
  * \return  0 if OK, 1 on error
  *
  * <pre>
@@ -115,18 +111,20 @@
  *      (4) For 8 and 16 bpp, if val < 0 the result is clipped to 0.
  * </pre>
  */
-l_ok
+l_int32
 pixAddConstantGray(PIX      *pixs,
                    l_int32   val)
 {
 l_int32    i, j, w, h, d, wpl, pval;
 l_uint32  *data, *line;
 
+    PROCNAME("pixAddConstantGray");
+
     if (!pixs)
-        return ERROR_INT("pixs not defined", __func__, 1);
+        return ERROR_INT("pixs not defined", procName, 1);
     pixGetDimensions(pixs, &w, &h, &d);
     if (d != 8 && d != 16 && d != 32)
-        return ERROR_INT("pixs not 8, 16 or 32 bpp", __func__, 1);
+        return ERROR_INT("pixs not 8, 16 or 32 bpp", procName, 1);
 
     data = pixGetData(pixs);
     wpl = pixGetWpl(pixs);
@@ -173,8 +171,8 @@ l_uint32  *data, *line;
 /*!
  * \brief   pixMultConstantGray()
  *
- * \param[in]    pixs   8, 16 or 32 bpp
- * \param[in]    val    >= 0.0; amount to multiply by each pixel
+ * \param[in]    pixs 8, 16 or 32 bpp
+ * \param[in]    val  >= 0.0; amount to multiply by each pixel
  * \return  0 if OK, 1 on error
  *
  * <pre>
@@ -184,7 +182,7 @@ l_uint32  *data, *line;
  *      (3) For 8 and 16 bpp, the result is clipped to 0xff and 0xffff, rsp.
  * </pre>
  */
-l_ok
+l_int32
 pixMultConstantGray(PIX       *pixs,
                     l_float32  val)
 {
@@ -192,13 +190,15 @@ l_int32    i, j, w, h, d, wpl, pval;
 l_uint32   upval;
 l_uint32  *data, *line;
 
+    PROCNAME("pixMultConstantGray");
+
     if (!pixs)
-        return ERROR_INT("pixs not defined", __func__, 1);
+        return ERROR_INT("pixs not defined", procName, 1);
     pixGetDimensions(pixs, &w, &h, &d);
     if (d != 8 && d != 16 && d != 32)
-        return ERROR_INT("pixs not 8, 16 or 32 bpp", __func__, 1);
+        return ERROR_INT("pixs not 8, 16 or 32 bpp", procName, 1);
     if (val < 0.0)
-        return ERROR_INT("val < 0.0", __func__, 1);
+        return ERROR_INT("val < 0.0", procName, 1);
 
     data = pixGetData(pixs);
     wpl = pixGetWpl(pixs);
@@ -237,9 +237,9 @@ l_uint32  *data, *line;
 /*!
  * \brief   pixAddGray()
  *
- * \param[in]    pixd    [optional]; this can be null, equal to pixs1, or
- *                       different from pixs1
- * \param[in]    pixs1   can be equal to pixd
+ * \param[in]    pixd [optional]; this can be null, equal to pixs1, or
+ *                    different from pixs1
+ * \param[in]    pixs1 can be == to pixd
  * \param[in]    pixs2
  * \return  pixd always
  *
@@ -265,26 +265,28 @@ pixAddGray(PIX  *pixd,
 l_int32    i, j, d, ws, hs, w, h, wpls, wpld, val, sum;
 l_uint32  *datas, *datad, *lines, *lined;
 
+    PROCNAME("pixAddGray");
+
     if (!pixs1)
-        return (PIX *)ERROR_PTR("pixs1 not defined", __func__, pixd);
+        return (PIX *)ERROR_PTR("pixs1 not defined", procName, pixd);
     if (!pixs2)
-        return (PIX *)ERROR_PTR("pixs2 not defined", __func__, pixd);
+        return (PIX *)ERROR_PTR("pixs2 not defined", procName, pixd);
     if (pixs2 == pixs1)
-        return (PIX *)ERROR_PTR("pixs2 and pixs1 must differ", __func__, pixd);
+        return (PIX *)ERROR_PTR("pixs2 and pixs1 must differ", procName, pixd);
     if (pixs2 == pixd)
-        return (PIX *)ERROR_PTR("pixs2 and pixd must differ", __func__, pixd);
+        return (PIX *)ERROR_PTR("pixs2 and pixd must differ", procName, pixd);
     d = pixGetDepth(pixs1);
     if (d != 8 && d != 16 && d != 32)
-        return (PIX *)ERROR_PTR("pix are not 8, 16 or 32 bpp", __func__, pixd);
+        return (PIX *)ERROR_PTR("pix are not 8, 16 or 32 bpp", procName, pixd);
     if (pixGetDepth(pixs2) != d)
-        return (PIX *)ERROR_PTR("depths differ (pixs1, pixs2)", __func__, pixd);
+        return (PIX *)ERROR_PTR("depths differ (pixs1, pixs2)", procName, pixd);
     if (pixd && (pixGetDepth(pixd) != d))
-        return (PIX *)ERROR_PTR("depths differ (pixs1, pixd)", __func__, pixd);
+        return (PIX *)ERROR_PTR("depths differ (pixs1, pixd)", procName, pixd);
 
     if (!pixSizesEqual(pixs1, pixs2))
-        L_WARNING("pixs1 and pixs2 not equal in size\n", __func__);
+        L_WARNING("pixs1 and pixs2 not equal in size\n", procName);
     if (pixd && !pixSizesEqual(pixs1, pixd))
-        L_WARNING("pixs1 and pixd not equal in size\n", __func__);
+        L_WARNING("pixs1 and pixd not equal in size\n", procName);
 
     if (pixs1 != pixd)
         pixd = pixCopy(pixd, pixs1);
@@ -327,9 +329,9 @@ l_uint32  *datas, *datad, *lines, *lined;
 /*!
  * \brief   pixSubtractGray()
  *
- * \param[in]    pixd     [optional]; this can be null, equal to pixs1, or
- *                        different from pixs1
- * \param[in]    pixs1    can be equal to pixd
+ * \param[in]    pixd [optional]; this can be null, equal to pixs1, or
+ *                    different from pixs1
+ * \param[in]    pixs1 can be == to pixd
  * \param[in]    pixs2
  * \return  pixd always
  *
@@ -355,26 +357,28 @@ pixSubtractGray(PIX  *pixd,
 l_int32    i, j, w, h, ws, hs, d, wpls, wpld, val, diff;
 l_uint32  *datas, *datad, *lines, *lined;
 
+    PROCNAME("pixSubtractGray");
+
     if (!pixs1)
-        return (PIX *)ERROR_PTR("pixs1 not defined", __func__, pixd);
+        return (PIX *)ERROR_PTR("pixs1 not defined", procName, pixd);
     if (!pixs2)
-        return (PIX *)ERROR_PTR("pixs2 not defined", __func__, pixd);
+        return (PIX *)ERROR_PTR("pixs2 not defined", procName, pixd);
     if (pixs2 == pixs1)
-        return (PIX *)ERROR_PTR("pixs2 and pixs1 must differ", __func__, pixd);
+        return (PIX *)ERROR_PTR("pixs2 and pixs1 must differ", procName, pixd);
     if (pixs2 == pixd)
-        return (PIX *)ERROR_PTR("pixs2 and pixd must differ", __func__, pixd);
+        return (PIX *)ERROR_PTR("pixs2 and pixd must differ", procName, pixd);
     d = pixGetDepth(pixs1);
     if (d != 8 && d != 16 && d != 32)
-        return (PIX *)ERROR_PTR("pix are not 8, 16 or 32 bpp", __func__, pixd);
+        return (PIX *)ERROR_PTR("pix are not 8, 16 or 32 bpp", procName, pixd);
     if (pixGetDepth(pixs2) != d)
-        return (PIX *)ERROR_PTR("depths differ (pixs1, pixs2)", __func__, pixd);
+        return (PIX *)ERROR_PTR("depths differ (pixs1, pixs2)", procName, pixd);
     if (pixd && (pixGetDepth(pixd) != d))
-        return (PIX *)ERROR_PTR("depths differ (pixs1, pixd)", __func__, pixd);
+        return (PIX *)ERROR_PTR("depths differ (pixs1, pixd)", procName, pixd);
 
     if (!pixSizesEqual(pixs1, pixs2))
-        L_WARNING("pixs1 and pixs2 not equal in size\n", __func__);
+        L_WARNING("pixs1 and pixs2 not equal in size\n", procName);
     if (pixd && !pixSizesEqual(pixs1, pixd))
-        L_WARNING("pixs1 and pixd not equal in size\n", __func__);
+        L_WARNING("pixs1 and pixd not equal in size\n", procName);
 
     if (pixs1 != pixd)
         pixd = pixCopy(pixd, pixs1);
@@ -414,106 +418,14 @@ l_uint32  *datas, *datad, *lines, *lined;
 }
 
 
-/*!
- * \brief   pixMultiplyGray()
- *
- * \param[in]    pixs    32 bpp rgb or 8 bpp gray
- * \param[in]    pixg    8 bpp gray
- * \param[in]    norm    multiplicative factor to avoid overflow; 0 for default
- * \return  pixd, or null on error
- *
- * <pre>
- * Notes:
- *      (1) This function can be used for correcting a scanned image
- *          under non-uniform illumination.  For that application,
- *          %pixs is the scanned image, %pixg is an image whose values
- *          are inversely related to light from a uniform (say, white)
- *          target, and %norm is typically the inverse of the maximum
- *          pixel value in %pixg.
- *      (2) Set norm = 0 to get the default value, which is the inverse
- *          of the max value in %pixg.  This avoids overflow in the product.
- *      (3) For 32 bpp %pixs, all 3 components are multiplied by the
- *          same number.
- *      (4) Alignment is to UL corner.
- * </pre>
- */
-PIX *
-pixMultiplyGray(PIX        *pixs,
-                PIX        *pixg,
-                l_float32   norm)
-{
-l_int32    i, j, w, h, d, ws, hs, ds, wpls, wplg, wpld;
-l_int32    rval, gval, bval, rval2, gval2, bval2, vals, valg, val, maxgray;
-l_uint32   val32;
-l_uint32  *datas, *datag, *datad, *lines, *lineg, *lined;
-PIX       *pixd;
-
-    if (!pixs)
-        return (PIX *)ERROR_PTR("pixs not defined", __func__, NULL);
-    pixGetDimensions(pixs, &ws, &hs, &ds);
-    if (ds != 8 && ds != 32)
-        return (PIX *)ERROR_PTR("pixs not 8 or 32 bpp", __func__, NULL);
-    if (!pixg)
-        return (PIX *)ERROR_PTR("pixg not defined", __func__, NULL);
-    pixGetDimensions(pixg, &w, &h, &d);
-    if (d != 8)
-        return (PIX *)ERROR_PTR("pixg not 8 bpp", __func__, NULL);
-
-    if (norm <= 0.0) {
-        pixGetExtremeValue(pixg, 1, L_SELECT_MAX, NULL, NULL, NULL, &maxgray);
-        norm = (maxgray > 0) ? 1.0f / (l_float32)maxgray : 1.0f;
-    }
-
-    if ((pixd = pixCreateTemplate(pixs)) == NULL)
-        return (PIX *)ERROR_PTR("pixd not made", __func__, NULL);
-    datas = pixGetData(pixs);
-    datag = pixGetData(pixg);
-    datad = pixGetData(pixd);
-    wpls = pixGetWpl(pixs);
-    wplg = pixGetWpl(pixg);
-    wpld = pixGetWpl(pixd);
-    w = L_MIN(ws, w);
-    h = L_MIN(hs, h);
-    for (i = 0; i < h; i++) {
-        lines = datas + i * wpls;
-        lineg = datag + i * wplg;
-        lined = datad + i * wpld;
-        if (ds == 8) {
-            for (j = 0; j < w; j++) {
-                vals = GET_DATA_BYTE(lines, j);
-                valg = GET_DATA_BYTE(lineg, j);
-                val = (l_int32)(vals * valg * norm + 0.5);
-                val = L_MIN(255, val);
-                SET_DATA_BYTE(lined, j, val);
-            }
-        } else {  /* ds == 32 */
-            for (j = 0; j < w; j++) {
-                val32 = *(lines + j);
-                extractRGBValues(val32, &rval, &gval, &bval);
-                valg = GET_DATA_BYTE(lineg, j);
-                rval2 = (l_int32)(rval * valg * norm + 0.5);
-                rval2 = L_MIN(255, rval2);
-                gval2 = (l_int32)(gval * valg * norm + 0.5);
-                gval2 = L_MIN(255, gval2);
-                bval2 = (l_int32)(bval * valg * norm + 0.5);
-                bval2 = L_MIN(255, bval2);
-                composeRGBPixel(rval2, gval2, bval2, lined + j);
-            }
-        }
-    }
-
-    return pixd;
-}
-
-
 /*-------------------------------------------------------------*
  *                Grayscale threshold operation                *
  *-------------------------------------------------------------*/
 /*!
  * \brief   pixThresholdToValue()
  *
- * \param[in]    pixd       [optional]; if not null, must be equal to pixs
- * \param[in]    pixs       8, 16, 32 bpp
+ * \param[in]    pixd [optional]; if not null, must be equal to pixs
+ * \param[in]    pixs 8, 16, 32 bpp
  * \param[in]    threshval
  * \param[in]    setval
  * \return  pixd always
@@ -521,9 +433,9 @@ PIX       *pixd;
  * <pre>
  * Notes:
  *    ~ operation can be in-place (pixs == pixd) or to a new pixd
- *    ~ if %setval > %threshval, sets pixels with a value >= threshval to setval
- *    ~ if %setval < %threshval, sets pixels with a value <= threshval to setval
- *    ~ if %setval == %threshval, no-op
+ *    ~ if setval > threshval, sets pixels with a value >= threshval to setval
+ *    ~ if setval < threshval, sets pixels with a value <= threshval to setval
+ *    ~ if setval == threshval, no-op
  * </pre>
  */
 PIX *
@@ -535,24 +447,26 @@ pixThresholdToValue(PIX      *pixd,
 l_int32    i, j, w, h, d, wpld, setabove;
 l_uint32  *datad, *lined;
 
+    PROCNAME("pixThresholdToValue");
+
     if (!pixs)
-        return (PIX *)ERROR_PTR("pixs not defined", __func__, pixd);
+        return (PIX *)ERROR_PTR("pixs not defined", procName, pixd);
     d = pixGetDepth(pixs);
     if (d != 8 && d != 16 && d != 32)
-        return (PIX *)ERROR_PTR("pixs not 8, 16 or 32 bpp", __func__, pixd);
+        return (PIX *)ERROR_PTR("pixs not 8, 16 or 32 bpp", procName, pixd);
     if (pixd && (pixs != pixd))
-        return (PIX *)ERROR_PTR("pixd exists and is not pixs", __func__, pixd);
+        return (PIX *)ERROR_PTR("pixd exists and is not pixs", procName, pixd);
     if (threshval < 0 || setval < 0)
-        return (PIX *)ERROR_PTR("threshval & setval not < 0", __func__, pixd);
+        return (PIX *)ERROR_PTR("threshval & setval not < 0", procName, pixd);
     if (d == 8 && setval > 255)
-        return (PIX *)ERROR_PTR("setval > 255 for 8 bpp", __func__, pixd);
+        return (PIX *)ERROR_PTR("setval > 255 for 8 bpp", procName, pixd);
     if (d == 16 && setval > 0xffff)
-        return (PIX *)ERROR_PTR("setval > 0xffff for 16 bpp", __func__, pixd);
+        return (PIX *)ERROR_PTR("setval > 0xffff for 16 bpp", procName, pixd);
 
     if (!pixd)
         pixd = pixCopy(NULL, pixs);
     if (setval == threshval) {
-        L_WARNING("setval == threshval; no operation\n", __func__);
+        L_WARNING("setval == threshval; no operation\n", procName);
         return pixd;
     }
 
@@ -613,15 +527,15 @@ l_uint32  *datad, *lined;
 /*!
  * \brief   pixInitAccumulate()
  *
- * \param[in]    w, h      of accumulate array
- * \param[in]    offset    initialize the 32 bpp to have this
- *                         value; not more than 0x40000000
- * \return  pixd   32 bpp, or NULL on error
+ * \param[in]    w, h of accumulate array
+ * \param[in]    offset initialize the 32 bpp to have this
+ *                      value; not more than 0x40000000
+ * \return  pixd 32 bpp, or NULL on error
  *
  * <pre>
  * Notes:
- *      (1) %offset must be >= 0.
- *      (2) %offset is used so that we can do arithmetic
+ *      (1) The offset must be >= 0.
+ *      (2) The offset is used so that we can do arithmetic
  *          with negative number results on l_uint32 data; it
  *          prevents the l_uint32 data from going negative.
  *      (3) Because we use l_int32 intermediate data results,
@@ -630,7 +544,7 @@ l_uint32  *datad, *lined;
  *          which is half way between 0 and the max of l_int32.
  *      (4) The same offset should be used for initialization,
  *          multiplication by a constant, and final extraction!
- *      (5) If you're only adding positive values, %offset can be 0.
+ *      (5) If you're only adding positive values, offset can be 0.
  * </pre>
  */
 PIX *
@@ -640,8 +554,10 @@ pixInitAccumulate(l_int32   w,
 {
 PIX  *pixd;
 
+    PROCNAME("pixInitAccumulate");
+
     if ((pixd = pixCreate(w, h, 32)) == NULL)
-        return (PIX *)ERROR_PTR("pixd not made", __func__, NULL);
+        return (PIX *)ERROR_PTR("pixd not made", procName, NULL);
     if (offset > 0x40000000)
         offset = 0x40000000;
     pixSetAllArbitrary(pixd, offset);
@@ -652,15 +568,15 @@ PIX  *pixd;
 /*!
  * \brief   pixFinalAccumulate()
  *
- * \param[in]    pixs     32 bpp
- * \param[in]    offset   same as used for initialization
- * \param[in]    depth    8, 16 or 32 bpp, of destination
- * \return  pixd   8, 16 or 32 bpp, or NULL on error
+ * \param[in]    pixs 32 bpp
+ * \param[in]    offset same as used for initialization
+ * \param[in]    depth  8, 16 or 32 bpp, of destination
+ * \return  pixd 8, 16 or 32 bpp, or NULL on error
  *
  * <pre>
  * Notes:
- *      (1) %offset must be >= 0 and should not exceed 0x40000000.
- *      (2) %offset is subtracted from the src 32 bpp image
+ *      (1) The offset must be >= 0 and should not exceed 0x40000000.
+ *      (2) The offset is subtracted from the src 32 bpp image
  *      (3) For 8 bpp dest, the result is clipped to [0, 0xff]
  *      (4) For 16 bpp dest, the result is clipped to [0, 0xffff]
  * </pre>
@@ -674,18 +590,20 @@ l_int32    i, j, w, h, wpls, wpld, val;
 l_uint32  *datas, *datad, *lines, *lined;
 PIX       *pixd;
 
+    PROCNAME("pixFinalAccumulate");
+
     if (!pixs)
-        return (PIX *)ERROR_PTR("pixs not defined", __func__, NULL);
+        return (PIX *)ERROR_PTR("pixs not defined", procName, NULL);
     if (pixGetDepth(pixs) != 32)
-        return (PIX *)ERROR_PTR("pixs not 32 bpp", __func__, NULL);
+        return (PIX *)ERROR_PTR("pixs not 32 bpp", procName, NULL);
     if (depth != 8 && depth != 16 && depth != 32)
-        return (PIX *)ERROR_PTR("dest depth not 8, 16, 32 bpp", __func__, NULL);
+        return (PIX *)ERROR_PTR("dest depth not 8, 16, 32 bpp", procName, NULL);
     if (offset > 0x40000000)
         offset = 0x40000000;
 
     pixGetDimensions(pixs, &w, &h, NULL);
     if ((pixd = pixCreate(w, h, depth)) == NULL)
-        return (PIX *)ERROR_PTR("pixd not made", __func__, NULL);
+        return (PIX *)ERROR_PTR("pixd not made", procName, NULL);
     pixCopyResolution(pixd, pixs);  /* but how did pixs get it initially? */
     datas = pixGetData(pixs);
     datad = pixGetData(pixd);
@@ -729,15 +647,15 @@ PIX       *pixd;
 /*!
  * \brief   pixFinalAccumulateThreshold()
  *
- * \param[in]    pixs        32 bpp
- * \param[in]    offset      same as used for initialization
- * \param[in]    threshold   values less than this are set in the destination
- * \return  pixd   1 bpp, or NULL on error
+ * \param[in]    pixs 32 bpp
+ * \param[in]    offset same as used for initialization
+ * \param[in]    threshold values less than this are set in the destination
+ * \return  pixd 1 bpp, or NULL on error
  *
  * <pre>
  * Notes:
- *      (1) %offset must be >= 0 and should not exceed 0x40000000.
- *      (2) %offset is subtracted from the src 32 bpp image
+ *      (1) The offset must be >= 0 and should not exceed 0x40000000.
+ *      (2) The offset is subtracted from the src 32 bpp image
  * </pre>
  */
 PIX *
@@ -749,16 +667,18 @@ l_int32    i, j, w, h, wpls, wpld, val;
 l_uint32  *datas, *datad, *lines, *lined;
 PIX       *pixd;
 
+    PROCNAME("pixFinalAccumulateThreshold");
+
     if (!pixs)
-        return (PIX *)ERROR_PTR("pixs not defined", __func__, NULL);
+        return (PIX *)ERROR_PTR("pixs not defined", procName, NULL);
     if (pixGetDepth(pixs) != 32)
-        return (PIX *)ERROR_PTR("pixs not 32 bpp", __func__, NULL);
+        return (PIX *)ERROR_PTR("pixs not 32 bpp", procName, NULL);
     if (offset > 0x40000000)
         offset = 0x40000000;
 
     pixGetDimensions(pixs, &w, &h, NULL);
     if ((pixd = pixCreate(w, h, 1)) == NULL)
-        return (PIX *)ERROR_PTR("pixd not made", __func__, NULL);
+        return (PIX *)ERROR_PTR("pixd not made", procName, NULL);
     pixCopyResolution(pixd, pixs);  /* but how did pixs get it initially? */
     datas = pixGetData(pixs);
     datad = pixGetData(pixd);
@@ -782,9 +702,9 @@ PIX       *pixd;
 /*!
  * \brief   pixAccumulate()
  *
- * \param[in]    pixd    32 bpp
- * \param[in]    pixs    1, 8, 16 or 32 bpp
- * \param[in]    op      L_ARITH_ADD or L_ARITH_SUBTRACT
+ * \param[in]    pixd 32 bpp
+ * \param[in]    pixs 1, 8, 16 or 32 bpp
+ * \param[in]    op  L_ARITH_ADD or L_ARITH_SUBTRACT
  * \return  0 if OK; 1 on error
  *
  * <pre>
@@ -795,7 +715,7 @@ PIX       *pixd;
  *      (3) The alignment is to the origin [UL corner] of pixs & pixd.
  * </pre>
  */
-l_ok
+l_int32
 pixAccumulate(PIX     *pixd,
               PIX     *pixs,
               l_int32  op)
@@ -804,16 +724,18 @@ l_int32    i, j, w, h, d, wd, hd, wpls, wpld;
 l_uint32  *datas, *datad, *lines, *lined;
 
 
+    PROCNAME("pixAccumulate");
+
     if (!pixd || (pixGetDepth(pixd) != 32))
-        return ERROR_INT("pixd not defined or not 32 bpp", __func__, 1);
+        return ERROR_INT("pixd not defined or not 32 bpp", procName, 1);
     if (!pixs)
-        return ERROR_INT("pixs not defined", __func__, 1);
+        return ERROR_INT("pixs not defined", procName, 1);
     d = pixGetDepth(pixs);
     if (d != 1 && d != 8 && d != 16 && d != 32)
-        return ERROR_INT("pixs not 1, 8, 16 or 32 bpp", __func__, 1);
+        return ERROR_INT("pixs not 1, 8, 16 or 32 bpp", procName, 1);
     if (op != L_ARITH_ADD && op != L_ARITH_SUBTRACT)
         return ERROR_INT("op must be in {L_ARITH_ADD, L_ARITH_SUBTRACT}",
-                         __func__, 1);
+                         procName, 1);
 
     datas = pixGetData(pixs);
     datad = pixGetData(pixd);
@@ -880,19 +802,19 @@ l_uint32  *datas, *datad, *lines, *lined;
 /*!
  * \brief   pixMultConstAccumulate()
  *
- * \param[in]    pixs      32 bpp
+ * \param[in]    pixs 32 bpp
  * \param[in]    factor
- * \param[in]    offset    same as used for initialization
+ * \param[in]    offset same as used for initialization
  * \return  0 if OK; 1 on error
  *
  * <pre>
  * Notes:
- *      (1) %offset must be >= 0 and should not exceed 0x40000000.
- *      (2) This multiplies each pixel, relative to offset, by %factor.
- *      (3) The result is returned with %offset back in place.
+ *      (1) The offset must be >= 0 and should not exceed 0x40000000.
+ *      (2) This multiplies each pixel, relative to offset, by the input factor
+ *      (3) The result is returned with the offset back in place.
  * </pre>
  */
-l_ok
+l_int32
 pixMultConstAccumulate(PIX       *pixs,
                        l_float32  factor,
                        l_uint32   offset)
@@ -900,10 +822,12 @@ pixMultConstAccumulate(PIX       *pixs,
 l_int32    i, j, w, h, wpl, val;
 l_uint32  *data, *line;
 
+    PROCNAME("pixMultConstAccumulate");
+
     if (!pixs)
-        return ERROR_INT("pixs not defined", __func__, 1);
+        return ERROR_INT("pixs not defined", procName, 1);
     if (pixGetDepth(pixs) != 32)
-        return ERROR_INT("pixs not 32 bpp", __func__, 1);
+        return ERROR_INT("pixs not 32 bpp", procName, 1);
     if (offset > 0x40000000)
         offset = 0x40000000;
 
@@ -930,7 +854,7 @@ l_uint32  *data, *line;
 /*!
  * \brief   pixAbsDifference()
  *
- * \param[in]    pixs1, pixs2    both either 8 or 16 bpp gray, or 32 bpp RGB
+ * \param[in]    pixs1, pixs2  both either 8 or 16 bpp gray, or 32 bpp RGB
  * \return  pixd, or NULL on error
  *
  * <pre>
@@ -953,22 +877,24 @@ l_int32    rval1, gval1, bval1, rval2, gval2, bval2, rdiff, gdiff, bdiff;
 l_uint32  *datas1, *datas2, *datad, *lines1, *lines2, *lined;
 PIX       *pixd;
 
+    PROCNAME("pixAbsDifference");
+
     if (!pixs1)
-        return (PIX *)ERROR_PTR("pixs1 not defined", __func__, NULL);
+        return (PIX *)ERROR_PTR("pixs1 not defined", procName, NULL);
     if (!pixs2)
-        return (PIX *)ERROR_PTR("pixs2 not defined", __func__, NULL);
+        return (PIX *)ERROR_PTR("pixs2 not defined", procName, NULL);
     d = pixGetDepth(pixs1);
     if (d != pixGetDepth(pixs2))
-        return (PIX *)ERROR_PTR("src1 and src2 depths unequal", __func__, NULL);
+        return (PIX *)ERROR_PTR("src1 and src2 depths unequal", procName, NULL);
     if (d != 8 && d != 16 && d != 32)
-        return (PIX *)ERROR_PTR("depths not in {8, 16, 32}", __func__, NULL);
+        return (PIX *)ERROR_PTR("depths not in {8, 16, 32}", procName, NULL);
 
     pixGetDimensions(pixs1, &w, &h, NULL);
     pixGetDimensions(pixs2, &w2, &h2, NULL);
     w = L_MIN(w, w2);
     h = L_MIN(h, h2);
     if ((pixd = pixCreate(w, h, d)) == NULL)
-        return (PIX *)ERROR_PTR("pixd not made", __func__, NULL);
+        return (PIX *)ERROR_PTR("pixd not made", procName, NULL);
     pixCopyResolution(pixd, pixs1);
     datas1 = pixGetData(pixs1);
     datas2 = pixGetData(pixs2);
@@ -1026,7 +952,7 @@ PIX       *pixd;
 /*!
  * \brief   pixAddRGB()
  *
- * \param[in]    pixs1, pixs2    32 bpp RGB, or colormapped
+ * \param[in]    pixs1, pixs2  32 bpp RGB, or colormapped
  * \return  pixd, or NULL on error
  *
  * <pre>
@@ -1048,16 +974,18 @@ l_int32    rval1, gval1, bval1, rval2, gval2, bval2, rval, gval, bval;
 l_uint32  *datac1, *datac2, *datad, *linec1, *linec2, *lined;
 PIX       *pixc1, *pixc2, *pixd;
 
+    PROCNAME("pixAddRGB");
+
     if (!pixs1)
-        return (PIX *)ERROR_PTR("pixs1 not defined", __func__, NULL);
+        return (PIX *)ERROR_PTR("pixs1 not defined", procName, NULL);
     if (!pixs2)
-        return (PIX *)ERROR_PTR("pixs2 not defined", __func__, NULL);
+        return (PIX *)ERROR_PTR("pixs2 not defined", procName, NULL);
     pixGetDimensions(pixs1, &w, &h, &d);
     pixGetDimensions(pixs2, &w2, &h2, &d2);
     if (!pixGetColormap(pixs1) && d != 32)
-        return (PIX *)ERROR_PTR("pixs1 not cmapped or rgb", __func__, NULL);
+        return (PIX *)ERROR_PTR("pixs1 not cmapped or rgb", procName, NULL);
     if (!pixGetColormap(pixs2) && d2 != 32)
-        return (PIX *)ERROR_PTR("pixs2 not cmapped or rgb", __func__, NULL);
+        return (PIX *)ERROR_PTR("pixs2 not cmapped or rgb", procName, NULL);
     if (pixGetColormap(pixs1))
         pixc1 = pixRemoveColormap(pixs1, REMOVE_CMAP_TO_FULL_COLOR);
     else
@@ -1103,11 +1031,11 @@ PIX       *pixc1, *pixc2, *pixd;
 /*!
  * \brief   pixMinOrMax()
  *
- * \param[in]    pixd     [optional] destination: this can be null,
- *                        equal to pixs1, or different from pixs1
- * \param[in]    pixs1    can be equal to pixd
+ * \param[in]    pixd  [optional] destination: this can be null,
+ *                     equal to pixs1, or different from pixs1
+ * \param[in]    pixs1 can be == to pixd
  * \param[in]    pixs2
- * \param[in]    type     L_CHOOSE_MIN, L_CHOOSE_MAX
+ * \param[in]    type L_CHOOSE_MIN, L_CHOOSE_MAX
  * \return  pixd always
  *
  * <pre>
@@ -1117,9 +1045,9 @@ PIX       *pixc1, *pixc2, *pixd;
  *          for a 3 component image.  For 32 bpp, ignore the LSB
  *          of each word (the alpha channel)
  *      (3) There are 3 cases:
- *          ~  if pixd == null,   MinOrMax(src1, src2) --> new pixd
- *          ~  if pixd == pixs1,  MinOrMax(src1, src2) --> src1  (in-place)
- *          ~  if pixd != pixs1,  MinOrMax(src1, src2) --> input pixd
+ *          ~  if pixd == null,   Min(src1, src2) --> new pixd
+ *          ~  if pixd == pixs1,  Min(src1, src2) --> src1  (in-place)
+ *          ~  if pixd != pixs1,  Min(src1, src2) --> input pixd
  * </pre>
  */
 PIX *
@@ -1132,19 +1060,21 @@ l_int32    d, ws, hs, w, h, wpls, wpld, i, j, vals, vald, val;
 l_int32    rval1, gval1, bval1, rval2, gval2, bval2, rval, gval, bval;
 l_uint32  *datas, *datad, *lines, *lined;
 
+    PROCNAME("pixMinOrMax");
+
     if (!pixs1)
-        return (PIX *)ERROR_PTR("pixs1 not defined", __func__, pixd);
+        return (PIX *)ERROR_PTR("pixs1 not defined", procName, pixd);
     if (!pixs2)
-        return (PIX *)ERROR_PTR("pixs2 not defined", __func__, pixd);
+        return (PIX *)ERROR_PTR("pixs2 not defined", procName, pixd);
     if (pixs1 == pixs2)
-        return (PIX *)ERROR_PTR("pixs1 and pixs2 must differ", __func__, pixd);
+        return (PIX *)ERROR_PTR("pixs1 and pixs2 must differ", procName, pixd);
     if (type != L_CHOOSE_MIN && type != L_CHOOSE_MAX)
-        return (PIX *)ERROR_PTR("invalid type", __func__, pixd);
+        return (PIX *)ERROR_PTR("invalid type", procName, pixd);
     d = pixGetDepth(pixs1);
     if (pixGetDepth(pixs2) != d)
-        return (PIX *)ERROR_PTR("depths unequal", __func__, pixd);
+        return (PIX *)ERROR_PTR("depths unequal", procName, pixd);
     if (d != 8 && d != 16 && d != 32)
-        return (PIX *)ERROR_PTR("depth not 8, 16 or 32 bpp", __func__, pixd);
+        return (PIX *)ERROR_PTR("depth not 8, 16 or 32 bpp", procName, pixd);
 
     if (pixs1 != pixd)
         pixd = pixCopy(pixd, pixs1);
@@ -1208,9 +1138,9 @@ l_uint32  *datas, *datad, *lines, *lined;
 /*!
  * \brief   pixMaxDynamicRange()
  *
- * \param[in]    pixs    4, 8, 16 or 32 bpp source
- * \param[in]    type    L_LINEAR_SCALE or L_LOG_SCALE
- * \return  pixd    8 bpp, or NULL on error
+ * \param[in]    pixs  4, 8, 16 or 32 bpp source
+ * \param[in]    type  L_LINEAR_SCALE or L_LOG_SCALE
+ * \return  pixd 8 bpp, or NULL on error
  *
  * <pre>
  * Notes:
@@ -1234,16 +1164,18 @@ l_float32   factor;
 l_float32  *tab;
 PIX        *pixd;
 
+    PROCNAME("pixMaxDynamicRange");
+
     if (!pixs)
-        return (PIX *)ERROR_PTR("pixs not defined", __func__, NULL);
+        return (PIX *)ERROR_PTR("pixs not defined", procName, NULL);
     pixGetDimensions(pixs, &w, &h, &d);
     if (d != 4 && d != 8 && d != 16 && d != 32)
-        return (PIX *)ERROR_PTR("pixs not in {4,8,16,32} bpp", __func__, NULL);
+        return (PIX *)ERROR_PTR("pixs not in {4,8,16,32} bpp", procName, NULL);
     if (type != L_LINEAR_SCALE && type != L_LOG_SCALE)
-        return (PIX *)ERROR_PTR("invalid type", __func__, NULL);
+        return (PIX *)ERROR_PTR("invalid type", procName, NULL);
 
     if ((pixd = pixCreate(w, h, 8)) == NULL)
-        return (PIX *)ERROR_PTR("pixd not made", __func__, NULL);
+        return (PIX *)ERROR_PTR("pixd not made", procName, NULL);
     pixCopyResolution(pixd, pixs);
     datas = pixGetData(pixs);
     datad = pixGetData(pixd);
@@ -1282,7 +1214,7 @@ PIX        *pixd;
         /* Map to the full dynamic range */
     if (d == 4) {
         if (type == L_LINEAR_SCALE) {
-            factor = 255.f / (l_float32)max;
+            factor = 255. / (l_float32)max;
             for (i = 0; i < h; i++) {
                 lines = datas + i * wpls;
                 lined = datad + i * wpld;
@@ -1294,7 +1226,7 @@ PIX        *pixd;
             }
         } else {  /* type == L_LOG_SCALE) */
             tab = makeLogBase2Tab();
-            factor = 255.f / getLogBase2(max, tab);
+            factor = 255. / getLogBase2(max, tab);
             for (i = 0; i < h; i++) {
                 lines = datas + i * wpls;
                 lined = datad + i * wpld;
@@ -1308,7 +1240,7 @@ PIX        *pixd;
         }
     } else if (d == 8) {
         if (type == L_LINEAR_SCALE) {
-            factor = 255.f / (l_float32)max;
+            factor = 255. / (l_float32)max;
             for (i = 0; i < h; i++) {
                 lines = datas + i * wpls;
                 lined = datad + i * wpld;
@@ -1320,7 +1252,7 @@ PIX        *pixd;
             }
         } else {  /* type == L_LOG_SCALE) */
             tab = makeLogBase2Tab();
-            factor = 255.f / getLogBase2(max, tab);
+            factor = 255. / getLogBase2(max, tab);
             for (i = 0; i < h; i++) {
                 lines = datas + i * wpls;
                 lined = datad + i * wpld;
@@ -1334,7 +1266,7 @@ PIX        *pixd;
         }
     } else if (d == 16) {
         if (type == L_LINEAR_SCALE) {
-            factor = 255.f / (l_float32)max;
+            factor = 255. / (l_float32)max;
             for (i = 0; i < h; i++) {
                 lines = datas + i * wpls;
                 lined = datad + i * wpld;
@@ -1346,7 +1278,7 @@ PIX        *pixd;
             }
         } else {  /* type == L_LOG_SCALE) */
             tab = makeLogBase2Tab();
-            factor = 255.f / getLogBase2(max, tab);
+            factor = 255. / getLogBase2(max, tab);
             for (i = 0; i < h; i++) {
                 lines = datas + i * wpls;
                 lined = datad + i * wpld;
@@ -1360,7 +1292,7 @@ PIX        *pixd;
         }
     } else {  /* d == 32 */
         if (type == L_LINEAR_SCALE) {
-            factor = 255.f / (l_float32)max;
+            factor = 255. / (l_float32)max;
             for (i = 0; i < h; i++) {
                 lines = datas + i * wpls;
                 lined = datad + i * wpld;
@@ -1372,7 +1304,7 @@ PIX        *pixd;
             }
         } else {  /* type == L_LOG_SCALE) */
             tab = makeLogBase2Tab();
-            factor = 255.f / getLogBase2(max, tab);
+            factor = 255. / getLogBase2(max, tab);
             for (i = 0; i < h; i++) {
                 lines = datas + i * wpls;
                 lined = datad + i * wpld;
@@ -1393,15 +1325,15 @@ PIX        *pixd;
 /*!
  * \brief   pixMaxDynamicRangeRGB()
  *
- * \param[in]    pixs    32 bpp rgb source
- * \param[in]    type    L_LINEAR_SCALE or L_LOG_SCALE
- * \return  pixd   32 bpp, or NULL on error
+ * \param[in]    pixs  32 bpp rgb source
+ * \param[in]    type  L_LINEAR_SCALE or L_LOG_SCALE
+ * \return  pixd 32 bpp, or NULL on error
  *
  * <pre>
  * Notes:
  *      (1) Scales pixel values to fit maximally within a 32 bpp dest pixd
  *      (2) All color components are scaled with the same factor, based
- *          on the maximum r, g or b component in the image.  This should
+ *          on the maximum r,g or b component in the image.  This should
  *          not be used if the 32-bit value is a single number (e.g., a
  *          count in a histogram generated by pixMakeHistoHS()).
  *      (3) Uses a LUT for log scaling.
@@ -1419,10 +1351,12 @@ l_float32   factor;
 l_float32  *tab;
 PIX        *pixd;
 
+    PROCNAME("pixMaxDynamicRangeRGB");
+
     if (!pixs || pixGetDepth(pixs) != 32)
-        return (PIX *)ERROR_PTR("pixs undefined or not 32 bpp", __func__, NULL);
+        return (PIX *)ERROR_PTR("pixs undefined or not 32 bpp", procName, NULL);
     if (type != L_LINEAR_SCALE && type != L_LOG_SCALE)
-        return (PIX *)ERROR_PTR("invalid type", __func__, NULL);
+        return (PIX *)ERROR_PTR("invalid type", procName, NULL);
 
         /* Get max */
     pixd = pixCreateTemplate(pixs);
@@ -1441,14 +1375,10 @@ PIX        *pixd;
             max = L_MAX(max, (word >> 8) & 0xff);
         }
     }
-    if (max == 0) {
-        L_WARNING("max = 0; setting to 1\n", __func__);
-        max = 1;
-    }
 
         /* Map to the full dynamic range */
     if (type == L_LINEAR_SCALE) {
-        factor = 255.f / (l_float32)max;
+        factor = 255. / (l_float32)max;
         for (i = 0; i < h; i++) {
             lines = datas + i * wpls;
             lined = datad + i * wpld;
@@ -1460,7 +1390,7 @@ PIX        *pixd;
         }
     } else {  /* type == L_LOG_SCALE) */
         tab = makeLogBase2Tab();
-        factor = 255.f / getLogBase2(max, tab);
+        factor = 255. / getLogBase2(max, tab);
         for (i = 0; i < h; i++) {
             lines = datas + i * wpls;
             lined = datad + i * wpld;
@@ -1483,8 +1413,8 @@ PIX        *pixd;
 /*!
  * \brief   linearScaleRGBVal()
  *
- * \param[in]    sval     32-bit rgb pixel value
- * \param[in]    factor   multiplication factor on each component
+ * \param[in]    sval   32-bit rgb pixel value
+ * \param[in]    factor multiplication factor on each component
  * \return  dval  linearly scaled version of %sval
  *
  * <pre>
@@ -1494,7 +1424,6 @@ PIX        *pixd;
  *          Otherwise, the product will overflow a uint8.  In use, factor
  *          is the same for all pixels in a pix.
  *      (2) No scaling is performed on the transparency ("A") component.
- * </pre>
  */
 l_uint32
 linearScaleRGBVal(l_uint32   sval,
@@ -1502,9 +1431,9 @@ linearScaleRGBVal(l_uint32   sval,
 {
 l_uint32  dval;
 
-    dval = ((l_uint8)(factor * (sval >> 24) + 0.5f) << 24) |
-           ((l_uint8)(factor * ((sval >> 16) & 0xff) + 0.5f) << 16) |
-           ((l_uint8)(factor * ((sval >> 8) & 0xff) + 0.5f) << 8) |
+    dval = ((l_uint8)(factor * (sval >> 24) + 0.5) << 24) |
+           ((l_uint8)(factor * ((sval >> 16) & 0xff) + 0.5) << 16) |
+           ((l_uint8)(factor * ((sval >> 8) & 0xff) + 0.5) << 8) |
            (sval & 0xff);
     return dval;
 }
@@ -1513,9 +1442,9 @@ l_uint32  dval;
 /*!
  * \brief   logScaleRGBVal()
  *
- * \param[in]    sval     32-bit rgb pixel value
- * \param[in]    tab      256 entry log-base-2 table
- * \param[in]    factor   multiplication factor on each component
+ * \param[in]    sval   32-bit rgb pixel value
+ * \param[in]    tab  256 entry log-base-2 table
+ * \param[in]    factor multiplication factor on each component
  * \return  dval  log scaled version of %sval
  *
  * <pre>
@@ -1536,10 +1465,10 @@ logScaleRGBVal(l_uint32    sval,
 {
 l_uint32  dval;
 
-    dval = ((l_uint8)(factor * getLogBase2(sval >> 24, tab) + 0.5f) << 24) |
-           ((l_uint8)(factor * getLogBase2(((sval >> 16) & 0xff), tab) + 0.5f)
+    dval = ((l_uint8)(factor * getLogBase2(sval >> 24, tab) + 0.5) << 24) |
+           ((l_uint8)(factor * getLogBase2(((sval >> 16) & 0xff), tab) + 0.5)
                      << 16) |
-           ((l_uint8)(factor * getLogBase2(((sval >> 8) & 0xff), tab) + 0.5f)
+           ((l_uint8)(factor * getLogBase2(((sval >> 8) & 0xff), tab) + 0.5)
                      << 8) |
            (sval & 0xff);
     return dval;
@@ -1561,8 +1490,10 @@ l_int32     i;
 l_float32   log2;
 l_float32  *tab;
 
+    PROCNAME("makeLogBase2Tab");
+
     if ((tab = (l_float32 *)LEPT_CALLOC(256, sizeof(l_float32))) == NULL)
-        return (l_float32 *)ERROR_PTR("tab not made", __func__, NULL);
+        return (l_float32 *)ERROR_PTR("tab not made", procName, NULL);
 
     log2 = (l_float32)log((l_float32)2);
     for (i = 0; i < 256; i++)
@@ -1575,23 +1506,25 @@ l_float32  *tab;
 /*
  * \brief   getLogBase2()
  *
- * \param[in]    val       in range [0 ... 255]
- * \param[in]    logtab    256-entry table of logs
- * \return       logval    log[base2] of %val, or 0 on error
+ * \param[in]    val   in range [0 ... 255]
+ * \param[in]    logtab  256-entry table of logs
+ * \return       logval  log[base2] of %val, or 0 on error
  */
 l_float32
 getLogBase2(l_int32     val,
             l_float32  *logtab)
 {
+    PROCNAME("getLogBase2");
+
     if (!logtab)
-        return ERROR_INT("logtab not defined", __func__, 0);
+        return ERROR_INT("logtab not defined", procName, 0);
 
     if (val < 0x100)
         return logtab[val];
     else if (val < 0x10000)
-        return 8.0f + logtab[val >> 8];
+        return 8.0 + logtab[val >> 8];
     else if (val < 0x1000000)
-        return 16.0f + logtab[val >> 16];
+        return 16.0 + logtab[val >> 16];
     else
-        return 24.0f + logtab[val >> 24];
+        return 24.0 + logtab[val >> 24];
 }

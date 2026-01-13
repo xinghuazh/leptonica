@@ -45,7 +45,6 @@
  *    Read/write to memory
  *          PIX             *pixReadMemJpeg()
  *          l_int32          readHeaderMemJpeg()
- *          l_int32          readResolutionMemJpeg()
  *          l_int32          pixWriteMemJpeg()
  *
  *    Setting special flag for chroma sampling on write
@@ -90,12 +89,11 @@
  *
  *    How to avoid subsampling the chroma channels
  *    --------------------------------------------
- *    By default, the U,V (chroma) channels use 2x2 subsampling (aka 4.2.0).
- *    Higher quality for color, using full resolution (4.4.4) for the chroma,
- *    is obtained by setting a field in the pix before writing:
- *        pixSetChromaSampling(pix, L_NO_CHROMA_SAMPLING_JPEG);
- *    The field can be reset for default 4.2.0 subsampling with
- *        pixSetChromaSampling(pix, 0);
+ *    When writing, you can avoid subsampling the U,V (chroma)
+ *    channels.  This gives higher quality for the color, which is
+ *    important for some situations.  The default subsampling is 2x2 on
+ *    both channels.  Before writing, call pixSetChromaSampling(pix, 0)
+ *    to prevent chroma subsampling.
  *
  *    How to extract just the luminance channel in reading RGB
  *    --------------------------------------------------------
@@ -103,31 +101,37 @@
  *    can extract just the 8 bpp luminance channel, using pixReadJpeg(),
  *    where you use L_JPEG_READ_LUMINANCE for the %hint arg.
  *
- *    How to continue to read if the data is corrupted
- *    ------------------------------------------------
- *    By default, if data is corrupted we make every effort to fail
- *    to return a pix.  (Failure is not always possible with bad
- *    data, because in some situations, such as during arithmetic
- *    decoding, the low-level jpeg library will not abort or raise
- *    a warning.)  To attempt to ignore warnings and get a pix when data
- *    is corrupted, use L_JPEG_CONTINUE_WITH_BAD_DATA in the %hint arg.
+ *    How to fail to read if the data is corrupted
+ *    ---------------------------------------------
+ *    By default, if the low-level jpeg library functions do not abort,
+ *    a pix will be returned, even if the data is corrupted and warnings
+ *    are issued.  In order to be most likely to fail to read when there
+ *    is data corruption, use L_JPEG_FAIL_ON_BAD_DATA in the %hint arg.
  *
  *    Compressing to memory and decompressing from memory
  *    ---------------------------------------------------
- *    On systems like Windows without fmemopen() and open_memstream(),
+ *    On systems like windows without fmemopen() and open_memstream(),
  *    we write data to a temp file and read it back for operations
  *    between pix and compressed-data, such as pixReadMemJpeg() and
  *    pixWriteMemJpeg().
+ *
+ *    Vestigial code: parsing the jpeg file for header metadata
+ *    ---------------------------------------------------------
+ *    For extracting header metadata, we previously parsed the file, looking
+ *    for specific markers.  This is error-prone because of non-standard
+ *    jpeg files, and we now use readHeaderJpeg() and readHeaderMemJpeg().
+ *    The vestigial code is retained in jpegio_notused.c to help you
+ *    understand a bit about how to parse jpeg markers.  It is not compiled
+ *    into the library.
  * </pre>
  */
 
 #ifdef HAVE_CONFIG_H
-#include <config_auto.h>
+#include "config_auto.h"
 #endif  /* HAVE_CONFIG_H */
 
 #include <string.h>
 #include "allheaders.h"
-#include "pix_internal.h"
 
 /* --------------------------------------------*/
 #if  HAVE_LIBJPEG   /* defined in environ.h */
@@ -148,7 +152,7 @@ static void jpeg_error_catch_all_2(j_common_ptr cinfo);
 static l_uint8 jpeg_getc(j_decompress_ptr cinfo);
 
     /* Note: 'boolean' is defined in jmorecfg.h.  We use it explicitly
-     * here because for Windows where __MINGW32__ is defined,
+     * here because for windows where __MINGW32__ is defined,
      * the prototype for jpeg_comment_callback() is given as
      * returning a boolean.  */
 static boolean jpeg_comment_callback(j_decompress_ptr cinfo);
@@ -173,12 +177,12 @@ struct callback_data {
  * \brief   pixReadJpeg()
  *
  * \param[in]    filename
- * \param[in]    cmapflag   0 for no colormap in returned pix;
- *                          1 to return an 8 bpp cmapped pix if spp = 3 or 4
- * \param[in]    reduction  scaling factor: 1, 2, 4 or 8
- * \param[out]   pnwarn     [optional] number of warnings about
- *                          corrupted data
- * \param[in]    hint       a bitwise OR of L_JPEG_* values; 0 for default
+ * \param[in]    cmapflag 0 for no colormap in returned pix;
+ *                        1 to return an 8 bpp cmapped pix if spp = 3 or 4
+ * \param[in]    reduction scaling factor: 1, 2, 4 or 8
+ * \param[out]   pnwarn [optional] number of warnings about
+ *                       corrupted data
+ * \param[in]    hint a bitwise OR of L_JPEG_* values; 0 for default
  * \return  pix, or NULL on error
  *
  * <pre>
@@ -188,21 +192,21 @@ struct callback_data {
  *          an 8 bpp colormapped image.
  *      (3) Images reduced by factors of 2, 4 or 8 can be returned
  *          significantly faster than full resolution images.
- *      (4) If the jpeg data is bad, depending on the severity of the
- *          data corruption one of two things will happen:
- *          (a) 0 or more warnings are generated, or
- *          (b) the library will immediately attempt to exit. This is
- *              caught by our error handler and no pix will be returned.
- *          If data corruption causes a warning, the default action
- *          is to abort the read. The reason is that malformed jpeg
- *          data sequences exist that prevent termination of the read.
- *          To allow the decoding to continue after corrupted data is
- *          encountered, include L_JPEG_CONTINUE_WITH_BAD_DATA in %hint.
+ *      (4) If the jpeg data is bad, the jpeg library will continue
+ *          silently, or return warnings, or attempt to exit.  Depending
+ *          on the severity of the data corruption, there are two possible
+ *          outcomes:
+ *          (a) a possibly damaged pix can be generated, along with zero
+ *              or more warnings, or
+ *          (b) the library will attempt to exit (caught by our error
+ *              handler) and no pix will be returned.
+ *          If a pix is generated with at least one warning of data
+ *          corruption, and if L_JPEG_FAIL_ON_BAD_DATA is included in %hint,
+ *          no pix will be returned.
  *      (5) The possible hint values are given in the enum in imageio.h:
  *            * L_JPEG_READ_LUMINANCE
- *            * L_JPEG_CONTINUE_WITH_BAD_DATA
- *          Default (0) is to do neither, and to fail on warning of data
- *          corruption.
+ *            * L_JPEG_FAIL_ON_BAD_DATA
+ *          Default (0) is to do neither.
  * </pre>
  */
 PIX *
@@ -217,17 +221,18 @@ l_uint8  *comment;
 FILE     *fp;
 PIX      *pix;
 
+    PROCNAME("pixReadJpeg");
+
     if (pnwarn) *pnwarn = 0;
     if (!filename)
-        return (PIX *)ERROR_PTR("filename not defined", __func__, NULL);
+        return (PIX *)ERROR_PTR("filename not defined", procName, NULL);
     if (cmapflag != 0 && cmapflag != 1)
         cmapflag = 0;  /* default */
     if (reduction != 1 && reduction != 2 && reduction != 4 && reduction != 8)
-        return (PIX *)ERROR_PTR("reduction not in {1,2,4,8}", __func__, NULL);
+        return (PIX *)ERROR_PTR("reduction not in {1,2,4,8}", procName, NULL);
 
     if ((fp = fopenReadStream(filename)) == NULL)
-        return (PIX *)ERROR_PTR_1("image file not found",
-                                  filename, __func__, NULL);
+        return (PIX *)ERROR_PTR("image file not found", procName, NULL);
     pix = pixReadStreamJpeg(fp, cmapflag, reduction, pnwarn, hint);
     if (pix) {
         ret = fgetJpegComment(fp, &comment);
@@ -238,8 +243,7 @@ PIX      *pix;
     fclose(fp);
 
     if (!pix)
-        return (PIX *)ERROR_PTR_1("image not returned",
-                                  filename, __func__, NULL);
+        return (PIX *)ERROR_PTR("image not returned", procName, NULL);
     return pix;
 }
 
@@ -247,18 +251,18 @@ PIX      *pix;
 /*!
  * \brief   pixReadStreamJpeg()
  *
- * \param[in]    fp         file stream
- * \param[in]    cmapflag   0 for no colormap in returned pix;
- *                          1 to return an 8 bpp cmapped pix if spp = 3 or 4
- * \param[in]    reduction  scaling factor: 1, 2, 4 or 8
- * \param[out]   pnwarn     [optional] number of warnings
- * \param[in]    hint       a bitwise OR of L_JPEG_* values; 0 for default
+ * \param[in]    fp file stream
+ * \param[in]    cmapflag 0 for no colormap in returned pix;
+ *                        1 to return an 8 bpp cmapped pix if spp = 3 or 4
+ * \param[in]    reduction scaling factor: 1, 2, 4 or 8
+ * \param[out]   pnwarn [optional] number of warnings
+ * \param[in]    hint a bitwise OR of L_JPEG_* values; 0 for default
  * \return  pix, or NULL on error
  *
+ *  Usage: see pixReadJpeg
  * <pre>
  * Notes:
- *      (1) For usage, see pixReadJpeg().
- *      (2) The jpeg comment, if it exists, is not stored in the pix.
+ *      (1) The jpeg comment, if it exists, is not stored in the pix.
  * </pre>
  */
 PIX *
@@ -270,27 +274,28 @@ pixReadStreamJpeg(FILE     *fp,
 {
 l_int32                        cyan, yellow, magenta, black, nwarn;
 l_int32                        i, j, k, rval, gval, bval;
-l_int32                        nlinesread, abort_on_warning;
 l_int32                        w, h, wpl, spp, ncolors, cindex, ycck, cmyk;
 l_uint32                      *data;
 l_uint32                      *line, *ppixel;
 JSAMPROW                       rowbuffer;
 PIX                           *pix;
 PIXCMAP                       *cmap;
-struct jpeg_decompress_struct  cinfo = { 0 };
-struct jpeg_error_mgr          jerr = { 0 };
+struct jpeg_decompress_struct  cinfo;
+struct jpeg_error_mgr          jerr;
 jmp_buf                        jmpbuf;  /* must be local to the function */
+
+    PROCNAME("pixReadStreamJpeg");
 
     if (pnwarn) *pnwarn = 0;
     if (!fp)
-        return (PIX *)ERROR_PTR("fp not defined", __func__, NULL);
+        return (PIX *)ERROR_PTR("fp not defined", procName, NULL);
     if (cmapflag != 0 && cmapflag != 1)
         cmapflag = 0;  /* default */
     if (reduction != 1 && reduction != 2 && reduction != 4 && reduction != 8)
-        return (PIX *)ERROR_PTR("reduction not in {1,2,4,8}", __func__, NULL);
+        return (PIX *)ERROR_PTR("reduction not in {1,2,4,8}", procName, NULL);
 
     if (BITS_IN_JSAMPLE != 8)  /* set in jmorecfg.h */
-        return (PIX *)ERROR_PTR("BITS_IN_JSAMPLE != 8", __func__, NULL);
+        return (PIX *)ERROR_PTR("BITS_IN_JSAMPLE != 8", procName, NULL);
 
     rewind(fp);
     pix = NULL;
@@ -301,10 +306,9 @@ jmp_buf                        jmpbuf;  /* must be local to the function */
     jerr.error_exit = jpeg_error_catch_all_1;
     cinfo.client_data = (void *)&jmpbuf;
     if (setjmp(jmpbuf)) {
-        jpeg_destroy_decompress(&cinfo);
         pixDestroy(&pix);
         LEPT_FREE(rowbuffer);
-        return (PIX *)ERROR_PTR("internal jpeg error", __func__, NULL);
+        return (PIX *)ERROR_PTR("internal jpeg error", procName, NULL);
     }
 
         /* Initialize jpeg structs for decompression */
@@ -317,7 +321,7 @@ jmp_buf                        jmpbuf;  /* must be local to the function */
     if (hint & L_JPEG_READ_LUMINANCE) {
         cinfo.out_color_space = JCS_GRAYSCALE;
         spp = 1;
-        L_INFO("reading luminance channel only\n", __func__);
+        L_INFO("reading luminance channel only\n", procName);
     } else {
         spp = cinfo.out_color_components;
     }
@@ -328,33 +332,25 @@ jmp_buf                        jmpbuf;  /* must be local to the function */
     ycck = (cinfo.jpeg_color_space == JCS_YCCK && spp == 4 && cmapflag == 0);
     cmyk = (cinfo.jpeg_color_space == JCS_CMYK && spp == 4 && cmapflag == 0);
     if (spp != 1 && spp != 3 && !ycck && !cmyk) {
-        jpeg_destroy_decompress(&cinfo);
         return (PIX *)ERROR_PTR("spp must be 1 or 3, or YCCK or CMYK",
-                                __func__, NULL);
+                                procName, NULL);
     }
     if ((spp == 3 && cmapflag == 0) || ycck || cmyk) {  /* rgb or 4 bpp color */
-        rowbuffer = (JSAMPROW)LEPT_CALLOC(sizeof(JSAMPLE), (size_t)spp * w);
+        rowbuffer = (JSAMPROW)LEPT_CALLOC(sizeof(JSAMPLE), spp * w);
         pix = pixCreate(w, h, 32);
     } else {  /* 8 bpp gray or colormapped */
         rowbuffer = (JSAMPROW)LEPT_CALLOC(sizeof(JSAMPLE), w);
         pix = pixCreate(w, h, 8);
     }
+    pixSetInputFormat(pix, IFF_JFIF_JPEG);
     if (!rowbuffer || !pix) {
         LEPT_FREE(rowbuffer);
-        rowbuffer = NULL;
         pixDestroy(&pix);
-        jpeg_destroy_decompress(&cinfo);
-        return (PIX *)ERROR_PTR("rowbuffer or pix not made", __func__, NULL);
+        return (PIX *)ERROR_PTR("rowbuffer or pix not made", procName, NULL);
     }
-    pixSetInputFormat(pix, IFF_JFIF_JPEG);
 
-        /* Initialize decompression.
-         * Set up a colormap for color quantization if requested.
-         * Arithmetic coding is rarely used on the jpeg data, but if it
-         * is, jpeg_start_decompress() handles the decoding.
-         * With corrupted encoded data, this can take an arbitrarily
-         * long time, and fuzzers are finding examples.  Unfortunately,
-         * there is no way to get a callback from an error in this phase. */
+        /* Initialize decompression.  Set up a colormap for color
+         * quantization if requested. */
     if (spp == 1) {  /* Grayscale or colormapped */
         jpeg_start_decompress(&cinfo);
     } else {        /* Color; spp == 3 or YCCK or CMYK */
@@ -381,28 +377,21 @@ jmp_buf                        jmpbuf;  /* must be local to the function */
     wpl  = pixGetWpl(pix);
     data = pixGetData(pix);
 
-        /* Decompress.  It appears that jpeg_read_scanlines() always
-         * returns 1 when you ask for one scanline, but we test anyway.
-         * During decoding of scanlines, warnings are issued if corrupted
-         * data is found.  The default behavior is to abort reading
-         * when a warning is encountered.  By setting the hint to have
-         * the same bit set as in L_JPEG_CONTINUE_WITH_BAD_DATA, e.g.,
-         *       hint = hint | L_JPEG_CONTINUE_WITH_BAD_DATA
-         * reading will continue after warnings, in an attempt to return
-         * the (possibly corrupted) image. */
-    abort_on_warning = (hint & L_JPEG_CONTINUE_WITH_BAD_DATA) ? 0 : 1;
+        /* Decompress.  Unfortunately, we cannot use the return value
+         * from jpeg_read_scanlines() to determine if there was a problem
+         * with the data; it always appears to return 1.  We can only
+         * tell from the warnings during decoding, such as "premature
+         * end of data segment".  The default behavior is to return an
+         * image even if there are warnings.  However, by setting the
+         * hint to have the same bit flag as L_JPEG_FAIL_ON_BAD_DATA,
+         * no image will be returned if there are any warnings. */
     for (i = 0; i < h; i++) {
-        nlinesread = jpeg_read_scanlines(&cinfo, &rowbuffer, (JDIMENSION)1);
-        nwarn = cinfo.err->num_warnings;
-        if (nlinesread == 0 || (abort_on_warning && nwarn > 0)) {
-            L_ERROR("read error at scanline %d; nwarn = %d\n",
-                    __func__, i, nwarn);
+        if (jpeg_read_scanlines(&cinfo, &rowbuffer, (JDIMENSION)1) == 0) {
+            L_ERROR("read error at scanline %d\n", procName, i);
             pixDestroy(&pix);
             jpeg_destroy_decompress(&cinfo);
             LEPT_FREE(rowbuffer);
-            rowbuffer = NULL;
-            if (pnwarn) *pnwarn = nwarn;
-            return (PIX *)ERROR_PTR("bad data", __func__, NULL);
+            return (PIX *)ERROR_PTR("bad data", procName, NULL);
         }
 
             /* -- 24 bit color -- */
@@ -465,6 +454,9 @@ jmp_buf                        jmpbuf;  /* must be local to the function */
         }
     }
 
+    nwarn = cinfo.err->num_warnings;
+    if (pnwarn) *pnwarn = nwarn;
+
         /* If the pixel density is neither 1 nor 2, it may not be defined.
          * In that case, don't set the resolution.  */
     if (cinfo.density_unit == 1) {  /* pixels per inch */
@@ -476,16 +468,22 @@ jmp_buf                        jmpbuf;  /* must be local to the function */
     }
 
     if (cinfo.output_components != spp)
-        lept_stderr("output spp = %d, spp = %d\n",
-                    cinfo.output_components, spp);
+        fprintf(stderr, "output spp = %d, spp = %d\n",
+                cinfo.output_components, spp);
 
     jpeg_finish_decompress(&cinfo);
     jpeg_destroy_decompress(&cinfo);
     LEPT_FREE(rowbuffer);
-    rowbuffer = NULL;
-    if (pnwarn) *pnwarn = nwarn;
-    if (nwarn > 0)
-        L_WARNING("%d warning(s) of bad data\n", __func__, nwarn);
+
+    if (nwarn > 0) {
+        if (hint & L_JPEG_FAIL_ON_BAD_DATA) {
+            L_ERROR("fail with %d warning(s) of bad data\n", procName, nwarn);
+            pixDestroy(&pix);
+        } else {
+            L_WARNING("%d warning(s) of bad data\n", procName, nwarn);
+        }
+    }
+
     return pix;
 }
 
@@ -497,14 +495,14 @@ jmp_buf                        jmpbuf;  /* must be local to the function */
  * \brief   readHeaderJpeg()
  *
  * \param[in]    filename
- * \param[out]   pw     [optional]
- * \param[out]   ph     [optional]
- * \param[out]   pspp   [optional] samples/pixel
- * \param[out]   pycck  [optional] 1 if ycck color space; 0 otherwise
- * \param[out]   pcmyk  [optional] 1 if cmyk color space; 0 otherwise
+ * \param[out]   pw [optional]
+ *           [out]   ph ([optional]
+ *           [out]   pspp ([optional]  samples/pixel
+ * \param[out]   pycck [optional]  1 if ycck color space; 0 otherwise
+ * \param[out]   pcmyk [optional]  1 if cmyk color space; 0 otherwise
  * \return  0 if OK, 1 on error
  */
-l_ok
+l_int32
 readHeaderJpeg(const char  *filename,
                l_int32     *pw,
                l_int32     *ph,
@@ -515,18 +513,20 @@ readHeaderJpeg(const char  *filename,
 l_int32  ret;
 FILE    *fp;
 
+    PROCNAME("readHeaderJpeg");
+
     if (pw) *pw = 0;
     if (ph) *ph = 0;
     if (pspp) *pspp = 0;
     if (pycck) *pycck = 0;
     if (pcmyk) *pcmyk = 0;
     if (!filename)
-        return ERROR_INT("filename not defined", __func__, 1);
+        return ERROR_INT("filename not defined", procName, 1);
     if (!pw && !ph && !pspp && !pycck && !pcmyk)
-        return ERROR_INT("no results requested", __func__, 1);
+        return ERROR_INT("no results requested", procName, 1);
 
     if ((fp = fopenReadStream(filename)) == NULL)
-        return ERROR_INT_1("image file not found", filename, __func__, 1);
+        return ERROR_INT("image file not found", procName, 1);
     ret = freadHeaderJpeg(fp, pw, ph, pspp, pycck, pcmyk);
     fclose(fp);
     return ret;
@@ -536,15 +536,15 @@ FILE    *fp;
 /*!
  * \brief   freadHeaderJpeg()
  *
- * \param[in]    fp     file stream
- * \param[out]   pw     [optional]
- * \param[out]   ph     [optional]
- * \param[out]   pspp   [optional]  samples/pixel
- * \param[out]   pycck  [optional]  1 if ycck color space; 0 otherwise
- * \param[out]   pcmyk  [optional]  1 if cmyk color space; 0 otherwise
+ * \param[in]    fp file stream
+ * \param[out]   pw [optional]
+ *           [out]   ph ([optional]
+ *           [out]   pspp ([optional]  samples/pixel
+ * \param[out]   pycck [optional]  1 if ycck color space; 0 otherwise
+ * \param[out]   pcmyk [optional]  1 if cmyk color space; 0 otherwise
  * \return  0 if OK, 1 on error
  */
-l_ok
+l_int32
 freadHeaderJpeg(FILE     *fp,
                 l_int32  *pw,
                 l_int32  *ph,
@@ -552,10 +552,12 @@ freadHeaderJpeg(FILE     *fp,
                 l_int32  *pycck,
                 l_int32  *pcmyk)
 {
-l_int32                        spp, w, h;
-struct jpeg_decompress_struct  cinfo = { 0 };
-struct jpeg_error_mgr          jerr = { 0 };
+l_int32                        spp;
+struct jpeg_decompress_struct  cinfo;
+struct jpeg_error_mgr          jerr;
 jmp_buf                        jmpbuf;  /* must be local to the function */
+
+    PROCNAME("freadHeaderJpeg");
 
     if (pw) *pw = 0;
     if (ph) *ph = 0;
@@ -563,9 +565,9 @@ jmp_buf                        jmpbuf;  /* must be local to the function */
     if (pycck) *pycck = 0;
     if (pcmyk) *pcmyk = 0;
     if (!fp)
-        return ERROR_INT("stream not defined", __func__, 1);
+        return ERROR_INT("stream not defined", procName, 1);
     if (!pw && !ph && !pspp && !pycck && !pcmyk)
-        return ERROR_INT("no results requested", __func__, 1);
+        return ERROR_INT("no results requested", procName, 1);
 
     rewind(fp);
 
@@ -574,22 +576,15 @@ jmp_buf                        jmpbuf;  /* must be local to the function */
     cinfo.client_data = (void *)&jmpbuf;
     jerr.error_exit = jpeg_error_catch_all_1;
     if (setjmp(jmpbuf))
-        return ERROR_INT("internal jpeg error", __func__, 1);
+        return ERROR_INT("internal jpeg error", procName, 1);
 
         /* Initialize the jpeg structs for reading the header */
     jpeg_create_decompress(&cinfo);
     jpeg_stdio_src(&cinfo, fp);
     jpeg_read_header(&cinfo, TRUE);
     jpeg_calc_output_dimensions(&cinfo);
-    spp = cinfo.out_color_components;
-    w = cinfo.output_width;
-    h = cinfo.output_height;
-    if (w < 1 || h < 1 || spp < 1 || spp > 4) {
-        jpeg_destroy_decompress(&cinfo);
-        rewind(fp);
-        return ERROR_INT("bad jpeg image parameters", __func__, 1);
-    }
 
+    spp = cinfo.out_color_components;
     if (pspp) *pspp = spp;
     if (pw) *pw = cinfo.output_width;
     if (ph) *ph = cinfo.output_height;
@@ -605,34 +600,34 @@ jmp_buf                        jmpbuf;  /* must be local to the function */
 
 
 /*
- * \brief   fgetJpegResolution()
+ *  fgetJpegResolution()
  *
- * \param[in]    fp             file stream
- * \param[out]   pxres, pyres   resolutions
- * \return   0 if OK; 1 on error
+ *      Input:  fp (file stream opened for read)
+ *              &xres, &yres (<return> resolution in ppi)
+ *      Return: 0 if OK; 1 on error
  *
- * <pre>
- * Notes:
+ *  Notes:
  *      (1) If neither resolution field is set, this is not an error;
  *          the returned resolution values are 0 (designating 'unknown').
  *      (2) Side-effect: this rewinds the stream.
- * </pre>
  */
 l_int32
 fgetJpegResolution(FILE     *fp,
                    l_int32  *pxres,
                    l_int32  *pyres)
 {
-struct jpeg_decompress_struct  cinfo = { 0 };
-struct jpeg_error_mgr          jerr = { 0 };
+struct jpeg_decompress_struct  cinfo;
+struct jpeg_error_mgr          jerr;
 jmp_buf                        jmpbuf;  /* must be local to the function */
+
+    PROCNAME("fgetJpegResolution");
 
     if (pxres) *pxres = 0;
     if (pyres) *pyres = 0;
     if (!pxres || !pyres)
-        return ERROR_INT("&xres and &yres not both defined", __func__, 1);
+        return ERROR_INT("&xres and &yres not both defined", procName, 1);
     if (!fp)
-        return ERROR_INT("stream not opened", __func__, 1);
+        return ERROR_INT("stream not opened", procName, 1);
 
     rewind(fp);
 
@@ -641,7 +636,7 @@ jmp_buf                        jmpbuf;  /* must be local to the function */
     cinfo.client_data = (void *)&jmpbuf;
     jerr.error_exit = jpeg_error_catch_all_1;
     if (setjmp(jmpbuf))
-        return ERROR_INT("internal jpeg error", __func__, 1);
+        return ERROR_INT("internal jpeg error", procName, 1);
 
         /* Initialize the jpeg structs for reading the header */
     jpeg_create_decompress(&cinfo);
@@ -665,30 +660,30 @@ jmp_buf                        jmpbuf;  /* must be local to the function */
 
 
 /*
- * \brief   fgetJpegComment()
+ *  fgetJpegComment()
  *
- * \param[in]    fp        file stream opened for read
- * \param[out]   pcomment  comment
- * \return   0 if OK; 1 on error
+ *      Input:  fp (file stream opened for read)
+ *              &comment (<return> comment)
+ *      Return: 0 if OK; 1 on error
  *
- * <pre>
- * Notes:
+ *  Notes:
  *      (1) Side-effect: this rewinds the stream.
- * </pre>
  */
 l_int32
 fgetJpegComment(FILE      *fp,
                 l_uint8  **pcomment)
 {
-struct jpeg_decompress_struct  cinfo = { 0 };
-struct jpeg_error_mgr          jerr = { 0 };
-struct callback_data           cb_data = { 0 };  /* contains local jmp_buf */
+struct jpeg_decompress_struct  cinfo;
+struct jpeg_error_mgr          jerr;
+struct callback_data           cb_data;  /* contains local jmp_buf */
+
+    PROCNAME("fgetJpegComment");
 
     if (!pcomment)
-        return ERROR_INT("&comment not defined", __func__, 1);
+        return ERROR_INT("&comment not defined", procName, 1);
     *pcomment = NULL;
     if (!fp)
-        return ERROR_INT("stream not opened", __func__, 1);
+        return ERROR_INT("stream not opened", procName, 1);
 
     rewind(fp);
 
@@ -699,7 +694,7 @@ struct callback_data           cb_data = { 0 };  /* contains local jmp_buf */
     cinfo.client_data = (void *)&cb_data;
     if (setjmp(cb_data.jmpbuf)) {
         LEPT_FREE(cb_data.comment);
-        return ERROR_INT("internal jpeg error", __func__, 1);
+        return ERROR_INT("internal jpeg error", procName, 1);
     }
 
         /* Initialize the jpeg structs for reading the header */
@@ -723,12 +718,12 @@ struct callback_data           cb_data = { 0 };  /* contains local jmp_buf */
  * \brief   pixWriteJpeg()
  *
  * \param[in]    filename
- * \param[in]    pix           any depth; cmap is OK
- * \param[in]    quality       1 - 100; 75 is default
- * \param[in]    progressive   0 for baseline sequential; 1 for progressive
+ * \param[in]    pix  any depth; cmap is OK
+ * \param[in]    quality 1 - 100; 75 is default
+ * \param[in]    progressive 0 for baseline sequential; 1 for progressive
  * \return  0 if OK; 1 on error
  */
-l_ok
+l_int32
 pixWriteJpeg(const char  *filename,
              PIX         *pix,
              l_int32      quality,
@@ -736,17 +731,19 @@ pixWriteJpeg(const char  *filename,
 {
 FILE  *fp;
 
+    PROCNAME("pixWriteJpeg");
+
     if (!pix)
-        return ERROR_INT("pix not defined", __func__, 1);
+        return ERROR_INT("pix not defined", procName, 1);
     if (!filename)
-        return ERROR_INT("filename not defined", __func__, 1);
+        return ERROR_INT("filename not defined", procName, 1);
 
     if ((fp = fopenWriteStream(filename, "wb+")) == NULL)
-        return ERROR_INT_1("stream not opened", filename, __func__, 1);
+        return ERROR_INT("stream not opened", procName, 1);
 
     if (pixWriteStreamJpeg(fp, pix, quality, progressive)) {
         fclose(fp);
-        return ERROR_INT_1("pix not written to stream", filename, __func__, 1);
+        return ERROR_INT("pix not written to stream", procName, 1);
     }
 
     fclose(fp);
@@ -757,10 +754,10 @@ FILE  *fp;
 /*!
  * \brief   pixWriteStreamJpeg()
  *
- * \param[in]    fp           file stream
- * \param[in]    pixs         any depth; cmap is OK
- * \param[in]    quality      1 - 100; 75 is default value; 0 is also default
- * \param[in]    progressive  0 for baseline sequential; 1 for progressive
+ * \param[in]    fp file stream
+ * \param[in]    pixs  any depth; cmap is OK
+ * \param[in]    quality  1 - 100; 75 is default value; 0 is also default
+ * \param[in]    progressive 0 for baseline sequential; 1 for progressive
  * \return  0 if OK, 1 on error
  *
  * <pre>
@@ -787,7 +784,7 @@ FILE  *fp;
  *          for luminosity and a lower resolution one for the chromas.
  * </pre>
  */
-l_ok
+l_int32
 pixWriteStreamJpeg(FILE    *fp,
                    PIX     *pixs,
                    l_int32  quality,
@@ -799,20 +796,19 @@ l_int32                      w, h, d, wpl, spp, colorflag, rowsamples;
 l_uint32                    *ppixel, *line, *data;
 JSAMPROW                     rowbuffer;
 PIX                         *pix;
-struct jpeg_compress_struct  cinfo = { 0 };
-struct jpeg_error_mgr        jerr = { 0 };
+struct jpeg_compress_struct  cinfo;
+struct jpeg_error_mgr        jerr;
 char                        *text;
 jmp_buf                      jmpbuf;  /* must be local to the function */
 
+    PROCNAME("pixWriteStreamJpeg");
+
     if (!fp)
-        return ERROR_INT("stream not open", __func__, 1);
+        return ERROR_INT("stream not open", procName, 1);
     if (!pixs)
-        return ERROR_INT("pixs not defined", __func__, 1);
-    if (quality <= 0) quality = 75;  /* default */
-    if (quality > 100) {
-        L_ERROR("invalid jpeg quality; setting to 75\n", __func__);
-        quality = 75;
-    }
+        return ERROR_INT("pixs not defined", procName, 1);
+    if (quality <= 0)
+        quality = 75;  /* default */
 
         /* If necessary, convert the pix so that it can be jpeg compressed.
          * The colormap is removed based on the source, so if the colormap
@@ -821,19 +817,19 @@ jmp_buf                      jmpbuf;  /* must be local to the function */
     pix = NULL;
     if (pixGetColormap(pixs) != NULL) {
         L_INFO("removing colormap; may be better to compress losslessly\n",
-               __func__);
+               procName);
         pix = pixRemoveColormap(pixs, REMOVE_CMAP_BASED_ON_SRC);
     } else if (d >= 8 && d != 16) {  /* normal case; no rewrite */
         pix = pixClone(pixs);
     } else if (d < 8 || d == 16) {
-        L_INFO("converting from %d to 8 bpp\n", __func__, d);
+        L_INFO("converting from %d to 8 bpp\n", procName, d);
         pix = pixConvertTo8(pixs, 0);  /* 8 bpp, no cmap */
     } else {
-        L_ERROR("unknown pix type with d = %d and no cmap\n", __func__, d);
+        L_ERROR("unknown pix type with d = %d and no cmap\n", procName, d);
         return 1;
     }
     if (!pix)
-        return ERROR_INT("pix not made", __func__, 1);
+        return ERROR_INT("pix not made", procName, 1);
     pixSetPadBits(pix, 0);
 
     rewind(fp);
@@ -846,7 +842,7 @@ jmp_buf                      jmpbuf;  /* must be local to the function */
     if (setjmp(jmpbuf)) {
         LEPT_FREE(rowbuffer);
         pixDestroy(&pix);
-        return ERROR_INT("internal jpeg error", __func__, 1);
+        return ERROR_INT("internal jpeg error", procName, 1);
     }
 
         /* Initialize the jpeg structs for compression */
@@ -910,8 +906,8 @@ jmp_buf                      jmpbuf;  /* must be local to the function */
          * Just to be safe, subtract 100 to cover the Adobe name space.  */
     if ((text = pixGetText(pix)) != NULL) {
         if (strlen(text) > 65433) {
-            L_WARNING("text is %zu bytes; clipping to 65433\n",
-                   __func__, strlen(text));
+            L_WARNING("text is %lu bytes; clipping to 65433\n",
+                   procName, (unsigned long)strlen(text));
             text[65433] = '\0';
         }
         jpeg_write_marker(&cinfo, JPEG_COM, (const JOCTET *)text, strlen(text));
@@ -923,7 +919,7 @@ jmp_buf                      jmpbuf;  /* must be local to the function */
     if ((rowbuffer = (JSAMPROW)LEPT_CALLOC(sizeof(JSAMPLE), rowsamples))
         == NULL) {
         pixDestroy(&pix);
-        return ERROR_INT("calloc fail for rowbuffer", __func__, 1);
+        return ERROR_INT("calloc fail for rowbuffer", procName, 1);
     }
 
     data = pixGetData(pix);
@@ -953,7 +949,6 @@ jmp_buf                      jmpbuf;  /* must be local to the function */
 
     pixDestroy(&pix);
     LEPT_FREE(rowbuffer);
-    rowbuffer = NULL;
     jpeg_destroy_compress(&cinfo);
     return 0;
 }
@@ -966,14 +961,14 @@ jmp_buf                      jmpbuf;  /* must be local to the function */
 /*!
  * \brief   pixReadMemJpeg()
  *
- * \param[in]    data       const; jpeg-encoded
- * \param[in]    size       of data
- * \param[in]    cmflag     colormap flag 0 means return RGB image if color;
- *                          1 means create a colormap and return
- *                          an 8 bpp colormapped image if color
- * \param[in]    reduction  scaling factor: 1, 2, 4 or 8
- * \param[out]   pnwarn     [optional] number of warnings
- * \param[in]    hint       a bitwise OR of L_JPEG_* values; 0 for default
+ * \param[in]    data const; jpeg-encoded
+ * \param[in]    size of data
+ * \param[in]    cmflag colormap flag 0 means return RGB image if color;
+ *                      1 means create a colormap and return
+ *                      an 8 bpp colormapped image if color
+ * \param[in]    reduction scaling factor: 1, 2, 4 or 8
+ * \param[out]   pnwarn [optional] number of warnings
+ * \param[in]    hint a bitwise OR of L_JPEG_* values; 0 for default
  * \return  pix, or NULL on error
  *
  * <pre>
@@ -997,12 +992,14 @@ l_uint8  *comment;
 FILE     *fp;
 PIX      *pix;
 
+    PROCNAME("pixReadMemJpeg");
+
     if (pnwarn) *pnwarn = 0;
     if (!data)
-        return (PIX *)ERROR_PTR("data not defined", __func__, NULL);
+        return (PIX *)ERROR_PTR("data not defined", procName, NULL);
 
     if ((fp = fopenReadFromMemory(data, size)) == NULL)
-        return (PIX *)ERROR_PTR("stream not opened", __func__, NULL);
+        return (PIX *)ERROR_PTR("stream not opened", procName, NULL);
     pix = pixReadStreamJpeg(fp, cmflag, reduction, pnwarn, hint);
     if (pix) {
         ret = fgetJpegComment(fp, &comment);
@@ -1012,7 +1009,7 @@ PIX      *pix;
         }
     }
     fclose(fp);
-    if (!pix) L_ERROR("pix not read\n", __func__);
+    if (!pix) L_ERROR("pix not read\n", procName);
     return pix;
 }
 
@@ -1020,16 +1017,16 @@ PIX      *pix;
 /*!
  * \brief   readHeaderMemJpeg()
  *
- * \param[in]    data    const; jpeg-encoded
- * \param[in]    size    of data
- * \param[out]   pw      [optional] width
- * \param[out]   ph      [optional] height
- * \param[out]   pspp    [optional] samples/pixel
- * \param[out]   pycck   [optional] 1 if ycck color space; 0 otherwise
- * \param[out]   pcmyk   [optional] 1 if cmyk color space; 0 otherwise
+ * \param[in]    data const; jpeg-encoded
+ * \param[in]    size of data
+ * \param[out]   pw [optional]
+ *           [out]   ph ([optional]
+ *           [out]   pspp ([optional]  samples/pixel
+ * \param[out]   pycck [optional]  1 if ycck color space; 0 otherwise
+ * \param[out]   pcmyk [optional]  1 if cmyk color space; 0 otherwise
  * \return  0 if OK, 1 on error
  */
-l_ok
+l_int32
 readHeaderMemJpeg(const l_uint8  *data,
                   size_t          size,
                   l_int32        *pw,
@@ -1041,52 +1038,21 @@ readHeaderMemJpeg(const l_uint8  *data,
 l_int32  ret;
 FILE    *fp;
 
+    PROCNAME("readHeaderMemJpeg");
+
     if (pw) *pw = 0;
     if (ph) *ph = 0;
     if (pspp) *pspp = 0;
     if (pycck) *pycck = 0;
     if (pcmyk) *pcmyk = 0;
     if (!data)
-        return ERROR_INT("data not defined", __func__, 1);
+        return ERROR_INT("data not defined", procName, 1);
     if (!pw && !ph && !pspp && !pycck && !pcmyk)
-        return ERROR_INT("no results requested", __func__, 1);
+        return ERROR_INT("no results requested", procName, 1);
 
     if ((fp = fopenReadFromMemory(data, size)) == NULL)
-        return ERROR_INT("stream not opened", __func__, 1);
+        return ERROR_INT("stream not opened", procName, 1);
     ret = freadHeaderJpeg(fp, pw, ph, pspp, pycck, pcmyk);
-    fclose(fp);
-    return ret;
-}
-
-
-/*!
- * \brief   readResolutionMemJpeg()
- *
- * \param[in]   data    const; jpeg-encoded
- * \param[in]   size    of data
- * \param[out]  pxres   [optional]
- * \param[out]  pyres   [optional]
- * \return  0 if OK, 1 on error
- */
-l_ok
-readResolutionMemJpeg(const l_uint8  *data,
-                      size_t          size,
-                      l_int32        *pxres,
-                      l_int32        *pyres)
-{
-l_int32  ret;
-FILE    *fp;
-
-    if (pxres) *pxres = 0;
-    if (pyres) *pyres = 0;
-    if (!data)
-        return ERROR_INT("data not defined", __func__, 1);
-    if (!pxres && !pyres)
-        return ERROR_INT("no results requested", __func__, 1);
-
-    if ((fp = fopenReadFromMemory(data, size)) == NULL)
-        return ERROR_INT("stream not opened", __func__, 1);
-    ret = fgetJpegResolution(fp, pxres, pyres);
     fclose(fp);
     return ret;
 }
@@ -1095,11 +1061,11 @@ FILE    *fp;
 /*!
  * \brief   pixWriteMemJpeg()
  *
- * \param[out]   pdata        data of jpeg compressed image
- * \param[out]   psize        size of returned data
- * \param[in]    pix          any depth; cmap is OK
- * \param[in]    quality      1 - 100; 75 is default value; 0 is also default
- * \param[in]    progressive  0 for baseline sequential; 1 for progressive
+ * \param[out]   pdata data of jpeg compressed image
+ * \param[out]   psize size of returned data
+ * \param[in]    pix  any depth; cmap is OK
+ * \param[in]    quality  1 - 100; 75 is default value; 0 is also default
+ * \param[in]    progressive 0 for baseline sequential; 1 for progressive
  * \return  0 if OK, 1 on error
  *
  * <pre>
@@ -1108,7 +1074,7 @@ FILE    *fp;
  *          memory instead of to a file stream.
  * </pre>
  */
-l_ok
+l_int32
 pixWriteMemJpeg(l_uint8  **pdata,
                 size_t    *psize,
                 PIX       *pix,
@@ -1118,36 +1084,35 @@ pixWriteMemJpeg(l_uint8  **pdata,
 l_int32  ret;
 FILE    *fp;
 
+    PROCNAME("pixWriteMemJpeg");
+
     if (pdata) *pdata = NULL;
     if (psize) *psize = 0;
     if (!pdata)
-        return ERROR_INT("&data not defined", __func__, 1 );
+        return ERROR_INT("&data not defined", procName, 1 );
     if (!psize)
-        return ERROR_INT("&size not defined", __func__, 1 );
+        return ERROR_INT("&size not defined", procName, 1 );
     if (!pix)
-        return ERROR_INT("&pix not defined", __func__, 1 );
+        return ERROR_INT("&pix not defined", procName, 1 );
 
 #if HAVE_FMEMOPEN
     if ((fp = open_memstream((char **)pdata, psize)) == NULL)
-        return ERROR_INT("stream not opened", __func__, 1);
+        return ERROR_INT("stream not opened", procName, 1);
     ret = pixWriteStreamJpeg(fp, pix, quality, progressive);
-    fputc('\0', fp);
-    fclose(fp);
-    if (*psize > 0) *psize = *psize - 1;
 #else
-    L_INFO("no fmemopen API --> work-around: write to temp file\n", __func__);
+    L_INFO("work-around: writing to a temp file\n", procName);
   #ifdef _WIN32
     if ((fp = fopenWriteWinTempfile()) == NULL)
-        return ERROR_INT("tmpfile stream not opened", __func__, 1);
+        return ERROR_INT("tmpfile stream not opened", procName, 1);
   #else
     if ((fp = tmpfile()) == NULL)
-        return ERROR_INT("tmpfile stream not opened", __func__, 1);
+        return ERROR_INT("tmpfile stream not opened", procName, 1);
   #endif  /* _WIN32 */
     ret = pixWriteStreamJpeg(fp, pix, quality, progressive);
     rewind(fp);
     *pdata = l_binaryReadStream(fp, psize);
-    fclose(fp);
 #endif  /* HAVE_FMEMOPEN */
+    fclose(fp);
     return ret;
 }
 
@@ -1159,7 +1124,7 @@ FILE    *fp;
  * \brief   pixSetChromaSampling()
  *
  * \param[in]    pix
- * \param[in]    sampling    1 for subsampling; 0 for no subsampling
+ * \param[in]    sampling 1 for subsampling; 0 for no subsampling
  * \return  0 if OK, 1 on error
  *
  * <pre>
@@ -1170,12 +1135,14 @@ FILE    *fp;
  *          jpeg writing, call this with %sampling == 0.
  * </pre>
  */
-l_ok
+l_int32
 pixSetChromaSampling(PIX     *pix,
                      l_int32  sampling)
 {
+    PROCNAME("pixSetChromaSampling");
+
     if (!pix)
-        return ERROR_INT("pix not defined", __func__, 1 );
+        return ERROR_INT("pix not defined", procName, 1 );
     if (sampling)
         pixSetSpecial(pix, 0);  /* default */
     else
@@ -1203,6 +1170,7 @@ jpeg_error_catch_all_1(j_common_ptr cinfo)
     (*cinfo->err->output_message) (cinfo);
     jpeg_destroy(cinfo);
     longjmp(*pjmpbuf, 1);
+    return;
 }
 
 /*!
@@ -1222,6 +1190,7 @@ struct callback_data  *pcb_data;
     (*cinfo->err->output_message) (cinfo);
     jpeg_destroy(cinfo);
     longjmp(pcb_data->jmpbuf, 1);
+    return;
 }
 
 /* This function was borrowed from libjpeg */
@@ -1270,10 +1239,6 @@ struct callback_data  *pcb_data;
 
         /* Save the comment and return */
     pcb_data = (struct callback_data *)cinfo->client_data;
-    if (pcb_data->comment) {  /* clear before overwriting previous comment */
-        LEPT_FREE(pcb_data->comment);
-        pcb_data->comment = NULL;
-    }
     pcb_data->comment = comment;
     return 1;
 }

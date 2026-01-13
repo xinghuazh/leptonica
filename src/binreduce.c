@@ -40,12 +40,9 @@
  * </pre>
  */
 
-#ifdef HAVE_CONFIG_H
-#include <config_auto.h>
-#endif  /* HAVE_CONFIG_H */
-
 #include <string.h>
 #include "allheaders.h"
+
 
 /*------------------------------------------------------------------*
  *                       Subsampled reduction                       *
@@ -54,8 +51,8 @@
  * \brief   pixReduceBinary2()
  *
  * \param[in]    pixs
- * \param[in]    intab   [optional]; if null, a table is made here
- *                       and destroyed before exit
+ * \param[in]    intab [optional]; if null, a table is made here
+ *                   and destroyed before exit
  * \return  pixd 2x subsampled, or NULL on error
  *
  * <pre>
@@ -82,28 +79,34 @@ l_uint32   word;
 l_uint32  *datas, *datad, *lines, *lined;
 PIX       *pixd;
 
-    if (!pixs || pixGetDepth(pixs) != 1)
-        return (PIX *)ERROR_PTR("pixs undefined or not 1 bpp", __func__, NULL);
+    PROCNAME("pixReduceBinary2");
 
-    pixGetDimensions(pixs, &ws, &hs, NULL);
+    if (!pixs)
+        return (PIX *)ERROR_PTR("pixs not defined", procName, NULL);
+
+    if (pixGetDepth(pixs) != 1)
+        return (PIX *)ERROR_PTR("pixs not binary", procName, NULL);
+
+    if (intab) {  /* use input table */
+        tab = intab;
+    } else {
+        if ((tab = makeSubsampleTab2x()) == NULL)
+            return (PIX *)ERROR_PTR("tab not made", procName, NULL);
+    }
+
+    ws = pixGetWidth(pixs);
+    hs = pixGetHeight(pixs);
     if (hs <= 1)
-        return (PIX *)ERROR_PTR("hs must be at least 2", __func__, NULL);
+        return (PIX *)ERROR_PTR("hs must be at least 2", procName, NULL);
     wpls = pixGetWpl(pixs);
     datas = pixGetData(pixs);
-    pixSetPadBits(pixs, 0);
 
     if ((pixd = pixCreate(ws / 2, hs / 2, 1)) == NULL)
-        return (PIX *)ERROR_PTR("pixd not made", __func__, NULL);
+        return (PIX *)ERROR_PTR("pixd not made", procName, NULL);
     pixCopyResolution(pixd, pixs);
     pixScaleResolution(pixd, 0.5, 0.5);
     wpld = pixGetWpl(pixd);
     datad = pixGetData(pixd);
-
-    tab = (intab) ? intab : makeSubsampleTab2x();
-    if (!tab) {
-        pixDestroy(&pixd);
-        return (PIX *)ERROR_PTR("tab not made", __func__, NULL);
-    }
 
         /* e.g., if ws = 65: wd = 32, wpls = 3, wpld = 1 --> trouble */
     wplsi = L_MIN(wpls, 2 * wpld);  /* iterate over this number of words */
@@ -122,7 +125,8 @@ PIX       *pixd;
         }
     }
 
-    if (!intab) LEPT_FREE(tab);
+    if (intab == NULL)
+        LEPT_FREE(tab);
     return pixd;
 }
 
@@ -133,11 +137,11 @@ PIX       *pixd;
 /*!
  * \brief   pixReduceRankBinaryCascade()
  *
- * \param[in]    pixs    1 bpp
- * \param[in]    level1  threshold, in the set {0, 1, 2, 3, 4}
- * \param[in]    level2  threshold, in the set {0, 1, 2, 3, 4}
- * \param[in]    level3  threshold, in the set {0, 1, 2, 3, 4}
- * \param[in]    level4  threshold, in the set {0, 1, 2, 3, 4}
+ * \param[in]    pixs 1 bpp
+ * \param[in]    level1 threshold, in the set {0, 1, 2, 3, 4}
+ * \param[in]    level2 threshold, in the set {0, 1, 2, 3, 4}
+ * \param[in]    level3 threshold, in the set {0, 1, 2, 3, 4}
+ * \param[in]    level4 threshold, in the set {0, 1, 2, 3, 4}
  * \return  pixd, or NULL on error
  *
  * <pre>
@@ -156,20 +160,22 @@ pixReduceRankBinaryCascade(PIX     *pixs,
 PIX      *pix1, *pix2, *pix3, *pix4;
 l_uint8  *tab;
 
+    PROCNAME("pixReduceRankBinaryCascade");
+
     if (!pixs)
-        return (PIX *)ERROR_PTR("pixs not defined", __func__, NULL);
+        return (PIX *)ERROR_PTR("pixs not defined", procName, NULL);
     if (pixGetDepth(pixs) != 1)
-        return (PIX *)ERROR_PTR("pixs must be binary", __func__, NULL);
+        return (PIX *)ERROR_PTR("pixs must be binary", procName, NULL);
     if (level1 > 4 || level2 > 4 || level3 > 4 || level4 > 4)
-        return (PIX *)ERROR_PTR("levels must not exceed 4", __func__, NULL);
+        return (PIX *)ERROR_PTR("levels must not exceed 4", procName, NULL);
 
     if (level1 <= 0) {
-        L_WARNING("no reduction because level1 not > 0\n", __func__);
+        L_WARNING("no reduction because level1 not > 0\n", procName);
         return pixCopy(NULL, pixs);
     }
 
     if ((tab = makeSubsampleTab2x()) == NULL)
-        return (PIX *)ERROR_PTR("tab not made", __func__, NULL);
+        return (PIX *)ERROR_PTR("tab not made", procName, NULL);
 
     pix1 = pixReduceRankBinary2(pixs, level1, tab);
     if (level2 <= 0) {
@@ -201,11 +207,11 @@ l_uint8  *tab;
 /*!
  * \brief   pixReduceRankBinary2()
  *
- * \param[in]    pixs    1 bpp
- * \param[in]    level   rank threshold: 1, 2, 3, 4
- * \param[in]    intab   [optional]; if null, a table is made here
- *                       and destroyed before exit
- * \return  pixd   1 bpp, 2x rank threshold reduced, or NULL on error
+ * \param[in]    pixs 1 bpp
+ * \param[in]    level rank threshold: 1, 2, 3, 4
+ * \param[in]    intab [optional]; if null, a table is made here
+ *                     and destroyed before exit
+ * \return  pixd 1 bpp, 2x rank threshold reduced, or NULL on error
  *
  * <pre>
  * Notes:
@@ -232,34 +238,37 @@ l_uint32   word1, word2, word3, word4;
 l_uint32  *datas, *datad, *lines, *lined;
 PIX       *pixd;
 
+    PROCNAME("pixReduceRankBinary2");
+
     if (!pixs)
-        return (PIX *)ERROR_PTR("pixs not defined", __func__, NULL);
+        return (PIX *)ERROR_PTR("pixs not defined", procName, NULL);
 
     if (pixGetDepth(pixs) != 1)
-        return (PIX *)ERROR_PTR("pixs not binary", __func__, NULL);
+        return (PIX *)ERROR_PTR("pixs not binary", procName, NULL);
     if (level < 1 || level > 4)
         return (PIX *)ERROR_PTR("level must be in set {1,2,3,4}",
-            __func__, NULL);
+            procName, NULL);
 
-    pixGetDimensions(pixs, &ws, &hs, NULL);
+    if (intab) {  /* use input table */
+        tab = intab;
+    } else {
+        if ((tab = makeSubsampleTab2x()) == NULL)
+            return (PIX *)ERROR_PTR("tab not made", procName, NULL);
+    }
+
+    ws = pixGetWidth(pixs);
+    hs = pixGetHeight(pixs);
     if (hs <= 1)
-        return (PIX *)ERROR_PTR("hs must be at least 2", __func__, NULL);
+        return (PIX *)ERROR_PTR("hs must be at least 2", procName, NULL);
     wpls = pixGetWpl(pixs);
     datas = pixGetData(pixs);
-    pixSetPadBits(pixs, 0);
 
     if ((pixd = pixCreate(ws / 2, hs / 2, 1)) == NULL)
-        return (PIX *)ERROR_PTR("pixd not made", __func__, NULL);
+        return (PIX *)ERROR_PTR("pixd not made", procName, NULL);
     pixCopyResolution(pixd, pixs);
     pixScaleResolution(pixd, 0.5, 0.5);
     wpld = pixGetWpl(pixd);
     datad = pixGetData(pixd);
-
-    tab = (intab) ? intab : makeSubsampleTab2x();
-    if (!tab) {
-        pixDestroy(&pixd);
-        return (PIX *)ERROR_PTR("tab not made", __func__, NULL);
-    }
 
         /* e.g., if ws = 65: wd = 32, wpls = 3, wpld = 1 --> trouble */
     wplsi = L_MIN(wpls, 2 * wpld);  /* iterate over this number of words */
@@ -362,23 +371,22 @@ PIX       *pixd;
         break;
     }
 
-    if (!intab) LEPT_FREE(tab);
+    if (!intab)
+        LEPT_FREE(tab);
     return pixd;
 }
 
 
 /*!
- * \brief  makeSubsampleTab2x()
+ * \brief  Permutation table for 2x rank binary reduction
  *
- * \return tab   table of 256 permutations, or NULL on error
+ * \return tab table of 256 permutations, or NULL on error
  *
  * <pre>
- * Notes:
- *      Permutation table for 2x rank binary reduction
- *      This table permutes the bits in a byte, from
- *          0 4 1 5 2 6 3 7
- *      to
- *          0 1 2 3 4 5 6 7
+ *  This table permutes the bits in a byte, from
+ *      0 4 1 5 2 6 3 7
+ *  to
+ *      0 1 2 3 4 5 6 7
  * </pre>
  */
 l_uint8 *
@@ -387,8 +395,12 @@ makeSubsampleTab2x(void)
 l_uint8  *tab;
 l_int32   i;
 
-    tab = (l_uint8 *) LEPT_CALLOC(256, sizeof(l_uint8));
-    for (i = 0; i < 256; i++) {
+    PROCNAME("makeSubsampleTab2x");
+
+    if ((tab = (l_uint8 *) LEPT_CALLOC(256, sizeof(l_uint8))) == NULL)
+        return (l_uint8 *)ERROR_PTR("tab not made", procName, NULL);
+
+    for (i = 0; i < 256; i++)
         tab[i] = ((i & 0x01)     ) |    /* 7 */
                  ((i & 0x04) >> 1) |    /* 6 */
                  ((i & 0x10) >> 2) |    /* 5 */
@@ -397,6 +409,6 @@ l_int32   i;
                  ((i & 0x08) << 2) |    /* 2 */
                  ((i & 0x20) << 1) |    /* 1 */
                  ((i & 0x80)     );     /* 0 */
-    }
+
     return tab;
 }

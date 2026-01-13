@@ -112,10 +112,6 @@
  * </pre>
  */
 
-#ifdef HAVE_CONFIG_H
-#include <config_auto.h>
-#endif  /* HAVE_CONFIG_H */
-
 #include "allheaders.h"
 
 #ifndef  NO_CONSOLE_IO
@@ -212,20 +208,22 @@ wshedCreate(PIX     *pixs,
 l_int32   w, h;
 L_WSHED  *wshed;
 
+    PROCNAME("wshedCreate");
+
     if (!pixs)
-        return (L_WSHED *)ERROR_PTR("pixs is not defined", __func__, NULL);
+        return (L_WSHED *)ERROR_PTR("pixs is not defined", procName, NULL);
     if (pixGetDepth(pixs) != 8)
-        return (L_WSHED *)ERROR_PTR("pixs is not 8 bpp", __func__, NULL);
+        return (L_WSHED *)ERROR_PTR("pixs is not 8 bpp", procName, NULL);
     if (!pixm)
-        return (L_WSHED *)ERROR_PTR("pixm is not defined", __func__, NULL);
+        return (L_WSHED *)ERROR_PTR("pixm is not defined", procName, NULL);
     if (pixGetDepth(pixm) != 1)
-        return (L_WSHED *)ERROR_PTR("pixm is not 1 bpp", __func__, NULL);
+        return (L_WSHED *)ERROR_PTR("pixm is not 1 bpp", procName, NULL);
     pixGetDimensions(pixs, &w, &h, NULL);
     if (pixGetWidth(pixm) != w || pixGetHeight(pixm) != h)
-        return (L_WSHED *)ERROR_PTR("pixs/m sizes are unequal", __func__, NULL);
+        return (L_WSHED *)ERROR_PTR("pixs/m sizes are unequal", procName, NULL);
 
     if ((wshed = (L_WSHED *)LEPT_CALLOC(1, sizeof(L_WSHED))) == NULL)
-        return (L_WSHED *)ERROR_PTR("wshed not made", __func__, NULL);
+        return (L_WSHED *)ERROR_PTR("wshed not made", procName, NULL);
 
     wshed->pixs = pixClone(pixs);
     wshed->pixm = pixClone(pixm);
@@ -254,8 +252,10 @@ wshedDestroy(L_WSHED  **pwshed)
 l_int32   i;
 L_WSHED  *wshed;
 
+    PROCNAME("wshedDestroy");
+
     if (pwshed == NULL) {
-        L_WARNING("ptr address is null!\n", __func__);
+        L_WARNING("ptr address is null!\n", procName);
         return;
     }
 
@@ -285,6 +285,7 @@ L_WSHED  *wshed;
     }
     LEPT_FREE(wshed);
     *pwshed = NULL;
+    return;
 }
 
 
@@ -294,15 +295,13 @@ L_WSHED  *wshed;
  * \param[in]    wshed generated from wshedCreate()
  * \return  0 if OK, 1 on error
  *
- * <pre>
- * Notes:
- *      (1) N.B. This is buggy!  It seems to locate watersheds that are
+ *  Iportant note:
+ *      1 This is buggy.  It seems to locate watersheds that are
  *          duplicates.  The watershed extraction after complete fill
  *          grabs some regions belonging to existing watersheds.
  *          See prog/watershedtest.c for testing.
- * </pre>
  */
-l_ok
+l_int32
 wshedApply(L_WSHED  *wshed)
 {
 char      two_new_watersheds[] = "Two new watersheds";
@@ -328,8 +327,10 @@ PIXA     *pixad;
 L_STACK  *rstack;
 PTA      *ptas, *ptao;
 
+    PROCNAME("wshedApply");
+
     if (!wshed)
-        return ERROR_INT("wshed not defined", __func__, 1);
+        return ERROR_INT("wshed not defined", procName, 1);
 
     /* ------------------------------------------------------------ *
      *  Initialize priority queue and pixlab with seeds and minima  *
@@ -400,10 +401,10 @@ PTA      *ptas, *ptao;
     wshed->pixad = pixad;  /* wshed owns this */
     nalevels = numaCreate(nseeds);
     wshed->nalevels = nalevels;  /* wshed owns this */
-    L_INFO("nseeds = %d, nother = %d\n", __func__, nseeds, nother);
+    L_INFO("nseeds = %d, nother = %d\n", procName, nseeds, nother);
     while (lheapGetCount(lh) > 0) {
         popWSPixel(lh, rstack, &val, &x, &y, &index);
-/*        lept_stderr("x = %d, y = %d, index = %d\n", x, y, index); */
+/*        fprintf(stderr, "x = %d, y = %d, index = %d\n", x, y, index); */
         ulabel = GET_DATA_FOUR_BYTES(linelab32[y], x);
         if (ulabel == MAX_LABEL_VALUE)
             clabel = ulabel;
@@ -443,11 +444,11 @@ PTA      *ptas, *ptao;
                     hmax = hindex;
                 }
                 if (wshed->debug) {
-                    lept_stderr("clabel,hlabel = %d,%d\n", clabel, hlabel);
-                    lept_stderr("hmin = %d, hmax = %d\n", hmin, hmax);
-                    lept_stderr("cindex,hindex = %d,%d\n", cindex, hindex);
+                    fprintf(stderr, "clabel,hlabel = %d,%d\n", clabel, hlabel);
+                    fprintf(stderr, "hmin = %d, hmax = %d\n", hmin, hmax);
+                    fprintf(stderr, "cindex,hindex = %d,%d\n", cindex, hindex);
                     if (hmin < mindepth)
-                        lept_stderr("Too shallow!\n");
+                        fprintf(stderr, "Too shallow!\n");
                 }
 
                 if (hmin >= mindepth) {
@@ -458,7 +459,7 @@ PTA      *ptas, *ptao;
                     numaSetValue(nasi, cindex, 0);
                     numaSetValue(nasi, clabel, 0);
 
-                    if (wshed->debug) lept_stderr("nindex = %d\n", nindex);
+                    if (wshed->debug) fprintf(stderr, "nindex = %d\n", nindex);
                     debugPrintLUT(lut, nindex, wshed->debug);
                     mergeLookup(wshed, clabel, nindex);
                     debugPrintLUT(lut, nindex, wshed->debug);
@@ -537,9 +538,9 @@ PTA      *ptas, *ptao;
  * \brief   wshedSaveBasin()
  *
  * \param[in]    wshed
- * \param[in]    index   index of basin to be located
- * \param[in]    level   filling level reached at the time this function
- *                       is called
+ * \param[in]    index index of basin to be located
+ * \param[in]    level filling level reached at the time this function
+ *                     is called
  * \return  0 if OK, 1 on error
  *
  * <pre>
@@ -557,8 +558,10 @@ wshedSaveBasin(L_WSHED  *wshed,
 BOX  *box;
 PIX  *pix;
 
+    PROCNAME("wshedSaveBasin");
+
     if (!wshed) {
-        L_ERROR("wshed not defined\n", __func__);
+        L_ERROR("wshed not defined\n", procName);
         return;
     }
 
@@ -567,6 +570,7 @@ PIX  *pix;
         pixaAddBox(wshed->pixad, box, L_INSERT);
         numaAddNumber(wshed->nalevels, level - 1);
     }
+    return;
 }
 
 
@@ -574,10 +578,10 @@ PIX  *pix;
  * \brief   identifyWatershedBasin()
  *
  * \param[in]    wshed
- * \param[in]    index   index of basin to be located
- * \param[in]    level   of basin at point at which the two basins met
- * \param[out]   pbox    bounding box of basin
- * \param[out]   ppixd   pix of basin, cropped to its bounding box
+ * \param[in]    index index of basin to be located
+ * \param[in]    level of basin at point at which the two basins met
+ * \param[out]   pbox bounding box of basin
+ * \param[out]   ppixd pix of basin, cropped to its bounding box
  * \return  0 if OK, 1 on error
  *
  * <pre>
@@ -607,14 +611,16 @@ BOX      *box;
 PIX      *pixs, *pixt, *pixd;
 L_QUEUE  *lq;
 
+    PROCNAME("identifyWatershedBasin");
+
     if (!pbox)
-        return ERROR_INT("&box not defined", __func__, 1);
+        return ERROR_INT("&box not defined", procName, 1);
     *pbox = NULL;
     if (!ppixd)
-        return ERROR_INT("&pixd not defined", __func__, 1);
+        return ERROR_INT("&pixd not defined", procName, 1);
     *ppixd = NULL;
     if (!wshed)
-        return ERROR_INT("wshed not defined", __func__, 1);
+        return ERROR_INT("wshed not defined", procName, 1);
 
         /* Make a queue and an auxiliary stack */
     lq = lqueueCreate(0);
@@ -634,7 +640,7 @@ L_QUEUE  *lq;
     ptaGetIPt(wshed->ptas, index, &x, &y);
     pixSetPixel(pixt, x, y, 1);
     pushNewPixel(lq, x, y, &minx, &maxx, &miny, &maxy);
-    if (wshed->debug) lept_stderr("prime: (x,y) = (%d, %d)\n", x, y);
+    if (wshed->debug) fprintf(stderr, "prime: (x,y) = (%d, %d)\n", x, y);
 
         /* Each pixel in a spreading breadth-first search is inspected.
          * It is accepted as part of this watershed, and pushed on
@@ -682,8 +688,8 @@ L_QUEUE  *lq;
  * \brief   mergeLookup()
  *
  * \param[in]    wshed
- * \param[in]    sindex   primary index being changed in the merge
- * \param[in]    dindex   index that %sindex will point to after the merge
+ * \param[in]    sindex primary index being changed in the merge
+ * \param[in]    dindex index that %sindex will point to after the merge
  * \return  0 if OK, 1 on error
  *
  * <pre>
@@ -712,13 +718,15 @@ l_int32  *lut;
 NUMA     *na;
 NUMA    **links;
 
+    PROCNAME("mergeLookup");
+
     if (!wshed)
-        return ERROR_INT("wshed not defined", __func__, 1);
+        return ERROR_INT("wshed not defined", procName, 1);
     size = wshed->arraysize;
     if (sindex < 0 || sindex >= size)
-        return ERROR_INT("invalid sindex", __func__, 1);
+        return ERROR_INT("invalid sindex", procName, 1);
     if (dindex < 0 || dindex >= size)
-        return ERROR_INT("invalid dindex", __func__, 1);
+        return ERROR_INT("invalid dindex", procName, 1);
 
         /* Redirect links in the lut */
     n = 0;
@@ -750,11 +758,11 @@ NUMA    **links;
 /*!
  * \brief   wshedGetHeight()
  *
- * \param[in]    wshed     array of current indices
- * \param[in]    val       value of current pixel popped off queue
- * \param[in]    label     of pixel or 32 bpp label image
- * \param[out]   pheight   height of current value from seed
- *                         or minimum of watershed
+ * \param[in]    wshed array of current indices
+ * \param[in]    val value of current pixel popped off queue
+ * \param[in]    label of pixel or 32 bpp label image
+ * \param[out]   pheight height of current value from seed
+ *                       or minimum of watershed
  * \return  0 if OK, 1 on error
  *
  * <pre>
@@ -772,18 +780,20 @@ wshedGetHeight(L_WSHED  *wshed,
 {
 l_int32  minval;
 
+    PROCNAME("wshedGetHeight");
+
     if (!pheight)
-        return ERROR_INT("&height not defined", __func__, 1);
+        return ERROR_INT("&height not defined", procName, 1);
     *pheight = 0;
     if (!wshed)
-        return ERROR_INT("wshed not defined", __func__, 1);
+        return ERROR_INT("wshed not defined", procName, 1);
 
     if (label < wshed->nseeds)
         numaGetIValue(wshed->nash, label, &minval);
     else if (label < wshed->nseeds + wshed->nother)
         numaGetIValue(wshed->namh, label, &minval);
     else
-        return ERROR_INT("finished watershed; should not call", __func__, 1);
+        return ERROR_INT("finished watershed; should not call", procName, 1);
 
     *pheight = val - minval;
     return 0;
@@ -791,19 +801,17 @@ l_int32  minval;
 
 
 /*
- * \brief   pushNewPixel()
+ *  pushNewPixel()
  *
- * \param[in]     lqueue
- * \param[in]     x, y                          pixel coordinates
- * \param[out]    pminx, pmaxx, pminy, pmaxy    bounding box update
- * \return   void
+ *      Input:  lqueue
+ *              x, y   (pixel coordinates)
+ *              &minx, &maxx, &miny, &maxy  (<return> bounding box update)
+ *      Return: void
  *
- * <pre>
- * Notes:
+ *  Notes:
  *      (1) This is a wrapper for adding a NewPixel to a queue, which
  *          updates the bounding box for all pixels on that queue and
  *          uses the storage stack to retrieve a NewPixel.
- * </pre>
  */
 static void
 pushNewPixel(L_QUEUE  *lq,
@@ -816,8 +824,10 @@ pushNewPixel(L_QUEUE  *lq,
 {
 L_NEWPIXEL  *np;
 
+    PROCNAME("pushNewPixel");
+
     if (!lq) {
-        L_ERROR("queue not defined\n", __func__);
+        L_ERROR("queue not defined\n", procName);
         return;
     }
 
@@ -836,22 +846,21 @@ L_NEWPIXEL  *np;
     np->x = x;
     np->y = y;
     lqueueAdd(lq, np);
+    return;
 }
 
 
 /*
- * \brief   popNewPixel()
+ *  popNewPixel()
  *
- * \param[in]    lqueue
- * \param[out]   px, py    pixel coordinates
- * \return   void
+ *      Input:  lqueue
+ *              &x, &y   (<return> pixel coordinates)
+ *      Return: void
  *
- * <pre>
- * Notes:
- *      (1) This is a wrapper for removing a NewPixel from a queue,
- *          which returns the pixel coordinates and saves the NewPixel
- *          on the storage stack.
- * </pre>
+ *   Notes:
+ *       (1) This is a wrapper for removing a NewPixel from a queue,
+ *           which returns the pixel coordinates and saves the NewPixel
+ *           on the storage stack.
  */
 static void
 popNewPixel(L_QUEUE  *lq,
@@ -860,8 +869,10 @@ popNewPixel(L_QUEUE  *lq,
 {
 L_NEWPIXEL  *np;
 
+    PROCNAME("popNewPixel");
+
     if (!lq) {
-        L_ERROR("lqueue not defined\n", __func__);
+        L_ERROR("lqueue not defined\n", procName);
         return;
     }
 
@@ -870,24 +881,23 @@ L_NEWPIXEL  *np;
     *px = np->x;
     *py = np->y;
     lstackAdd(lq->stack, np);  /* save for re-use */
+    return;
 }
 
 
 /*
- * \brief   pushWSPixel()
+ *  pushWSPixel()
  *
- * \param[in]    lh       priority queue
- * \param[in]    stack    of reusable WSPixels
- * \param[in]    val      pixel value: used for ordering the heap
- * \param[in]    x, y     pixel coordinates
- * \param[in]    index    label for set to which pixel belongs
- * \return    void
+ *      Input:  lh  (priority queue)
+ *              stack  (of reusable WSPixels)
+ *              val  (pixel value: used for ordering the heap)
+ *              x, y  (pixel coordinates)
+ *              index  (label for set to which pixel belongs)
+ *      Return: void
  *
- * <pre>
- * Notes:
+ *  Notes:
  *      (1) This is a wrapper for adding a WSPixel to a heap.  It
  *          uses the storage stack to retrieve a WSPixel.
- * </pre>
  */
 static void
 pushWSPixel(L_HEAP   *lh,
@@ -899,12 +909,14 @@ pushWSPixel(L_HEAP   *lh,
 {
 L_WSPIXEL  *wsp;
 
+    PROCNAME("pushWSPixel");
+
     if (!lh) {
-        L_ERROR("heap not defined\n", __func__);
+        L_ERROR("heap not defined\n", procName);
         return;
     }
     if (!stack) {
-        L_ERROR("stack not defined\n", __func__);
+        L_ERROR("stack not defined\n", procName);
         return;
     }
 
@@ -919,25 +931,24 @@ L_WSPIXEL  *wsp;
     wsp->y = y;
     wsp->index = index;
     lheapAdd(lh, wsp);
+    return;
 }
 
 
 /*
- * \brief  popWSPixel()
+ *  popWSPixel()
  *
- * \param[in]     lh        priority queue
- * \param[in]     stack     of reusable WSPixels
- * \param[out]    pval      pixel value
- * \param[out]    px, py    pixel coordinates
- * \param[out]    pindex    label for set to which pixel belongs
- * \return   void
+ *      Input:  lh  (priority queue)
+ *              stack  (of reusable WSPixels)
+ *              &val  (<return> pixel value)
+ *              &x, &y  (<return> pixel coordinates)
+ *              &index  (<return> label for set to which pixel belongs)
+ *      Return: void
  *
- * <pre>
- * Notes:
- *      (1) This is a wrapper for removing a WSPixel from a heap,
- *          which returns the WSPixel data and saves the WSPixel
- *          on the storage stack.
- * </pre>
+ *   Notes:
+ *       (1) This is a wrapper for removing a WSPixel from a heap,
+ *           which returns the WSPixel data and saves the WSPixel
+ *           on the storage stack.
  */
 static void
 popWSPixel(L_HEAP   *lh,
@@ -949,16 +960,18 @@ popWSPixel(L_HEAP   *lh,
 {
 L_WSPIXEL  *wsp;
 
+    PROCNAME("popWSPixel");
+
     if (!lh) {
-        L_ERROR("lheap not defined\n", __func__);
+        L_ERROR("lheap not defined\n", procName);
         return;
     }
     if (!stack) {
-        L_ERROR("stack not defined\n", __func__);
+        L_ERROR("stack not defined\n", procName);
         return;
     }
     if (!pval || !px || !py || !pindex) {
-        L_ERROR("data can't be returned\n", __func__);
+        L_ERROR("data can't be returned\n", procName);
         return;
     }
 
@@ -969,6 +982,7 @@ L_WSPIXEL  *wsp;
     *py = wsp->y;
     *pindex = wsp->index;
     lstackAdd(stack, wsp);  /* save for re-use */
+    return;
 }
 
 
@@ -980,10 +994,11 @@ debugPrintLUT(l_int32  *lut,
 l_int32  i;
 
     if (!debug) return;
-    lept_stderr("lut: ");
+    fprintf(stderr, "lut: ");
     for (i = 0; i < size; i++)
-        lept_stderr( "%d ", lut[i]);
-    lept_stderr("\n");
+        fprintf(stderr, "%d ", lut[i]);
+    fprintf(stderr, "\n");
+    return;
 }
 
 
@@ -997,9 +1012,10 @@ debugWshedMerge(L_WSHED *wshed,
 {
     if (!wshed || (wshed->debug == 0))
          return;
-    lept_stderr("%s:\n", descr);
-    lept_stderr("   (x, y) = (%d, %d)\n", x, y);
-    lept_stderr("   clabel = %d, cindex = %d\n", label, index);
+    fprintf(stderr, "%s:\n", descr);
+    fprintf(stderr, "   (x, y) = (%d, %d)\n", x, y);
+    fprintf(stderr, "   clabel = %d, cindex = %d\n", label, index);
+    return;
 }
 
 
@@ -1010,17 +1026,19 @@ debugWshedMerge(L_WSHED *wshed,
  * \brief   wshedBasins()
  *
  * \param[in]    wshed
- * \param[out]   ppixa       [optional] mask of watershed basins
+ * \param[out]   ppixa  [optional] mask of watershed basins
  * \param[out]   pnalevels   [optional] watershed levels
  * \return  0 if OK, 1 on error
  */
-l_ok
+l_int32
 wshedBasins(L_WSHED  *wshed,
             PIXA    **ppixa,
             NUMA    **pnalevels)
 {
+    PROCNAME("wshedBasins");
+
     if (!wshed)
-        return ERROR_INT("wshed not defined", __func__, 1);
+        return ERROR_INT("wshed not defined", procName, 1);
 
     if (ppixa)
         *ppixa = pixaCopy(wshed->pixad, L_CLONE);
@@ -1034,7 +1052,7 @@ wshedBasins(L_WSHED  *wshed,
  * \brief   wshedRenderFill()
  *
  * \param[in]    wshed
- * \return  pixd   initial image with all basins filled, or NULL on error
+ * \return  pixd initial image with all basins filled, or NULL on error
  */
 PIX *
 wshedRenderFill(L_WSHED  *wshed)
@@ -1044,8 +1062,10 @@ NUMA    *na;
 PIX     *pix, *pixd;
 PIXA    *pixa;
 
+    PROCNAME("wshedRenderFill");
+
     if (!wshed)
-        return (PIX *)ERROR_PTR("wshed not defined", __func__, NULL);
+        return (PIX *)ERROR_PTR("wshed not defined", procName, NULL);
 
     wshedBasins(wshed, &pixa, &na);
     pixd = pixCopy(NULL, wshed->pixs);
@@ -1068,7 +1088,7 @@ PIXA    *pixa;
  * \brief   wshedRenderColors()
  *
  * \param[in]    wshed
- * \return  pixd   initial image with all basins filled, or null on error
+ * \return  pixd initial image with all basins filled, or NULL on error
  */
 PIX *
 wshedRenderColors(L_WSHED  *wshed)
@@ -1077,8 +1097,10 @@ l_int32  w, h;
 PIX     *pixg, *pixt, *pixc, *pixm, *pixd;
 PIXA    *pixa;
 
+    PROCNAME("wshedRenderColors");
+
     if (!wshed)
-        return (PIX *)ERROR_PTR("wshed not defined", __func__, NULL);
+        return (PIX *)ERROR_PTR("wshed not defined", procName, NULL);
 
     wshedBasins(wshed, &pixa, NULL);
     pixg = pixCopy(NULL, wshed->pixs);

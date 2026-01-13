@@ -119,18 +119,17 @@ struct JbData
 typedef struct JbData  JBDATA;
 
 
-/*! JB Classifier */
+    /*! Classifier methods */
 enum {
-    JB_RANKHAUS = 0,
-    JB_CORRELATION = 1
+   JB_RANKHAUS = 0,
+   JB_CORRELATION = 1
 };
 
     /*! For jbGetComponents(): type of component to extract from images */
-/*! JB Component */
 enum {
-    JB_CONN_COMPS = 0,
-    JB_CHARACTERS = 1,
-    JB_WORDS = 2
+   JB_CONN_COMPS = 0,
+   JB_CHARACTERS = 1,
+   JB_WORDS = 2
 };
 
     /*! These parameters are used for naming the two files

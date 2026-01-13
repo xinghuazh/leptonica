@@ -8,13 +8,7 @@
 #             output file
 #     output: ccitt-g4 compressed mulitipage tiff file
 #
-#  Note 1:  Requires ghostscript
-#  Note 2:  If you give it images with bpp > 1, the result will be ugly.
-#  Note 3:  A modern alternative to ghostcript is to use poplar:
-#    If the pdf is composed of images that were orthographically generated:
-#          pdftoppm -png <pdf-file> <pdf-root>    [output in png]
-#    If the pdf is composed of images that were scanned:
-#          pdftoppm -jpeg <pdf-file> <pdf-root>   [output in jpeg]
+#   N.B. Requires ghostscript
 
 scriptname=${0##*/}
 
@@ -35,17 +29,16 @@ then
 fi
 
 # 'echo "0 neg 0 neg" translate' is the mysterious "primer"
-rm /tmp/junkpdf*
-
-# --------- Choose one of the two options below ---------
+# choose one of the two options below
 
 # output image size at 300 ppi
-#echo "0 neg 0 neg" translate | /usr/bin/gs -sDEVICE=tiffg4 -sOutputFile=/tmp/junkpdf%03d.tif -r300x300 -q - ${pdfin}
-#./writemtiff /tmp junkpdf ${tiffout}
+rm /tmp/junkpdf*
+echo "0 neg 0 neg" translate | /usr/bin/gs -sDEVICE=tiffg4 -sOutputFile=/tmp/junkpdf%03d.tif -r300x300 -q - ${pdfin}
+./writemtiff /tmp junkpdf ${tiffout}
 
 # output image size at 600 ppi
+rm /tmp/junkpdf*
 echo "0 neg 0 neg" translate | /usr/bin/gs -sDEVICE=tiffg4 -sOutputFile=/tmp/junkpdf%03d.tif -r600x600 -q - ${pdfin}
 ./writemtiff /tmp junkpdf ${tiffout}
 
-# ------------------------------------------------------
 

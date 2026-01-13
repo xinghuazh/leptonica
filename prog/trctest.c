@@ -30,33 +30,31 @@
  *   Example: trctest wet-day.jpg 3.1 50 160 /tmp/junk.png
  */
 
-#ifdef HAVE_CONFIG_H
-#include <config_auto.h>
-#endif  /* HAVE_CONFIG_H */
-
 #include "allheaders.h"
 
 int main(int    argc,
          char **argv)
 {
-PIX       *pixs, *pixd;
-l_int32    minval, maxval;
-l_float32  gamma;
-char      *filein, *fileout;
+PIX         *pixs, *pixd;
+l_int32      minval, maxval;
+l_float32    gamma;
+char        *filein, *fileout;
+static char  mainName[] = "trctest";
 
     if (argc != 6)
         return ERROR_INT(" Syntax:  trctest filein gamma minval maxval fileout",
-                         __func__, 1);
+                         mainName, 1);
+
     filein = argv[1];
     gamma = atof(argv[2]);
     minval = atoi(argv[3]);
     maxval = atoi(argv[4]);
     fileout = argv[5];
-    setLeptDebugOK(1);
-
     if ((pixs = pixRead(filein)) == NULL)
-        return ERROR_INT("pixs not made", __func__, 1);
+        return ERROR_INT("pixs not made", mainName, 1);
+
     pixd = pixGammaTRC(NULL, pixs, gamma, minval, maxval);
+
     pixWrite(fileout, pixd, IFF_PNG);
     pixDestroy(&pixs);
     pixDestroy(&pixd);

@@ -30,41 +30,38 @@
  *   Returns information about the images in the pixa or pixacomp file
  */
 
-#ifdef HAVE_CONFIG_H
-#include <config_auto.h>
-#endif  /* HAVE_CONFIG_H */
-
 #include <string.h>
 #include "allheaders.h"
 
 int main(int    argc,
          char **argv)
 {
-char     buf[64];
-char    *sn;
-l_int32  i, n;
-PIX     *pix;
-PIXA    *pixa;
-PIXAC   *pac;
-char    *filein;
+char         buf[64];
+char        *sn;
+l_int32      i, n;
+PIX         *pix;
+PIXA        *pixa;
+PIXAC       *pac;
+char        *filein;
+static char  mainName[] = "pixafileinfo";
 
     if (argc != 2)
-        return ERROR_INT(" Syntax:  pixafileinfo filein", __func__, 1);
-    setLeptDebugOK(1);
+        return ERROR_INT(" Syntax:  pixafileinfo filein", mainName, 1);
+    filein = argv[1];
 
         /* Input file can be either pixa or pixacomp */
     filein = argv[1];
     l_getStructStrFromFile(filein, L_STR_NAME, &sn);
     if (strcmp(sn, "Pixa") == 0) {
         if ((pixa = pixaRead(filein)) == NULL)
-            return ERROR_INT("pixa not made", __func__, 1);
+            return ERROR_INT("pixa not made", mainName, 1);
     } else if (strcmp(sn, "Pixacomp") == 0) {
         if ((pac = pixacompRead(filein)) == NULL)
-            return ERROR_INT("pac not made", __func__, 1);
+            return ERROR_INT("pac not made", mainName, 1);
         pixa = pixaCreateFromPixacomp(pac, L_COPY);
         pixacompDestroy(&pac);
     } else {
-        return ERROR_INT("invalid file type", __func__, 1);
+        return ERROR_INT("invalid file type", mainName, 1);
     }
 
     n = pixaGetCount(pixa);
@@ -73,7 +70,7 @@ char    *filein;
         snprintf(buf, sizeof(buf), "Pix(%d)", i);
         pixPrintStreamInfo(stderr, pix, buf);
         pixDestroy(&pix);
-        lept_stderr("=================================\n");
+        fprintf(stderr, "=================================\n");
     }
 
     pixaDestroy(&pixa);

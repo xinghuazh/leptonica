@@ -60,10 +60,6 @@
  * </pre>
  */
 
-#ifdef HAVE_CONFIG_H
-#include <config_auto.h>
-#endif  /* HAVE_CONFIG_H */
-
 #include "allheaders.h"
 
 static l_int32 pixSearchForRectangle(PIX *pixs, BOX *boxs, l_int32 minsum,
@@ -75,15 +71,16 @@ static l_int32 pixSearchForRectangle(PIX *pixs, BOX *boxs, l_int32 minsum,
 #define  DEBUG_SPLIT     0
 #endif  /* ~NO_CONSOLE_IO */
 
+
 /*---------------------------------------------------------------------*
  *                     Boxa/Boxaa painting into Pix                    *
  *---------------------------------------------------------------------*/
 /*!
  * \brief   pixMaskConnComp()
  *
- * \param[in]    pixs           1 bpp
- * \param[in]    connectivity   4 or 8
- * \param[out]   pboxa          [optional] bounding boxes of c.c.
+ * \param[in]    pixs 1 bpp
+ * \param[in]    connectivity 4 or 8
+ * \param[out]   pboxa [optional] bounding boxes of c.c.
  * \return  pixd 1 bpp mask over the c.c., or NULL on error
  *
  * <pre>
@@ -101,11 +98,13 @@ pixMaskConnComp(PIX     *pixs,
 BOXA  *boxa;
 PIX   *pixd;
 
+    PROCNAME("pixMaskConnComp");
+
     if (pboxa) *pboxa = NULL;
     if (!pixs || pixGetDepth(pixs) != 1)
-        return (PIX *)ERROR_PTR("pixs undefined or not 1 bpp", __func__, NULL);
+        return (PIX *)ERROR_PTR("pixs undefined or not 1 bpp", procName, NULL);
     if (connectivity != 4 && connectivity != 8)
-        return (PIX *)ERROR_PTR("connectivity not 4 or 8", __func__, NULL);
+        return (PIX *)ERROR_PTR("connectivity not 4 or 8", procName, NULL);
 
     boxa = pixConnComp(pixs, NULL, connectivity);
     pixd = pixCreateTemplate(pixs);
@@ -122,10 +121,10 @@ PIX   *pixd;
 /*!
  * \brief   pixMaskBoxa()
  *
- * \param[in]    pixd    [optional] may be NULL
- * \param[in]    pixs    any depth; not cmapped
- * \param[in]    boxa    of boxes, to paint
- * \param[in]    op      L_SET_PIXELS, L_CLEAR_PIXELS, L_FLIP_PIXELS
+ * \param[in]    pixd [optional] may be NULL
+ * \param[in]    pixs any depth; not cmapped
+ * \param[in]    boxa of boxes, to paint
+ * \param[in]    op L_SET_PIXELS, L_CLEAR_PIXELS, L_FLIP_PIXELS
  * \return  pixd with masking op over the boxes, or NULL on error
  *
  * <pre>
@@ -154,20 +153,22 @@ pixMaskBoxa(PIX     *pixd,
 l_int32  i, n, x, y, w, h;
 BOX     *box;
 
+    PROCNAME("pixMaskBoxa");
+
     if (!pixs)
-        return (PIX *)ERROR_PTR("pixs not defined", __func__, NULL);
+        return (PIX *)ERROR_PTR("pixs not defined", procName, NULL);
     if (pixGetColormap(pixs))
-        return (PIX *)ERROR_PTR("pixs is cmapped", __func__, NULL);
+        return (PIX *)ERROR_PTR("pixs is cmapped", procName, NULL);
     if (pixd && (pixd != pixs))
-        return (PIX *)ERROR_PTR("if pixd, must be in-place", __func__, NULL);
+        return (PIX *)ERROR_PTR("if pixd, must be in-place", procName, NULL);
     if (!boxa)
-        return (PIX *)ERROR_PTR("boxa not defined", __func__, NULL);
+        return (PIX *)ERROR_PTR("boxa not defined", procName, NULL);
     if (op != L_SET_PIXELS && op != L_CLEAR_PIXELS && op != L_FLIP_PIXELS)
-        return (PIX *)ERROR_PTR("invalid op", __func__, NULL);
+        return (PIX *)ERROR_PTR("invalid op", procName, NULL);
 
     pixd = pixCopy(pixd, pixs);
     if ((n = boxaGetCount(boxa)) == 0) {
-        L_WARNING("no boxes to mask\n", __func__);
+        L_WARNING("no boxes to mask\n", procName);
         return pixd;
     }
 
@@ -190,9 +191,9 @@ BOX     *box;
 /*!
  * \brief   pixPaintBoxa()
  *
- * \param[in]    pixs    any depth, can be cmapped
- * \param[in]    boxa    of boxes, to paint
- * \param[in]    val     rgba color to paint
+ * \param[in]    pixs any depth, can be cmapped
+ * \param[in]    boxa of boxes, to paint
+ * \param[in]    val rgba color to paint
  * \return  pixd with painted boxes, or NULL on error
  *
  * <pre>
@@ -223,13 +224,15 @@ BOX      *box;
 PIX      *pixd;
 PIXCMAP  *cmap;
 
+    PROCNAME("pixPaintBoxa");
+
     if (!pixs)
-        return (PIX *)ERROR_PTR("pixs not defined", __func__, NULL);
+        return (PIX *)ERROR_PTR("pixs not defined", procName, NULL);
     if (!boxa)
-        return (PIX *)ERROR_PTR("boxa not defined", __func__, NULL);
+        return (PIX *)ERROR_PTR("boxa not defined", procName, NULL);
 
     if ((n = boxaGetCount(boxa)) == 0) {
-        L_WARNING("no boxes to paint; returning a copy\n", __func__);
+        L_WARNING("no boxes to paint; returning a copy\n", procName);
         return pixCopy(NULL, pixs);
     }
 
@@ -243,7 +246,7 @@ PIXCMAP  *cmap;
     else
         pixd = pixConvertTo32(pixs);
     if (!pixd)
-        return (PIX *)ERROR_PTR("pixd not made", __func__, NULL);
+        return (PIX *)ERROR_PTR("pixd not made", procName, NULL);
 
     d = pixGetDepth(pixd);
     if (d == 8) {  /* colormapped */
@@ -251,7 +254,7 @@ PIXCMAP  *cmap;
         extractRGBValues(val, &rval, &gval, &bval);
         if (pixcmapAddNewColor(cmap, rval, gval, bval, &newindex)) {
             pixDestroy(&pixd);
-            return (PIX *)ERROR_PTR("cmap full; can't add", __func__, NULL);
+            return (PIX *)ERROR_PTR("cmap full; can't add", procName, NULL);
         }
     }
 
@@ -271,9 +274,9 @@ PIXCMAP  *cmap;
 /*!
  * \brief   pixSetBlackOrWhiteBoxa()
  *
- * \param[in]    pixs    any depth, can be cmapped
- * \param[in]    boxa    [optional] of boxes, to clear or set
- * \param[in]    op      L_SET_BLACK, L_SET_WHITE
+ * \param[in]    pixs any depth, can be cmapped
+ * \param[in]    boxa [optional] of boxes, to clear or set
+ * \param[in]    op L_SET_BLACK, L_SET_WHITE
  * \return  pixd with boxes filled with white or black, or NULL on error
  */
 PIX *
@@ -287,8 +290,10 @@ BOX      *box;
 PIX      *pixd;
 PIXCMAP  *cmap;
 
+    PROCNAME("pixSetBlackOrWhiteBoxa");
+
     if (!pixs)
-        return (PIX *)ERROR_PTR("pixs not defined", __func__, NULL);
+        return (PIX *)ERROR_PTR("pixs not defined", procName, NULL);
     if (!boxa)
         return pixCopy(NULL, pixs);
     if ((n = boxaGetCount(boxa)) == 0)
@@ -324,7 +329,7 @@ PIXCMAP  *cmap;
         color = (op == L_SET_WHITE) ? 0xffff : 0x0;
     } else {
         pixDestroy(&pixd);
-        return (PIX *)ERROR_PTR("invalid depth", __func__, NULL);
+        return (PIX *)ERROR_PTR("invalid depth", procName, NULL);
     }
 
     for (i = 0; i < n; i++) {
@@ -343,8 +348,8 @@ PIXCMAP  *cmap;
 /*!
  * \brief   pixPaintBoxaRandom()
  *
- * \param[in]    pixs    any depth, can be cmapped
- * \param[in]    boxa    of boxes, to paint
+ * \param[in]    pixs any depth, can be cmapped
+ * \param[in]    boxa of boxes, to paint
  * \return  pixd with painted boxes, or NULL on error
  *
  * <pre>
@@ -365,13 +370,15 @@ BOX      *box;
 PIX      *pixd;
 PIXCMAP  *cmap;
 
+    PROCNAME("pixPaintBoxaRandom");
+
     if (!pixs)
-        return (PIX *)ERROR_PTR("pixs not defined", __func__, NULL);
+        return (PIX *)ERROR_PTR("pixs not defined", procName, NULL);
     if (!boxa)
-        return (PIX *)ERROR_PTR("boxa not defined", __func__, NULL);
+        return (PIX *)ERROR_PTR("boxa not defined", procName, NULL);
 
     if ((n = boxaGetCount(boxa)) == 0) {
-        L_WARNING("no boxes to paint; returning a copy\n", __func__);
+        L_WARNING("no boxes to paint; returning a copy\n", procName);
         return pixCopy(NULL, pixs);
     }
 
@@ -380,7 +387,7 @@ PIXCMAP  *cmap;
     else
         pixd = pixConvertTo32(pixs);
     if (!pixd)
-        return (PIX *)ERROR_PTR("pixd not made", __func__, NULL);
+        return (PIX *)ERROR_PTR("pixd not made", procName, NULL);
 
     cmap = pixcmapCreateRandom(8, 1, 1);
     d = pixGetDepth(pixd);  /* either 8 or 32 */
@@ -409,9 +416,9 @@ PIXCMAP  *cmap;
 /*!
  * \brief   pixBlendBoxaRandom()
  *
- * \param[in]    pixs    any depth; can be cmapped
- * \param[in]    boxa    of boxes, to blend/paint
- * \param[in]    fract   of box color to use
+ * \param[in]    pixs any depth; can be cmapped
+ * \param[in]    boxa of boxes, to blend/paint
+ * \param[in]    fract of box color to use
  * \return  pixd 32 bpp, with blend/painted boxes, or NULL on error
  *
  * <pre>
@@ -435,22 +442,24 @@ BOX      *box;
 PIX      *pixd;
 PIXCMAP  *cmap;
 
+    PROCNAME("pixBlendBoxaRandom");
+
     if (!pixs)
-        return (PIX *)ERROR_PTR("pixs not defined", __func__, NULL);
+        return (PIX *)ERROR_PTR("pixs not defined", procName, NULL);
     if (!boxa)
-        return (PIX *)ERROR_PTR("boxa not defined", __func__, NULL);
+        return (PIX *)ERROR_PTR("boxa not defined", procName, NULL);
     if (fract < 0.0 || fract > 1.0) {
-        L_WARNING("fract must be in [0.0, 1.0]; setting to 0.5\n", __func__);
+        L_WARNING("fract must be in [0.0, 1.0]; setting to 0.5\n", procName);
         fract = 0.5;
     }
 
     if ((n = boxaGetCount(boxa)) == 0) {
-        L_WARNING("no boxes to paint; returning a copy\n", __func__);
+        L_WARNING("no boxes to paint; returning a copy\n", procName);
         return pixCopy(NULL, pixs);
     }
 
     if ((pixd = pixConvertTo32(pixs)) == NULL)
-        return (PIX *)ERROR_PTR("pixd not defined", __func__, NULL);
+        return (PIX *)ERROR_PTR("pixd not defined", procName, NULL);
 
     cmap = pixcmapCreateRandom(8, 1, 1);
     for (i = 0; i < n; i++) {
@@ -470,10 +479,10 @@ PIXCMAP  *cmap;
 /*!
  * \brief   pixDrawBoxa()
  *
- * \param[in]    pixs    any depth; can be cmapped
- * \param[in]    boxa    of boxes, to draw
- * \param[in]    width   of lines
- * \param[in]    val     rgba color to draw
+ * \param[in]    pixs any depth; can be cmapped
+ * \param[in]    boxa of boxes, to draw
+ * \param[in]    width of lines
+ * \param[in]    val rgba color to draw
  * \return  pixd with outlines of boxes added, or NULL on error
  *
  * <pre>
@@ -494,15 +503,17 @@ l_int32   mapvacancy;   /* true only if cmap and not full */
 PIX      *pixd;
 PIXCMAP  *cmap;
 
+    PROCNAME("pixDrawBoxa");
+
     if (!pixs)
-        return (PIX *)ERROR_PTR("pixs not defined", __func__, NULL);
+        return (PIX *)ERROR_PTR("pixs not defined", procName, NULL);
     if (!boxa)
-        return (PIX *)ERROR_PTR("boxa not defined", __func__, NULL);
+        return (PIX *)ERROR_PTR("boxa not defined", procName, NULL);
     if (width < 1)
-        return (PIX *)ERROR_PTR("width must be >= 1", __func__, NULL);
+        return (PIX *)ERROR_PTR("width must be >= 1", procName, NULL);
 
     if (boxaGetCount(boxa) == 0) {
-        L_WARNING("no boxes to draw; returning a copy\n", __func__);
+        L_WARNING("no boxes to draw; returning a copy\n", procName);
         return pixCopy(NULL, pixs);
     }
 
@@ -516,7 +527,7 @@ PIXCMAP  *cmap;
     else
         pixd = pixConvertTo32(pixs);
     if (!pixd)
-        return (PIX *)ERROR_PTR("pixd not made", __func__, NULL);
+        return (PIX *)ERROR_PTR("pixd not made", procName, NULL);
 
     extractRGBValues(val, &rval, &gval, &bval);
     if (pixGetDepth(pixd) == 8) {  /* colormapped */
@@ -532,9 +543,9 @@ PIXCMAP  *cmap;
 /*!
  * \brief   pixDrawBoxaRandom()
  *
- * \param[in]    pixs     any depth, can be cmapped
- * \param[in]    boxa     of boxes, to draw
- * \param[in]    width    thickness of line
+ * \param[in]    pixs any depth, can be cmapped
+ * \param[in]    boxa of boxes, to draw
+ * \param[in]    width thickness of line
  * \return  pixd with box outlines drawn, or NULL on error
  *
  * <pre>
@@ -556,15 +567,17 @@ PIX      *pixd;
 PIXCMAP  *cmap;
 PTAA     *ptaa;
 
+    PROCNAME("pixDrawBoxaRandom");
+
     if (!pixs)
-        return (PIX *)ERROR_PTR("pixs not defined", __func__, NULL);
+        return (PIX *)ERROR_PTR("pixs not defined", procName, NULL);
     if (!boxa)
-        return (PIX *)ERROR_PTR("boxa not defined", __func__, NULL);
+        return (PIX *)ERROR_PTR("boxa not defined", procName, NULL);
     if (width < 1)
-        return (PIX *)ERROR_PTR("width must be >= 1", __func__, NULL);
+        return (PIX *)ERROR_PTR("width must be >= 1", procName, NULL);
 
     if ((n = boxaGetCount(boxa)) == 0) {
-        L_WARNING("no boxes to draw; returning a copy\n", __func__);
+        L_WARNING("no boxes to draw; returning a copy\n", procName);
         return pixCopy(NULL, pixs);
     }
 
@@ -600,10 +613,10 @@ PTAA     *ptaa;
  * \param[in]    linewb   line width to display outline of each box
  * \param[in]    colorba  color to display boxa
  * \param[in]    colorb   color to display box
- * \param[in]    w    width of output pix; use 0 if determined by %pixs or %baa
- * \param[in]    h    height of output pix; use 0 if determined by %pixs or %baa
+ * \param[in]    w    width of outupt pix; use 0 if determined by %pixs or %baa
+ * \param[in]    h    height of outupt pix; use 0 if determined by %pixs or %baa
  * \return  0 if OK, 1 on error
- *
+ * 
  * <pre>
  * Notes:
  *      (1) If %pixs exists, this renders the boxes over an 8 bpp version
@@ -614,7 +627,6 @@ PTAA     *ptaa;
  *          If %pixs is NULL, the dimensions of %pixd are determined by
  *            - %w and %h if both are > 0, or
  *            - the minimum size required using all boxes in %baa.
- *
  * </pre>
  */
 PIX *
@@ -633,8 +645,10 @@ BOXA     *boxa;
 PIX      *pixd;
 PIXCMAP  *cmap;
 
+    PROCNAME("boxaaDisplay");
+
     if (!baa)
-        return (PIX *)ERROR_PTR("baa not defined", __func__, NULL);
+        return (PIX *)ERROR_PTR("baa not defined", procName, NULL);
 
     if (w <= 0 || h <= 0) {
         if (pixs)
@@ -679,16 +693,16 @@ PIXCMAP  *cmap;
 /*!
  * \brief   pixaDisplayBoxaa()
  *
- * \param[in]    pixas       any depth, can be cmapped
- * \param[in]    baa         boxes to draw on input pixa
- * \param[in]    colorflag   L_DRAW_RED, L_DRAW_GREEN, etc
- * \param[in]    width       thickness of lines
+ * \param[in]    pixas any depth, can be cmapped
+ * \param[in]    baa  boxes to draw on input pixa
+ * \param[in]    colorflag  (L_DRAW_RED, L_DRAW_GREEN, etc)
+ * \param[in]    width thickness of lines
  * \return  pixa with box outlines drawn on each pix, or NULL on error
  *
  * <pre>
  * Notes:
  *      (1) All pix in %pixas that are not rgb are converted to rgb.
- *      (2) Each boxa in %baa contains boxes that will be drawn on
+ *      (2) Each boxa in @baa contains boxes that will be drawn on
  *          the corresponding pix in %pixas.
  *      (3) The color of the boxes drawn on each pix are selected with
  *          %colorflag:
@@ -706,23 +720,26 @@ pixaDisplayBoxaa(PIXA    *pixas,
 l_int32    i, j, nba, n, nbox, rval, gval, bval;
 l_uint32   color;
 l_uint32   colors[255];
+l_float64  dval;
 BOXA      *boxa;
 BOX       *box;
 PIX       *pix;
 PIXA      *pixad;
 
+    PROCNAME("pixaDisplayBoxaa");
+
     if (!pixas)
-        return (PIXA *)ERROR_PTR("pixas not defined", __func__, NULL);
+        return (PIXA *)ERROR_PTR("pixas not defined", procName, NULL);
     if (!baa)
-        return (PIXA *)ERROR_PTR("baa not defined", __func__, NULL);
+        return (PIXA *)ERROR_PTR("baa not defined", procName, NULL);
     if (width < 1)
-        return (PIXA *)ERROR_PTR("width must be >= 1", __func__, NULL);
+        return (PIXA *)ERROR_PTR("width must be >= 1", procName, NULL);
     if ((nba = boxaaGetCount(baa)) < 1)
-        return (PIXA *)ERROR_PTR("no boxa in baa", __func__, NULL);
+        return (PIXA *)ERROR_PTR("no boxa in baa", procName, NULL);
     if ((n = pixaGetCount(pixas)) == 0)
-        return (PIXA *)ERROR_PTR("no pix in pixas", __func__, NULL);
+        return (PIXA *)ERROR_PTR("no pix in pixas", procName, NULL);
     if (n != nba)
-        return (PIXA *)ERROR_PTR("num pix != num boxa", __func__, NULL);
+        return (PIXA *)ERROR_PTR("num pix != num boxa", procName, NULL);
     if (colorflag == L_DRAW_RED)
         color = 0xff000000;
     else if (colorflag == L_DRAW_GREEN)
@@ -734,7 +751,7 @@ PIXA      *pixad;
     else if (colorflag == L_DRAW_RANDOM)
         color = 0x00000000;
     else
-        return (PIXA *)ERROR_PTR("invalid colorflag", __func__, NULL);
+        return (PIXA *)ERROR_PTR("invalid colorflag", procName, NULL);
 
     if (colorflag == L_DRAW_RED || colorflag == L_DRAW_GREEN ||
         colorflag == L_DRAW_BLUE) {
@@ -783,13 +800,13 @@ PIXA      *pixad;
 /*!
  * \brief   pixSplitIntoBoxa()
  *
- * \param[in]    pixs       1 bpp
- * \param[in]    minsum     minimum pixels to trigger propagation
- * \param[in]    skipdist   distance before computing sum for propagation
- * \param[in]    delta      difference required to stop propagation
- * \param[in]    maxbg      maximum number of allowed bg pixels in ref scan
- * \param[in]    maxcomps   use 0 for unlimited number of subdivided components
- * \param[in]    remainder  set to 1 to get b.b. of remaining stuff
+ * \param[in]    pixs 1 bpp
+ * \param[in]    minsum  minimum pixels to trigger propagation
+ * \param[in]    skipdist distance before computing sum for propagation
+ * \param[in]    delta difference required to stop propagation
+ * \param[in]    maxbg maximum number of allowed bg pixels in ref scan
+ * \param[in]    maxcomps use 0 for unlimited number of subdivided components
+ * \param[in]    remainder set to 1 to get b.b. of remaining stuff
  * \return  boxa of rectangles covering the fg of pixs, or NULL on error
  *
  * <pre>
@@ -829,8 +846,10 @@ BOXA    *boxa, *boxas, *boxad;
 PIX     *pix;
 PIXA    *pixas;
 
+    PROCNAME("pixSplitIntoBoxa");
+
     if (!pixs || pixGetDepth(pixs) != 1)
-        return (BOXA *)ERROR_PTR("pixs undefined or not 1 bpp", __func__, NULL);
+        return (BOXA *)ERROR_PTR("pixs undefined or not 1 bpp", procName, NULL);
 
     boxas = pixConnComp(pixs, &pixas, 8);
     n = boxaGetCount(boxas);
@@ -855,14 +874,14 @@ PIXA    *pixas;
 /*!
  * \brief   pixSplitComponentIntoBoxa()
  *
- * \param[in]    pix        1 bpp
- * \param[in]    box        [optional] location of pix w/rt an origin
- * \param[in]    minsum     minimum pixels to trigger propagation
- * \param[in]    skipdist   distance before computing sum for propagation
- * \param[in]    delta      difference required to stop propagation
- * \param[in]    maxbg      maximum number of allowed bg pixels in ref scan
- * \param[in]    maxcomps   use 0 for unlimited number of subdivided components
- * \param[in]    remainder  set to 1 to get b.b. of remaining stuff
+ * \param[in]    pix 1 bpp
+ * \param[in]    box [optional] location of pix w/rt an origin
+ * \param[in]    minsum  minimum pixels to trigger propagation
+ * \param[in]    skipdist distance before computing sum for propagation
+ * \param[in]    delta difference required to stop propagation
+ * \param[in]    maxbg maximum number of allowed bg pixels in ref scan
+ * \param[in]    maxcomps use 0 for unlimited number of subdivided components
+ * \param[in]    remainder set to 1 to get b.b. of remaining stuff
  * \return  boxa of rectangles covering the fg of pix, or NULL on error
  *
  * <pre>
@@ -940,8 +959,10 @@ BOXA    *boxad;
 NUMA    *nascore, *nas;
 PIX     *pixs;
 
+    PROCNAME("pixSplitComponentIntoBoxa");
+
     if (!pix || pixGetDepth(pix) != 1)
-        return (BOXA *)ERROR_PTR("pix undefined or not 1 bpp", __func__, NULL);
+        return (BOXA *)ERROR_PTR("pix undefined or not 1 bpp", procName, NULL);
 
     pixs = pixCopy(NULL, pix);
     pixGetDimensions(pixs, &w, &h, NULL);
@@ -965,10 +986,10 @@ PIX     *pixs;
         numaGetIValue(nas, 0, &maxdir);
         numaGetIValue(nascore, maxdir, &maxscore);
 #if  DEBUG_SPLIT
-        lept_stderr("Iteration: %d\n", iter);
+        fprintf(stderr, "Iteration: %d\n", iter);
         boxPrintStreamInfo(stderr, boxs);
-        boxaWriteStderr(boxat);
-        lept_stderr("\nmaxdir = %d, maxscore = %d\n\n", maxdir, maxscore);
+        boxaWriteStream(stderr, boxat);
+        fprintf(stderr, "\nmaxdir = %d, maxscore = %d\n\n", maxdir, maxscore);
 #endif  /* DEBUG_SPLIT */
         if (maxscore > 0) {  /* accept this */
             boxt1 = boxaGetBox(boxat, maxdir, L_CLONE);
@@ -1013,15 +1034,15 @@ PIX     *pixs;
 /*!
  * \brief   pixSearchForRectangle()
  *
- * \param[in]    pixs       1 bpp
- * \param[in]    boxs       current region to investigate
- * \param[in]    minsum     minimum pixels to trigger propagation
- * \param[in]    skipdist   distance before computing sum for propagation
- * \param[in]    delta      difference required to stop propagation
- * \param[in]    maxbg      maximum number of allowed bg pixels in ref scan
- * \param[in]    sideflag   side to search from
- * \param[in]    boxat      add result of rectangular region found here
- * \param[in]    nascore    add score for this rectangle here
+ * \param[in]    pixs 1 bpp
+ * \param[in]    boxs current region to investigate
+ * \param[in]    minsum  minimum pixels to trigger propagation
+ * \param[in]    skipdist distance before computing sum for propagation
+ * \param[in]    delta difference required to stop propagation
+ * \param[in]    maxbg maximum number of allowed bg pixels in ref scan
+ * \param[in]    sideflag side to search from
+ * \param[in]    boxat add result of rectangular region found here
+ * \param[in]    nascore add score for this rectangle here
  * \return  0 if OK, 1 on error
  *
  * <pre>
@@ -1051,14 +1072,16 @@ l_int32  x, y, x0, y0, xref, yref, colsum, rowsum, score, countref, diff;
 void   **lines1;
 BOX     *boxr;
 
+    PROCNAME("pixSearchForRectangle");
+
     if (!pixs || pixGetDepth(pixs) != 1)
-        return ERROR_INT("pixs undefined or not 1 bpp", __func__, 1);
+        return ERROR_INT("pixs undefined or not 1 bpp", procName, 1);
     if (!boxs)
-        return ERROR_INT("boxs not defined", __func__, 1);
+        return ERROR_INT("boxs not defined", procName, 1);
     if (!boxat)
-        return ERROR_INT("boxat not defined", __func__, 1);
+        return ERROR_INT("boxat not defined", procName, 1);
     if (!nascore)
-        return ERROR_INT("nascore not defined", __func__, 1);
+        return ERROR_INT("nascore not defined", procName, 1);
 
     lines1 = pixGetLinePtrs(pixs, NULL);
     boxGetGeometry(boxs, &bx, &by, &bw, &bh);
@@ -1266,8 +1289,8 @@ success:
  * \brief   makeMosaicStrips()
  *
  * \param[in]    w, h
- * \param[in]    direction    L_SCAN_HORIZONTAL or L_SCAN_VERTICAL
- * \param[in]    size         of strips in the scan direction
+ * \param[in]    direction L_SCAN_HORIZONTAL or L_SCAN_VERTICAL
+ * \param[in]    size of strips in the scan direction
  * \return  boxa, or NULL on error
  *
  * <pre>
@@ -1291,12 +1314,14 @@ l_int32  i, nstrips, extra;
 BOX     *box;
 BOXA    *boxa;
 
+    PROCNAME("makeMosaicStrips");
+
     if (w < 1 || h < 1)
-        return (BOXA *)ERROR_PTR("invalid w or h", __func__, NULL);
+        return (BOXA *)ERROR_PTR("invalid w or h", procName, NULL);
     if (direction != L_SCAN_HORIZONTAL && direction != L_SCAN_VERTICAL)
-        return (BOXA *)ERROR_PTR("invalid direction", __func__, NULL);
+        return (BOXA *)ERROR_PTR("invalid direction", procName, NULL);
     if (size < 1)
-        return (BOXA *)ERROR_PTR("size < 1", __func__, NULL);
+        return (BOXA *)ERROR_PTR("size < 1", procName, NULL);
 
     boxa = boxaCreate(0);
     if (direction == L_SCAN_HORIZONTAL) {
@@ -1331,11 +1356,12 @@ BOXA    *boxa;
  * \brief   boxaCompareRegions()
  *
  * \param[in]    boxa1, boxa2
- * \param[in]    areathresh  minimum area of boxes to be considered
- * \param[out]   pnsame      true if same number of boxes
- * \param[out]   pdiffarea   fractional difference in total area
- * \param[out]   pdiffxor    [optional] fractional difference in xor of regions
- * \param[out]   ppixdb      [optional] debug pix showing two boxa
+ * \param[in]    areathresh minimum area of boxes to be considered
+ * \param[out]   pnsame  true if same number of boxes
+ * \param[out]   pdiffarea fractional difference in total area
+ * \param[out]   pdiffxor [optional] fractional difference
+ *                         in xor of regions
+ * \param[out]   ppixdb [optional] debug pix showing two boxa
  * \return  0 if OK, 1 on error
  *
  * <pre>
@@ -1358,7 +1384,7 @@ BOXA    *boxa;
  *          segmentation mask for text or images from two pages.
  * </pre>
  */
-l_ok
+l_int32
 boxaCompareRegions(BOXA       *boxa1,
                    BOXA       *boxa2,
                    l_int32     areathresh,
@@ -1375,16 +1401,18 @@ BOXA     *boxa3, *boxa4, *boxa3t, *boxa4t;
 PIX      *pix1, *pix2, *pix3, *pix4, *pix5;
 PIXA     *pixa;
 
+    PROCNAME("boxaCompareRegions");
+
     if (pdiffxor) *pdiffxor = 1.0;
     if (ppixdb) *ppixdb = NULL;
     if (pnsame) *pnsame = FALSE;
     if (pdiffarea) *pdiffarea = 1.0;
     if (!boxa1 || !boxa2)
-        return ERROR_INT("boxa1 and boxa2 not both defined", __func__, 1);
+        return ERROR_INT("boxa1 and boxa2 not both defined", procName, 1);
     if (!pnsame)
-        return ERROR_INT("&nsame not defined", __func__, 1);
+        return ERROR_INT("&nsame not defined", procName, 1);
     if (!pdiffarea)
-        return ERROR_INT("&diffarea not defined", __func__, 1);
+        return ERROR_INT("&diffarea not defined", procName, 1);
 
     boxa3 = boxaSelectByArea(boxa1, areathresh, L_SELECT_IF_GTE, NULL);
     boxa4 = boxaSelectByArea(boxa2, areathresh, L_SELECT_IF_GTE, NULL);
@@ -1478,10 +1506,10 @@ PIXA     *pixa;
 /*!
  * \brief   pixSelectLargeULComp()
  *
- * \param[in]    pixs           1 bpp
- * \param[in]    areaslop       fraction near but less than 1.0
- * \param[in]    yslop          number of pixels in y direction
- * \param[in]    connectivity   4 or 8
+ * \param[in]    pixs 1 bpp
+ * \param[in]    areaslop fraction near but less than 1.0
+ * \param[in]    yslop number of pixels in y direction
+ * \param[in]    connectivity 4 or 8
  * \return  box, or NULL on error
  *
  * <pre>
@@ -1509,10 +1537,12 @@ pixSelectLargeULComp(PIX       *pixs,
 BOX   *box;
 BOXA  *boxa1;
 
+    PROCNAME("pixSelectLargeULComp");
+
     if (!pixs)
-        return (BOX *)ERROR_PTR("pixs not defined", __func__, NULL);
+        return (BOX *)ERROR_PTR("pixs not defined", procName, NULL);
     if (areaslop < 0.0 || areaslop > 1.0)
-        return (BOX *)ERROR_PTR("invalid value for areaslop", __func__, NULL);
+        return (BOX *)ERROR_PTR("invalid value for areaslop", procName, NULL);
     yslop = L_MAX(0, yslop);
 
     boxa1 = pixConnCompBB(pixs, connectivity);
@@ -1529,9 +1559,9 @@ BOXA  *boxa1;
 /*!
  * \brief   boxaSelectLargeULBox()
  *
- * \param[in]    boxas      1 bpp
- * \param[in]    areaslop   fraction near but less than 1.0
- * \param[in]    yslop      number of pixels in y direction
+ * \param[in]    boxas 1 bpp
+ * \param[in]    areaslop fraction near but less than 1.0
+ * \param[in]    yslop number of pixels in y direction
  * \return  box, or NULL on error
  *
  * <pre>
@@ -1549,12 +1579,14 @@ l_float32  area, max_area;
 BOX       *box;
 BOXA      *boxa1, *boxa2, *boxa3;
 
+    PROCNAME("boxaSelectLargeULBox");
+
     if (!boxas)
-        return (BOX *)ERROR_PTR("boxas not defined", __func__, NULL);
+        return (BOX *)ERROR_PTR("boxas not defined", procName, NULL);
     if (boxaGetCount(boxas) == 0)
-        return (BOX *)ERROR_PTR("no boxes in boxas", __func__, NULL);
+        return (BOX *)ERROR_PTR("no boxes in boxas", procName, NULL);
     if (areaslop < 0.0 || areaslop > 1.0)
-        return (BOX *)ERROR_PTR("invalid value for areaslop", __func__, NULL);
+        return (BOX *)ERROR_PTR("invalid value for areaslop", procName, NULL);
     yslop = L_MAX(0, yslop);
 
     boxa1 = boxaSort(boxas, L_SORT_BY_AREA, L_SORT_DECREASING, NULL);

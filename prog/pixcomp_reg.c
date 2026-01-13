@@ -33,13 +33,8 @@
  *    We also show some other ways to accumulate and display pixa.
  */
 
-#ifdef HAVE_CONFIG_H
-#include <config_auto.h>
-#endif  /* HAVE_CONFIG_H */
-
 #include <math.h>
 #include "allheaders.h"
-#include "pix_internal.h"
 
 static const char *fnames[] = {"weasel32.png", "weasel2.4c.png",
                                "weasel4.16c.png", "weasel4.8g.png",
@@ -52,7 +47,7 @@ int main(int    argc,
          char **argv)
 {
 l_uint8      *data1, *data2;
-l_int32       i;
+l_int32       i, n;
 size_t        size1, size2;
 BOX          *box;
 PIX          *pix, *pix1, *pix2, *pix3;
@@ -77,10 +72,11 @@ SARRAY       *sa;
     pixc2 = pixcompCreateFromPix(pix2, IFF_JFIF_JPEG);
     pix3 = pixCreateFromPixcomp(pixc2);
     regTestWritePixAndCheck(rp, pix3, IFF_JFIF_JPEG);  /* 0 */
-    pixaAddPix(pixa, pix3, L_INSERT);
+    pixSaveTiledOutline(pix3, pixa, 1.0, 1, 30, 2, 32);
     pixacompAddPix(pixac, pix1, IFF_DEFAULT);
     pixDestroy(&pix1);
     pixDestroy(&pix2);
+    pixDestroy(&pix3);
     pixcompDestroy(&pixc1);
     pixcompDestroy(&pixc2);
 
@@ -91,10 +87,11 @@ SARRAY       *sa;
     pixc2 = pixcompCreateFromPix(pix2, IFF_JFIF_JPEG);
     pix3 = pixCreateFromPixcomp(pixc2);
     regTestWritePixAndCheck(rp, pix3, IFF_JFIF_JPEG);  /* 1 */
-    pixaAddPix(pixa, pix3, L_INSERT);
+    pixSaveTiledOutline(pix3, pixa, 1.0, 1, 30, 2, 32);
     pixacompAddPix(pixac, pix1, IFF_DEFAULT);
     pixDestroy(&pix1);
     pixDestroy(&pix2);
+    pixDestroy(&pix3);
     pixcompDestroy(&pixc1);
     pixcompDestroy(&pixc2);
 
@@ -105,12 +102,13 @@ SARRAY       *sa;
     pixc2 = pixcompCreateFromPix(pix2, IFF_TIFF_G4);
     pix3 = pixCreateFromPixcomp(pixc2);
     regTestWritePixAndCheck(rp, pix3, IFF_TIFF_G4);  /* 2 */
-    pixaAddPix(pixa, pix3, L_INSERT);
+    pixSaveTiledOutline(pix3, pixa, 1.0, 0, 30, 2, 32);
     pixacompAddPix(pixac, pix1, IFF_DEFAULT);
     boxDestroy(&box);
     pixDestroy(&pix);
     pixDestroy(&pix1);
     pixDestroy(&pix2);
+    pixDestroy(&pix3);
     pixcompDestroy(&pixc1);
     pixcompDestroy(&pixc2);
 
@@ -120,10 +118,11 @@ SARRAY       *sa;
     pixc2 = pixcompCreateFromPix(pix2, IFF_PNG);
     pix3 = pixCreateFromPixcomp(pixc2);
     regTestWritePixAndCheck(rp, pix3, IFF_PNG);  /* 3 */
-    pixaAddPix(pixa, pix3, L_INSERT);
+    pixSaveTiledOutline(pix3, pixa, 1.0, 0, 30, 2, 32);
     pixacompAddPix(pixac, pix1, IFF_DEFAULT);
     pixDestroy(&pix1);
     pixDestroy(&pix2);
+    pixDestroy(&pix3);
     pixcompDestroy(&pixc1);
     pixcompDestroy(&pixc2);
 
@@ -136,7 +135,6 @@ SARRAY       *sa;
         /* Save a tiled composite from the pixa */
     pix1 = pixaDisplayTiledAndScaled(pixa, 32, 400, 4, 0, 20, 2);
     regTestWritePixAndCheck(rp, pix1, IFF_JFIF_JPEG);  /* 4 */
-    pixaDestroy(&pixa);
     pixDestroy(&pix1);
 
         /* Convert the pixac --> pixa and save a tiled composite */
@@ -149,7 +147,7 @@ SARRAY       *sa;
         /* Make a pixacomp from files, and join */
     sa = sarrayCreate(0);
     for (i = 0; i < 6; i++)
-        sarrayAddString(sa, fnames[i], L_COPY);
+        sarrayAddString(sa, (char *)fnames[i], L_COPY);
     pixac1 = pixacompCreateFromSA(sa, IFF_DEFAULT);
     pixacompJoin(pixac1, pixac, 0, -1);
     pixa1 = pixaCreateFromPixacomp(pixac1, L_COPY);
@@ -191,25 +189,8 @@ SARRAY       *sa;
     lept_free(data1);
     lept_free(data2);
 
-        /* Test pdf generation (both with and without transcoding */
+    pixaDestroy(&pixa);
     pixacompDestroy(&pixac);
-    pix1 = pixRead("test24.jpg");
-    pix2 = pixRead("marge.jpg");
-    pixac = pixacompCreate(2);
-    pixacompAddPix(pixac, pix1, IFF_JFIF_JPEG);
-    pixacompAddPix(pixac, pix2, IFF_JFIF_JPEG);
-    l_pdfSetDateAndVersion(0);
-    pixacompConvertToPdfData(pixac, 0, 1.0, L_DEFAULT_ENCODE, 0, "test1",
-                             &data1, &size1);
-    regTestWriteDataAndCheck(rp, data1, size1, "pdf");  /* 13 */
-    pixacompFastConvertToPdfData(pixac, "test2", &data2, &size2);
-    regTestWriteDataAndCheck(rp, data2, size2, "pdf");  /* 14 */
-    pixDestroy(&pix1);
-    pixDestroy(&pix2);
-    pixacompDestroy(&pixac);
-    lept_free(data1);
-    lept_free(data2);
-
     return regTestCleanup(rp);
 }
 
@@ -225,13 +206,14 @@ l_int32  ret, format, w, h, d, bps, spp, iscmap;
     d = bps * spp;
     if (d == 24) d = 32;
     if (ret)
-        lept_stderr("Error: couldn't read data: size = %d\n", (l_int32)size);
+        fprintf(stderr, "Error: couldn't read data: size = %d\n",
+                (l_int32)size);
     else
-        lept_stderr("Format data for image %d:\n"
-                    "  format: %s, size (w, h, d) = (%d, %d, %d)\n"
-                    "  bps = %d, spp = %d, iscmap = %d\n",
-                    i, ImageFileFormatExtensions[format], w, h, d,
-                    bps, spp, iscmap);
+        fprintf(stderr, "Format data for image %d:\n"
+                "  format: %s, size (w, h, d) = (%d, %d, %d)\n"
+                "  bps = %d, spp = %d, iscmap = %d\n",
+                i, ImageFileFormatExtensions[format], w, h, d,
+                bps, spp, iscmap);
     return;
 }
 

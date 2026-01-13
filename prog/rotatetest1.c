@@ -38,24 +38,25 @@
 int main(int    argc,
          char **argv)
 {
-l_int32    i, w, h, d, rotflag;
-PIX       *pixs, *pixt, *pixd;
-l_float32  angle, deg2rad, ang;
-char      *filein, *fileout;
+l_int32      i, w, h, d, rotflag;
+PIX         *pixs, *pixt, *pixd;
+l_float32    angle, deg2rad, pops, ang;
+char        *filein, *fileout;
+static char  mainName[] = "rotatetest1";
 
     if (argc != 4)
         return ERROR_INT(" Syntax:  rotatetest1 filein angle fileout",
-                         __func__, 1);
+                         mainName, 1);
+
     filein = argv[1];
     angle = atof(argv[2]);
     fileout = argv[3];
+    deg2rad = 3.1415926535 / 180.;
 
-    setLeptDebugOK(1);
     lept_mkdir("lept/rotate");
 
-    deg2rad = 3.1415926535 / 180.;
     if ((pixs = pixRead(filein)) == NULL)
-        return ERROR_INT("pix not made", __func__, 1);
+        return ERROR_INT("pix not made", mainName, 1);
     if (pixGetDepth(pixs) == 1) {
         pixt = pixScaleToGray3(pixs);
         pixDestroy(&pixs);
@@ -64,7 +65,7 @@ char      *filein, *fileout;
     }
 
     pixGetDimensions(pixs, &w, &h, &d);
-    lept_stderr("w = %d, h = %d\n", w, h);
+    fprintf(stderr, "w = %d, h = %d\n", w, h);
 
 #if 0
         /* repertory of rotation operations to choose from */
@@ -106,9 +107,6 @@ char      *filein, *fileout;
 #endif
 
 #if 0
-{
-    l_float32  pops;
-
         /* timing of various rotation operations (choose) */
     startTimer();
     w = pixGetWidth(pixs);
@@ -118,7 +116,7 @@ char      *filein, *fileout;
         pixDestroy(&pixd);
     }
     pops = (l_float32)(w * h * NTIMES / 1000000.) / stopTimer();
-    lept_stderr("vers. 1, mpops: %f\n", pops);
+    fprintf(stderr, "vers. 1, mpops: %f\n", pops);
     startTimer();
     w = pixGetWidth(pixs);
     h = pixGetHeight(pixs);
@@ -126,13 +124,12 @@ char      *filein, *fileout;
         pixRotateShearIP(pixs, w/2, h/2, deg2rad * angle, L_BRING_IN_WHITE);
     }
     pops = (l_float32)(w * h * NTIMES / 1000000.) / stopTimer();
-    lept_stderr("shear, mpops: %f\n", pops);
+    fprintf(stderr, "shear, mpops: %f\n", pops);
     pixWrite(fileout, pixs, IFF_PNG);
     for (i = 0; i < NTIMES; i++) {
         pixRotateShearIP(pixs, w/2, h/2, -deg2rad * angle, L_BRING_IN_WHITE);
     }
     pixWrite("/usr/tmp/junkout", pixs, IFF_PNG);
-}
 #endif
 
 #if 0
@@ -155,11 +152,11 @@ char      *filein, *fileout;
 
     startTimer();
     pix1 = pixRotateAMColor(pixs, 0.12, 0xffffff00);
-    lept_stderr(" standard color rotate: %7.2f sec\n", stopTimer());
+    fprintf(stderr, " standard color rotate: %7.2f sec\n", stopTimer());
     pixWrite("/tmp/lept/rotate/color1.jpg", pix1, IFF_JFIF_JPEG);
     startTimer();
     pix2 = pixRotateAMColorFast(pixs, 0.12, 0xffffff00);
-    lept_stderr(" fast color rotate: %7.2f sec\n", stopTimer());
+    fprintf(stderr, " fast color rotate: %7.2f sec\n", stopTimer());
     pixWrite("/tmp/lept/rotate/color2.jpg", pix2, IFF_JFIF_JPEG);
     pixd = pixAbsDifference(pix1, pix2);
     pixGetColorHistogram(pixd, 1, &nar, &nag, &nab);

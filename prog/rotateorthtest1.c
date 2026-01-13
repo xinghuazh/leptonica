@@ -33,10 +33,6 @@
  *        direction = 1 for cw; -1 for ccw
  */
 
-#ifdef HAVE_CONFIG_H
-#include <config_auto.h>
-#endif  /* HAVE_CONFIG_H */
-
 #include "allheaders.h"
 
 #define  NTIMES   10
@@ -45,24 +41,25 @@
 int main(int    argc,
          char **argv)
 {
-l_int32    dir;
-PIX       *pixs, *pixd, *pixt;
-l_float32  pops;
-char      *filein, *fileout;
+l_int32      i, w, h, dir;
+PIX         *pixs, *pixd, *pixt;
+l_float32    pops;
+char        *filein, *fileout;
+static char  mainName[] = "rotateorthtest1";
 
     if (argc != 3 && argc != 4)
         return ERROR_INT(" Syntax:  rotateorthtest1 filein fileout [direction]",
-                         __func__, 1);
+                         mainName, 1);
+
     filein = argv[1];
     fileout = argv[2];
     if (argc == 4)
         dir = atoi(argv[3]);
     else
         dir = 1;
-    setLeptDebugOK(1);
 
     if ((pixs = pixRead(filein)) == NULL)
-        return ERROR_INT("pix not made", __func__, 1);
+        return ERROR_INT("pix not made", mainName, 1);
 
         /* Do a single operation */
 #if 1
@@ -85,7 +82,7 @@ char      *filein, *fileout;
         pixDestroy(&pixd);
     }
     pops = (l_float32)(w * h * NTIMES) / stopTimer();
-    lept_stderr("MPops for 90 rotation: %7.3f\n", pops / 1000000.);
+    fprintf(stderr, "MPops for 90 rotation: %7.3f\n", pops / 1000000.);
     pixd = pixRotate90(pixs, dir);
 #endif
 
@@ -98,7 +95,7 @@ char      *filein, *fileout;
     for (i = 0; i < NTIMES; i++)
         pixRotate180(pixd, pixs);
     pops = (l_float32)(w * h * NTIMES) / stopTimer();
-    lept_stderr("MPops for 180 rotation: %7.3f\n", pops / 1000000.);
+    fprintf(stderr, "MPops for 180 rotation: %7.3f\n", pops / 1000000.);
 #endif
 
 
@@ -107,8 +104,8 @@ char      *filein, *fileout;
     pixt = pixRotate180(NULL, pixs);
     pixd = pixRotate180(NULL, pixt);
     pixEqual(pixs, pixd, &eq);
-    if (eq) lept_stderr("2 rots gives I\n");
-    else lept_stderr("2 rots fail to give I\n");
+    if (eq) fprintf(stderr, "2 rots gives I\n");
+    else fprintf(stderr, "2 rots fail to give I\n");
     pixDestroy(&pixt);
 #endif
 
@@ -118,8 +115,8 @@ char      *filein, *fileout;
     pixRotate180(pixd, pixd);
     pixRotate180(pixd, pixd);
     pixEqual(pixs, pixd, &eq);
-    if (eq) lept_stderr("2 rots gives I\n");
-    else lept_stderr("2 rots fail to give I\n");
+    if (eq) fprintf(stderr, "2 rots gives I\n");
+    else fprintf(stderr, "2 rots fail to give I\n");
 #endif
 
         /* Mix rotate 180 with LR/TB */
@@ -128,8 +125,8 @@ char      *filein, *fileout;
     pixRotateLR(pixd, pixd);
     pixRotateTB(pixd, pixd);
     pixEqual(pixs, pixd, &eq);
-    if (eq) lept_stderr("180 rot OK\n");
-    else lept_stderr("180 rot error\n");
+    if (eq) fprintf(stderr, "180 rot OK\n");
+    else fprintf(stderr, "180 rot error\n");
 #endif
 
     if (pixGetDepth(pixd) < 8)

@@ -28,35 +28,32 @@
  * graymorphtest.c
  *
  *     Implements basic grayscale morphology; tests speed
+ *
  */
-
-#ifdef HAVE_CONFIG_H
-#include <config_auto.h>
-#endif  /* HAVE_CONFIG_H */
 
 #include "allheaders.h"
 
 int main(int    argc,
          char **argv)
 {
-char    *filein, *fileout;
-l_int32  wsize, hsize, w, h, d;
-PIX     *pixs, *pixd;
+char           *filein, *fileout;
+l_int32         wsize, hsize, w, h, d;
+PIX            *pixs, *pixd;
+static char     mainName[] = "graymorphtest";
 
     if (argc != 5)
         return ERROR_INT(" Syntax:  graymorphtest filein wsize hsize fileout",
-                         __func__, 1);
+                         mainName, 1);
+
     filein = argv[1];
     wsize = atoi(argv[2]);
     hsize = atoi(argv[3]);
     fileout = argv[4];
-    setLeptDebugOK(1);
-
     if ((pixs = pixRead(filein)) == NULL)
-        return ERROR_INT("pix not made", __func__, 1);
+        return ERROR_INT("pix not made", mainName, 1);
     pixGetDimensions(pixs, &w, &h, &d);
     if (d != 8)
-        return ERROR_INT("pix not 8 bpp", __func__, 1);
+        return ERROR_INT("pix not 8 bpp", mainName, 1);
 
     /* ---------- Choose an operation ----------  */
 #if 1
@@ -90,7 +87,7 @@ PIX     *pixs, *pixd;
 #if 0
     startTimer();
     pixd = pixCloseGray(pixs, wsize, hsize);
-    lept_stderr(" Speed is %6.2f MPix/sec\n",
+    fprintf(stderr, " Speed is %6.2f MPix/sec\n",
           (l_float32)(4 * w * h) / (1000000. * stopTimer()));
     pixWrite(fileout, pixd, IFF_PNG);
 #endif

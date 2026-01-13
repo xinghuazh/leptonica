@@ -41,26 +41,22 @@
  *    resolution.
  */
 
-#ifdef HAVE_CONFIG_H
-#include <config_auto.h>
-#endif  /* HAVE_CONFIG_H */
-
 #include "allheaders.h"
 
 int main(int    argc,
          char **argv)
 {
-l_int32    w, h, ystart, yend, y, ymax, ymid, i, window, sum1, sum2, rankx;
-l_uint32   uval;
-l_float32  ave, rankval, maxvar, variance, norm, conf, angle, radangle;
-NUMA      *na1;
-PIX       *pix1, *pix2, *pix3, *pix4, *pix5, *pix6, *pix7;
-PIXA      *pixa;
+l_int32      w, h, ystart, yend, y, ymax, ymid, i, window, sum1, sum2, rankx;
+l_uint32     uval;
+l_float32    ave, rankval, maxvar, variance, norm, conf, angle, radangle;
+NUMA        *na1;
+PIX         *pix1, *pix2, *pix3, *pix4, *pix5, *pix6, *pix7;
+PIXA        *pixa;
+static char  mainName[] = "findbinding";
 
     if (argc != 1)
-        return ERROR_INT(" Syntax:  findbinding", __func__, 1);
+        return ERROR_INT(" Syntax:  findbinding", mainName, 1);
 
-    setLeptDebugOK(1);
     lept_mkdir("lept/binding");
     pixa = pixaCreate(0);
 
@@ -70,7 +66,7 @@ PIXA      *pixa;
         /* Find the skew angle */
     pix3 = pixConvertTo1(pix2, 150);
     pixFindSkewSweepAndSearch(pix3, &angle, &conf, 2, 2, 7.0, 1.0, 0.01);
-    lept_stderr("angle = %f, conf = %f\n", angle, conf);
+    fprintf(stderr, "angle = %f, conf = %f\n", angle, conf);
 
         /* Deskew, bringing in black pixels at the edges */
     if (L_ABS(angle) < 0.1 || conf < 1.5) {
@@ -132,7 +128,7 @@ PIXA      *pixa;
 
         /* Plot the windowed variance as a function of the y-value
          * of the window location */
-    lept_stderr("maxvar = %f, ymax = %d\n", maxvar, ymax);
+    fprintf(stderr, "maxvar = %f, ymax = %d\n", maxvar, ymax);
     gplotSimple1(na1, GPLOT_PNG, "/tmp/lept/binding/root", NULL);
     pix7 = pixRead("/tmp/lept/binding/root.png");
     pixDisplay(pix7, 0, 800);
@@ -146,7 +142,7 @@ PIXA      *pixa;
     pixaAddPix(pixa, pix5, L_COPY);
 
         /* Bundle the results up in a pdf */
-    lept_stderr("Writing pdf output file: /tmp/lept/binding/binding.pdf\n");
+    fprintf(stderr, "Writing pdf output file: /tmp/lept/binding/binding.pdf\n");
     pixaConvertToPdf(pixa, 45, 1.0, 0, 0, "Binding locator",
                      "/tmp/lept/binding/binding.pdf");
 

@@ -30,10 +30,6 @@
  *  Regression test for simple color morphological operations
  */
 
-#ifdef HAVE_CONFIG_H
-#include <config_auto.h>
-#endif  /* HAVE_CONFIG_H */
-
 #include "allheaders.h"
 
 static const l_int32  SIZE = 7;
@@ -54,7 +50,7 @@ L_REGPARAMS  *rp;
 
     pix1 = pixColorMorph(pixs, L_MORPH_DILATE, SIZE, SIZE);
     regTestWritePixAndCheck(rp, pix1, IFF_JFIF_JPEG);  /* 0 */
-    snprintf(buf, sizeof(buf), "d%d.%d", SIZE, SIZE);
+    sprintf(buf, "d%d.%d", SIZE, SIZE);
     pix2 = pixColorMorphSequence(pixs, buf, 0, 0);
     regTestComparePix(rp, pix1, pix2);  /* 1 */
     pixaAddPix(pixa, pix1, L_INSERT);
@@ -62,7 +58,7 @@ L_REGPARAMS  *rp;
 
     pix1 = pixColorMorph(pixs, L_MORPH_ERODE, SIZE, SIZE);
     regTestWritePixAndCheck(rp, pix1, IFF_JFIF_JPEG);  /* 2 */
-    snprintf(buf, sizeof(buf), "e%d.%d", SIZE, SIZE);
+    sprintf(buf, "e%d.%d", SIZE, SIZE);
     pix2 = pixColorMorphSequence(pixs, buf, 0, 0);
     regTestComparePix(rp, pix1, pix2);  /* 3 */
     pixaAddPix(pixa, pix1, L_INSERT);
@@ -70,7 +66,7 @@ L_REGPARAMS  *rp;
 
     pix1 = pixColorMorph(pixs, L_MORPH_OPEN, SIZE, SIZE);
     regTestWritePixAndCheck(rp, pix1, IFF_JFIF_JPEG);  /* 4 */
-    snprintf(buf, sizeof(buf), "o%d.%d", SIZE, SIZE);
+    sprintf(buf, "o%d.%d", SIZE, SIZE);
     pix2 = pixColorMorphSequence(pixs, buf, 0, 0);
     regTestComparePix(rp, pix1, pix2);  /* 5 */
     pixaAddPix(pixa, pix1, L_INSERT);
@@ -78,7 +74,7 @@ L_REGPARAMS  *rp;
 
     pix1 = pixColorMorph(pixs, L_MORPH_CLOSE, SIZE, SIZE);
     regTestWritePixAndCheck(rp, pix1, IFF_JFIF_JPEG);  /* 6 */
-    snprintf(buf, sizeof(buf), "c%d.%d", SIZE, SIZE);
+    sprintf(buf, "c%d.%d", SIZE, SIZE);
     pix2 = pixColorMorphSequence(pixs, buf, 0, 0);
     regTestComparePix(rp, pix1, pix2);  /* 7 */
     pixaAddPix(pixa, pix1, L_INSERT);
@@ -86,10 +82,10 @@ L_REGPARAMS  *rp;
 
     if (rp->display) {
         lept_mkdir("lept/cmorph");
-        lept_stderr("Writing to: /tmp/lept/cmorph/colormorph.pdf\n");
+        fprintf(stderr, "Writing to: /tmp/lept/cmorph/colormorph.pdf\n");
         pixaConvertToPdf(pixa, 0, 1.0, L_FLATE_ENCODE, 0, "colormorph-test",
                          "/tmp/lept/cmorph/colormorph.pdf");
-        lept_stderr("Writing to: /tmp/lept/cmorph/colormorph.jpg\n");
+        fprintf(stderr, "Writing to: /tmp/lept/cmorph/colormorph.jpg\n");
         pix1 = pixaDisplayTiledInColumns(pixa, 2, 1.0, 30, 2);
         pixWrite("/tmp/lept/cmorph/colormorph.jpg", pix1, IFF_JFIF_JPEG);
         pixDisplay(pix1, 100, 100);

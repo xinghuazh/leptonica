@@ -79,14 +79,11 @@
  * </pre>
  */
 
-#ifdef HAVE_CONFIG_H
-#include <config_auto.h>
-#endif  /* HAVE_CONFIG_H */
-
 #include <string.h>
 #include <math.h>
 #include "allheaders.h"
-#include "pix_internal.h"
+
+
 
 /*-----------------------------------------------------------------------*
  *      Label pixels by an index for connected component membership      *
@@ -94,10 +91,10 @@
 /*!
  * \brief   pixConnCompTransform()
  *
- * \param[in]     pixs       1 bpp
- * \param[in]     connect    connectivity: 4 or 8
- * \param[in]     depth      of pixd: 8 or 16 bpp; use 0 for auto determination
- * \return   pixd   8, 16 or 32 bpp, or NULL on error
+ * \param[in]     pixs 1 bpp
+ * \param[in]     connect connectivity: 4 or 8
+ * \param[in]     depth of pixd: 8 or 16 bpp; use 0 for auto determination
+ * \return   pixd 8, 16 or 32 bpp, or NULL on error
  *
  * <pre>
  * Notes:
@@ -123,12 +120,14 @@ BOXA    *boxa;
 PIX     *pix1, *pix2, *pixd;
 PIXA    *pixa;
 
+    PROCNAME("pixConnCompTransform");
+
     if (!pixs || pixGetDepth(pixs) != 1)
-        return (PIX *)ERROR_PTR("pixs undefined or not 1 bpp", __func__, NULL);
+        return (PIX *)ERROR_PTR("pixs undefined or not 1 bpp", procName, NULL);
     if (connect != 4 && connect != 8)
-        return (PIX *)ERROR_PTR("connectivity must be 4 or 8", __func__, NULL);
+        return (PIX *)ERROR_PTR("connectivity must be 4 or 8", procName, NULL);
     if (depth != 0 && depth != 8 && depth != 16 && depth != 32)
-        return (PIX *)ERROR_PTR("depth must be 0, 8, 16 or 32", __func__, NULL);
+        return (PIX *)ERROR_PTR("depth must be 0, 8, 16 or 32", procName, NULL);
 
     boxa = pixConnComp(pixs, &pixa, connect);
     n = pixaGetCount(pixa);
@@ -179,9 +178,9 @@ PIXA    *pixa;
 /*!
  * \brief   pixConnCompAreaTransform()
  *
- * \param[in]     pixs       1 bpp
- * \param[in]     connect    connectivity: 4 or 8
- * \return   pixd   32 bpp, 1 spp, or NULL on error
+ * \param[in]     pixs 1 bpp
+ * \param[in]     connect connectivity: 4 or 8
+ * \return   pixd 32 bpp, 1 spp, or NULL on error
  *
  * <pre>
  * Notes:
@@ -201,10 +200,12 @@ BOXA     *boxa;
 PIX      *pix1, *pix2, *pixd;
 PIXA     *pixa;
 
+    PROCNAME("pixConnCompAreaTransform");
+
     if (!pixs || pixGetDepth(pixs) != 1)
-        return (PIX *)ERROR_PTR("pixs undefined or not 1 bpp", __func__, NULL);
+        return (PIX *)ERROR_PTR("pixs undefined or not 1 bpp", procName, NULL);
     if (connect != 4 && connect != 8)
-        return (PIX *)ERROR_PTR("connectivity must be 4 or 8", __func__, NULL);
+        return (PIX *)ERROR_PTR("connectivity must be 4 or 8", procName, NULL);
 
     boxa = pixConnComp(pixs, &pixa, connect);
     n = pixaGetCount(pixa);
@@ -241,11 +242,11 @@ PIXA     *pixa;
 /*!
  * \brief   pixConnCompIncrInit()
  *
- * \param[in]     pixs     1 bpp
- * \param[in]     conn     connectivity: 4 or 8
- * \param[out]    ppixd    32 bpp, with c.c. labelled
- * \param[out]    pptaa    with pixel locations indexed by c.c.
- * \param[out]    pncc     initial number of c.c.
+ * \param[in]     pixs 1 bpp
+ * \param[in]     conn connectivity: 4 or 8
+ * \param[out]    ppixd 32 bpp, with c.c. labelled
+ * \param[out]    pptaa with pixel locations indexed by c.c.
+ * \param[out]    pncc initial number of c.c.
  * \return   0 if OK, 1 on error
  *
  * <pre>
@@ -262,7 +263,7 @@ PIXA     *pixa;
  *          and representing the background value (index 0) in the pix.
  * </pre>
  */
-l_ok
+l_int32
 pixConnCompIncrInit(PIX     *pixs,
                     l_int32  conn,
                     PIX    **ppixd,
@@ -274,15 +275,17 @@ PIX     *pixd;
 PTA     *pta;
 PTAA    *ptaa;
 
+    PROCNAME("pixConnCompIncrInit");
+
     if (ppixd) *ppixd = NULL;
     if (pptaa) *pptaa = NULL;
     if (pncc) *pncc = 0;
     if (!ppixd || !pptaa || !pncc)
-        return ERROR_INT("&pixd, &ptaa, &ncc not all defined", __func__, 1);
+        return ERROR_INT("&pixd, &ptaa, &ncc not all defined", procName, 1);
     if (!pixs || pixGetDepth(pixs) != 1)
-        return ERROR_INT("pixs undefined or not 1 bpp", __func__, 1);
+        return ERROR_INT("pixs undefined or not 1 bpp", procName, 1);
     if (conn != 4 && conn != 8)
-        return ERROR_INT("connectivity must be 4 or 8", __func__, 1);
+        return ERROR_INT("connectivity must be 4 or 8", procName, 1);
 
     pixGetDimensions(pixs, &w, &h, NULL);
     pixZero(pixs, &empty);
@@ -298,11 +301,11 @@ PTAA    *ptaa;
 
         /* Set up the initial labeled image and indexed pixel arrays */
     if ((pixd = pixConnCompTransform(pixs, conn, 32)) == NULL)
-        return ERROR_INT("pixd not made", __func__, 1);
+        return ERROR_INT("pixd not made", procName, 1);
     pixSetSpecial(pixd, conn);
     *ppixd = pixd;
     if ((ptaa = ptaaIndexLabeledPixels(pixd, &ncc)) == NULL)
-        return ERROR_INT("ptaa not made", __func__, 1);
+        return ERROR_INT("ptaa not made", procName, 1);
     *pptaa = ptaa;
     *pncc = ncc;
     return 0;
@@ -312,12 +315,12 @@ PTAA    *ptaa;
 /*!
  * \brief   pixConnCompIncrAdd()
  *
- * \param[in]     pixs     32 bpp, with pixels labeled by c.c.
- * \param[in]     ptaa     with each pta of pixel locations indexed by c.c.
- * \param[out]    pncc     number of c.c
- * \param[in]     x,y      location of added pixel
- * \param[in]     debug    0 for no output; otherwise output whenever
- *                         debug <= nvals, up to debug == 3
+ * \param[in]     pixs 32 bpp, with pixels labeled by c.c.
+ * \param[in]     ptaa with each pta of pixel locations indexed by c.c.
+ * \param[out]    pncc number of c.c
+ * \param[in]     x,y location of added pixel
+ * \param[in]     debug 0 for no output; otherwise output whenever
+ *                      debug <= nvals, up to debug == 3
  * \return   -1 if nothing happens; 0 if a pixel is added; 1 on error
  *
  * <pre>
@@ -357,20 +360,22 @@ l_uint32  val;
 l_int32  *neigh;
 PTA      *ptas, *ptad;
 
+    PROCNAME("pixConnCompIncrAdd");
+
     if (!pixs || pixGetDepth(pixs) != 32)
-        return ERROR_INT("pixs not defined or not 32 bpp", __func__, 1);
+        return ERROR_INT("pixs not defined or not 32 bpp", procName, 1);
     if (!ptaa)
-        return ERROR_INT("ptaa not defined", __func__, 1);
+        return ERROR_INT("ptaa not defined", procName, 1);
     if (!pncc)
-        return ERROR_INT("&ncc not defined", __func__, 1);
+        return ERROR_INT("&ncc not defined", procName, 1);
     conn = pixs->special;
     if (conn != 4 && conn != 8)
-        return ERROR_INT("connectivity must be 4 or 8", __func__, 1);
+        return ERROR_INT("connectivity must be 4 or 8", procName, 1);
     pixGetDimensions(pixs, &w, &h, NULL);
     if (x < 0 || x >= w)
-        return ERROR_INT("invalid x pixel location", __func__, 1);
+        return ERROR_INT("invalid x pixel location", procName, 1);
     if (y < 0 || y >= h)
-        return ERROR_INT("invalid y pixel location", __func__, 1);
+        return ERROR_INT("invalid y pixel location", procName, 1);
 
     pixGetPixel(pixs, x, y, &val);
     if (val > 0)  /* already belongs to a set */
@@ -402,7 +407,7 @@ PTA      *ptas, *ptad;
     ptaaAddPt(ptaa, neigh[0], x, y);
     if (nvals == 1) {
         if (debug == 1)
-            lept_stderr("nvals = %d: neigh = (%d)\n", nvals, neigh[0]);
+            fprintf(stderr, "nvals = %d: neigh = (%d)\n", nvals, neigh[0]);
         LEPT_FREE(neigh);
         return 0;
     }
@@ -416,18 +421,18 @@ PTA      *ptas, *ptad;
          *  (b) save the pixel locations in the pta for the first component. */
     if (nvals == 2) {
         if (debug >= 1 && debug <= 2) {
-            lept_stderr("nvals = %d: neigh = (%d,%d)\n", nvals,
-                        neigh[0], neigh[1]);
+            fprintf(stderr, "nvals = %d: neigh = (%d,%d)\n", nvals,
+                    neigh[0], neigh[1]);
         }
     } else if (nvals == 3) {
         if (debug >= 1 && debug <= 3) {
-            lept_stderr("nvals = %d: neigh = (%d,%d,%d)\n", nvals,
-                        neigh[0], neigh[1], neigh[2]);
+            fprintf(stderr, "nvals = %d: neigh = (%d,%d,%d)\n", nvals,
+                    neigh[0], neigh[1], neigh[2]);
         }
     } else {  /* nvals == 4 */
         if (debug >= 1 && debug <= 4) {
-            lept_stderr("nvals = %d: neigh = (%d,%d,%d,%d)\n", nvals,
-                        neigh[0], neigh[1], neigh[2], neigh[3]);
+            fprintf(stderr, "nvals = %d: neigh = (%d,%d,%d,%d)\n", nvals,
+                    neigh[0], neigh[1], neigh[2], neigh[3]);
         }
     }
     ptad = ptaaGetPta(ptaa, firstindex, L_CLONE);
@@ -452,12 +457,12 @@ PTA      *ptas, *ptad;
 /*!
  * \brief   pixGetSortedNeighborValues()
  *
- * \param[in]     pixs     8, 16 or 32 bpp, with pixels labeled by c.c.
- * \param[in]     x, y     location of pixel
- * \param[in]     conn     4 or 8 connected neighbors
- * \param[out]    pneigh   array of integers, to be filled with
- *                         the values of the neighbors, if any
- * \param[out]    pnvals   the number of unique neighbor values found
+ * \param[in]     pixs 8, 16 or 32 bpp, with pixels labeled by c.c.
+ * \param[in]     x, y location of pixel
+ * \param[in]     conn 4 or 8 connected neighbors
+ * \param[out]    pneigh array of integers, to be filled with
+ *                      the values of the neighbors, if any
+ * \param[out]    pnvals the number of unique neighbor values found
  * \return   0 if OK, 1 on error
  *
  * <pre>
@@ -472,7 +477,7 @@ PTA      *ptas, *ptad;
  *          neighbor values is 4.
  * </pre>
  */
-l_ok
+l_int32
 pixGetSortedNeighborValues(PIX       *pixs,
                            l_int32    x,
                            l_int32    y,
@@ -489,16 +494,18 @@ L_ASET_NODE  *node;
 PTA          *pta;
 RB_TYPE       key;
 
+    PROCNAME("pixGetSortedNeighborValues");
+
     if (pneigh) *pneigh = NULL;
     if (pnvals) *pnvals = 0;
     if (!pneigh || !pnvals)
-        return ERROR_INT("&neigh and &nvals not both defined", __func__, 1);
+        return ERROR_INT("&neigh and &nvals not both defined", procName, 1);
     if (!pixs || pixGetDepth(pixs) < 8)
-        return ERROR_INT("pixs not defined or depth < 8", __func__, 1);
+        return ERROR_INT("pixs not defined or depth < 8", procName, 1);
 
         /* Identify the locations of nearest neighbor pixels */
     if ((pta = ptaGetNeighborPixLocs(pixs, x, y, conn)) == NULL)
-        return ERROR_INT("pta of neighbors not made", __func__, 1);
+        return ERROR_INT("pta of neighbors not made", procName, 1);
 
         /* Find the pixel values and insert into a set as keys */
     aset = l_asetCreate(L_UINT_TYPE);
@@ -540,8 +547,8 @@ RB_TYPE       key;
 /*!
  * \brief   pixLocToColorTransform()
  *
- * \param[in]     pixs    1 bpp
- * \return   pixd   32 bpp rgb, or NULL on error
+ * \param[in]     pixs 1 bpp
+ * \return   pixd 32 bpp rgb, or NULL on error
  *
  * <pre>
  * Notes:
@@ -565,8 +572,10 @@ l_uint32  *datas, *datar, *datag, *datab, *datacc;
 l_uint32  *lines, *liner, *lineg, *lineb, *linecc;
 PIX       *pix1, *pixcc, *pixr, *pixg, *pixb, *pixd;
 
+    PROCNAME("pixLocToColorTransform");
+
     if (!pixs || pixGetDepth(pixs) != 1)
-        return (PIX *)ERROR_PTR("pixs undefined or not 1 bpp", __func__, NULL);
+        return (PIX *)ERROR_PTR("pixs undefined or not 1 bpp", procName, NULL);
 
         /* Label each pixel with the area of the c.c. to which it belongs.
          * Clip the result to 255 in an 8 bpp pix. This is used for
@@ -574,8 +583,8 @@ PIX       *pix1, *pixcc, *pixr, *pixg, *pixb, *pixd;
     pixGetDimensions(pixs, &w, &h, NULL);
     w2 = w / 2;
     h2 = h / 2;
-    invw2 = 255.0f / (l_float32)w2;
-    invh2 = 255.0f / (l_float32)h2;
+    invw2 = 255.0 / (l_float32)w2;
+    invh2 = 255.0 / (l_float32)h2;
     pix1 = pixConnCompAreaTransform(pixs, 8);
     pixcc = pixConvert32To8(pix1, L_LS_TWO_BYTES, L_CLIP_TO_FF);
     pixDestroy(&pix1);

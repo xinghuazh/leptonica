@@ -30,10 +30,6 @@
  *   Tests scale-to-gray, unsharp masking, smoothing, and color scaling
  */
 
-#ifdef HAVE_CONFIG_H
-#include <config_auto.h>
-#endif  /* HAVE_CONFIG_H */
-
 #include "allheaders.h"
 
 #define   DISPLAY      0    /* set to 1 to see the results */
@@ -41,23 +37,24 @@
 int main(int    argc,
          char **argv)
 {
-PIX     *pixs;
-l_int32  d;
+PIX         *pixs;
+l_int32      d;
+static char  mainName[] = "scaletest2";
 
     if (argc != 2)
-        return ERROR_INT(" Syntax:  scaletest2 filein", __func__, 1);
-
-    setLeptDebugOK(1);
-    lept_mkdir("lept/scale");
+        return ERROR_INT(" Syntax:  scaletest2 filein", mainName, 1);
 
     if ((pixs = pixRead(argv[1])) == NULL)
-       	return ERROR_INT("pixs not made", __func__, 1);
+       	return ERROR_INT("pixs not made", mainName, 1);
     d = pixGetDepth(pixs);
+
+    lept_mkdir("lept/scale");
 
 #if 1
         /* Integer scale-to-gray functions */
-    if (d == 1) {
-        PIX  *pixd;
+    if (d == 1)
+    {
+    PIX  *pixd;
 
         pixd = pixScaleToGray2(pixs);
         pixWrite("/tmp/lept/scale/s2g_2x", pixd, IFF_PNG);
@@ -83,8 +80,9 @@ l_int32  d;
 #if 1
         /* Various non-integer scale-to-gray, compared with
 	 * with different ways of getting similar results */
-    if (d == 1) {
-        PIX  *pixt, *pixd;
+    if (d == 1)
+    {
+    PIX  *pixt, *pixd;
 
         pixd = pixScaleToGray8(pixs);
         pixWrite("/tmp/lept/scale/s2g_8.png", pixd, IFF_PNG);
@@ -142,12 +140,12 @@ l_int32  d;
 
 #if 1
         /* Antialiased (smoothed) reduction, along with sharpening */
-    if (d != 1) {
-        PIX *pixt1, *pixt2;
-
+    if (d != 1)
+    {
+    PIX *pixt1, *pixt2;
         startTimer();
         pixt1 = pixScaleSmooth(pixs, 0.154, 0.154);
-        lept_stderr("fast scale: %5.3f sec\n", stopTimer());
+        fprintf(stderr, "fast scale: %5.3f sec\n", stopTimer());
         pixDisplayWithTitle(pixt1, 0, 0, "smooth scaling", DISPLAY);
         pixWrite("/tmp/lept/scale/smooth1.png", pixt1, IFF_PNG);
         pixt2 = pixUnsharpMasking(pixt1, 1, 0.3);
@@ -161,16 +159,16 @@ l_int32  d;
 
 #if 1
         /* Test a large range of scale-to-gray reductions */
-    if (d == 1) {
-        l_int32    i;
-        l_float32  scale;
-        PIX       *pixd;
-
+    if (d == 1)
+    {
+    l_int32    i;
+    l_float32  scale;
+    PIX       *pixd;
         for (i = 2; i < 15; i++) {
             scale = 1. / (l_float32)i;
             startTimer();
             pixd = pixScaleToGray(pixs, scale);
-            lept_stderr("Time for scale %7.3f: %7.3f sec\n",
+            fprintf(stderr, "Time for scale %7.3f: %7.3f sec\n",
             scale, stopTimer());
             pixDisplayWithTitle(pixd, 75 * i, 100, "scaletogray", DISPLAY);
             pixDestroy(&pixd);
@@ -179,7 +177,7 @@ l_int32  d;
             scale = 1. / (l_float32)(2 * i);
             startTimer();
             pixd = pixScaleToGray(pixs, scale);
-            lept_stderr("Time for scale %7.3f: %7.3f sec\n",
+            fprintf(stderr, "Time for scale %7.3f: %7.3f sec\n",
             scale, stopTimer());
             pixDisplayWithTitle(pixd, 100 * i, 600, "scaletogray", DISPLAY);
             pixDestroy(&pixd);
@@ -190,16 +188,16 @@ l_int32  d;
 
 #if 1
         /* Test the same range of scale-to-gray mipmap reductions */
-    if (d == 1) {
-        l_int32    i;
-        l_float32  scale;
-        PIX       *pixd;
-
+    if (d == 1)
+    {
+    l_int32    i;
+    l_float32  scale;
+    PIX       *pixd;
         for (i = 2; i < 15; i++) {
             scale = 1. / (l_float32)i;
             startTimer();
             pixd = pixScaleToGrayMipmap(pixs, scale);
-            lept_stderr("Time for scale %7.3f: %7.3f sec\n",
+            fprintf(stderr, "Time for scale %7.3f: %7.3f sec\n",
             scale, stopTimer());
             pixDisplayWithTitle(pixd, 75 * i, 100, "scale mipmap", DISPLAY);
             pixDestroy(&pixd);
@@ -208,7 +206,7 @@ l_int32  d;
             scale = 1. / (l_float32)(2 * i);
             startTimer();
             pixd = pixScaleToGrayMipmap(pixs, scale);
-            lept_stderr("Time for scale %7.3f: %7.3f sec\n",
+            fprintf(stderr, "Time for scale %7.3f: %7.3f sec\n",
             scale, stopTimer());
             pixDisplayWithTitle(pixd, 100 * i, 600, "scale mipmap", DISPLAY);
             pixDestroy(&pixd);
@@ -219,7 +217,8 @@ l_int32  d;
 #if 1
         /* Test several methods for antialiased reduction,
          * along with sharpening */
-    if (d != 1) {
+    if (d != 1)
+    {
         PIX *pixt1, *pixt2, *pixt3, *pixt4, *pixt5, *pixt6, *pixt7;
         l_float32 SCALING = 0.27;
         l_int32   SIZE = 7;
@@ -230,7 +229,7 @@ l_int32  d;
 
         startTimer();
         pixt1 = pixScaleSmooth(pixs, SCALING, SCALING);
-        lept_stderr("fast scale: %5.3f sec\n", stopTimer());
+        fprintf(stderr, "fast scale: %5.3f sec\n", stopTimer());
         pixDisplayWithTitle(pixt1, 0, 0, "smooth scaling", DISPLAY);
         pixWrite("/tmp/lept/scale/sm_1.png", pixt1, IFF_PNG);
         pixt2 = pixUnsharpMasking(pixt1, 1, 0.3);
@@ -239,7 +238,7 @@ l_int32  d;
         startTimer();
         pixt3 = pixBlockconv(pixs, smooth, smooth);
         pixt4 = pixScaleBySampling(pixt3, SCALING, SCALING);
-        lept_stderr("slow scale: %5.3f sec\n", stopTimer());
+        fprintf(stderr, "slow scale: %5.3f sec\n", stopTimer());
         pixDisplayWithTitle(pixt4, 200, 200, "sampled scaling", DISPLAY);
         pixWrite("/tmp/lept/scale/sm_2.png", pixt4, IFF_PNG);
 
@@ -247,7 +246,7 @@ l_int32  d;
         pixt5 = pixUnsharpMasking(pixs, smooth, FRACT);
         pixt6 = pixBlockconv(pixt5, smooth, smooth);
         pixt7 = pixScaleBySampling(pixt6, SCALING, SCALING);
-        lept_stderr("very slow scale + sharp: %5.3f sec\n", stopTimer());
+        fprintf(stderr, "very slow scale + sharp: %5.3f sec\n", stopTimer());
         pixDisplayWithTitle(pixt7, 500, 200, "sampled scaling", DISPLAY);
         pixWrite("/tmp/lept/scale/sm_3.jpg", pixt7, IFF_JFIF_JPEG);
 
@@ -266,18 +265,19 @@ l_int32  d;
         /* Test the color scaling function, comparing the
          * special case of scaling factor 2.0 with the
          * general case. */
-    if (d == 32) {
-        PIX    *pix1, *pix2, *pixd;
-        NUMA   *nar, *nag, *nab, *naseq;
-        GPLOT  *gplot;
+    if (d == 32)
+    {
+    PIX    *pix1, *pix2, *pixd;
+    NUMA   *nar, *nag, *nab, *naseq;
+    GPLOT  *gplot;
 
         startTimer();
         pix1 = pixScaleColorLI(pixs, 2.00001, 2.0);
-        lept_stderr(" Time with regular LI: %7.3f\n", stopTimer());
+        fprintf(stderr, " Time with regular LI: %7.3f\n", stopTimer());
         pixWrite("/tmp/lept/scale/color1.jpg", pix1, IFF_JFIF_JPEG);
         startTimer();
         pix2 = pixScaleColorLI(pixs, 2.0, 2.0);
-        lept_stderr(" Time with 2x LI: %7.3f\n", stopTimer());
+        fprintf(stderr, " Time with 2x LI: %7.3f\n", stopTimer());
         pixWrite("/tmp/lept/scale/color2.jpg", pix2, IFF_JFIF_JPEG);
 
         pixd = pixAbsDifference(pix1, pix2);
@@ -307,10 +307,11 @@ l_int32  d;
         /* Test the gray LI scaling function, comparing the
          * special cases of scaling factor 2.0 and 4.0 with the
          * general case */
-    if (d == 8 || d == 32) {
-        PIX    *pixt, *pix0, *pix1, *pix2, *pixd;
-        NUMA   *nagray, *naseq;
-        GPLOT  *gplot;
+    if (d == 8 || d == 32)
+    {
+    PIX    *pixt, *pix0, *pix1, *pix2, *pixd;
+    NUMA   *nagray, *naseq;
+    GPLOT  *gplot;
 
         if (d == 8)
             pixt = pixClone(pixs);
@@ -321,17 +322,17 @@ l_int32  d;
 #if 1
         startTimer();
         pix1 = pixScaleGrayLI(pix0, 2.00001, 2.0);
-        lept_stderr(" Time with regular LI 2x: %7.3f\n", stopTimer());
+        fprintf(stderr, " Time with regular LI 2x: %7.3f\n", stopTimer());
         startTimer();
         pix2 = pixScaleGrayLI(pix0, 2.0, 2.0);
-        lept_stderr(" Time with 2x LI: %7.3f\n", stopTimer());
+        fprintf(stderr, " Time with 2x LI: %7.3f\n", stopTimer());
 #else
         startTimer();
         pix1 = pixScaleGrayLI(pix0, 4.00001, 4.0);
-        lept_stderr(" Time with regular LI 4x: %7.3f\n", stopTimer());
+        fprintf(stderr, " Time with regular LI 4x: %7.3f\n", stopTimer());
         startTimer();
         pix2 = pixScaleGrayLI(pix0, 4.0, 4.0);
-        lept_stderr(" Time with 2x LI: %7.3f\n", stopTimer());
+        fprintf(stderr, " Time with 2x LI: %7.3f\n", stopTimer());
 #endif
         pixWrite("/tmp/lept/scale/gray1", pix1, IFF_JFIF_JPEG);
         pixWrite("/tmp/lept/scale/gray2", pix2, IFF_JFIF_JPEG);

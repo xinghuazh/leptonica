@@ -24,19 +24,10 @@
  -  SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
  *====================================================================*/
 
+
 /*!
  * \file  ptafunc1.c
  * <pre>
- *
- *      --------------------------------------
- *      This file has these Pta utilities:
- *         - simple rearrangements
- *         - geometric analysis
- *         - min/max and filtering
- *         - least squares fitting
- *         - interconversions with Pix and Numa
- *         - display into a pix
- *      --------------------------------------
  *
  *      Simple rearrangements
  *           PTA      *ptaSubsample()
@@ -57,7 +48,6 @@
  *           PTA      *ptaTransform()
  *           l_int32   ptaPtInsidePolygon()
  *           l_float32 l_angleBetweenVectors()
- *           l_int32   ptaPolygonIsConvex()
  *
  *      Min/max and filtering
  *           l_int32   ptaGetMinMax()
@@ -99,17 +89,13 @@
  * </pre>
  */
 
-#ifdef HAVE_CONFIG_H
-#include <config_auto.h>
-#endif  /* HAVE_CONFIG_H */
-
 #include <math.h>
 #include "allheaders.h"
-#include "pix_internal.h"
 
 #ifndef M_PI
 #define M_PI 3.14159265358979323846
 #endif  /* M_PI */
+
 
 /*---------------------------------------------------------------------*
  *                        Simple rearrangements                        *
@@ -118,7 +104,7 @@
  * \brief   ptaSubsample()
  *
  * \param[in]    ptas
- * \param[in]    subfactor    subsample factor, >= 1
+ * \param[in]    subfactor subsample factor, >= 1
  * \return  ptad evenly sampled pt values from ptas, or NULL on error
  */
 PTA *
@@ -129,10 +115,12 @@ l_int32    n, i;
 l_float32  x, y;
 PTA       *ptad;
 
+    PROCNAME("pixSubsample");
+
     if (!ptas)
-        return (PTA *)ERROR_PTR("ptas not defined", __func__, NULL);
+        return (PTA *)ERROR_PTR("ptas not defined", procName, NULL);
     if (subfactor < 1)
-        return (PTA *)ERROR_PTR("subfactor < 1", __func__, NULL);
+        return (PTA *)ERROR_PTR("subfactor < 1", procName, NULL);
 
     ptad = ptaCreate(0);
     n = ptaGetCount(ptas);
@@ -149,10 +137,10 @@ PTA       *ptad;
 /*!
  * \brief   ptaJoin()
  *
- * \param[in]    ptad     dest pta; add to this one
- * \param[in]    ptas     source pta; add from this one
- * \param[in]    istart   starting index in ptas
- * \param[in]    iend     ending index in ptas; use -1 to cat all
+ * \param[in]    ptad  dest pta; add to this one
+ * \param[in]    ptas  source pta; add from this one
+ * \param[in]    istart  starting index in ptas
+ * \param[in]    iend  ending index in ptas; use -1 to cat all
  * \return  0 if OK, 1 on error
  *
  * <pre>
@@ -162,7 +150,7 @@ PTA       *ptad;
  *      (3) if ptas == NULL, this is a no-op
  * </pre>
  */
-l_ok
+l_int32
 ptaJoin(PTA     *ptad,
         PTA     *ptas,
         l_int32  istart,
@@ -170,8 +158,10 @@ ptaJoin(PTA     *ptad,
 {
 l_int32  n, i, x, y;
 
+    PROCNAME("ptaJoin");
+
     if (!ptad)
-        return ERROR_INT("ptad not defined", __func__, 1);
+        return ERROR_INT("ptad not defined", procName, 1);
     if (!ptas)
         return 0;
 
@@ -181,15 +171,13 @@ l_int32  n, i, x, y;
     if (iend < 0 || iend >= n)
         iend = n - 1;
     if (istart > iend)
-        return ERROR_INT("istart > iend; no pts", __func__, 1);
+        return ERROR_INT("istart > iend; no pts", procName, 1);
 
     for (i = istart; i <= iend; i++) {
         ptaGetIPt(ptas, i, &x, &y);
-        if (ptaAddPt(ptad, x, y) == 1) {
-            L_ERROR("failed to add pt at i = %d\n", __func__, i);
-            return 1;
-        }
+        ptaAddPt(ptad, x, y);
     }
+
     return 0;
 }
 
@@ -197,10 +185,10 @@ l_int32  n, i, x, y;
 /*!
  * \brief   ptaaJoin()
  *
- * \param[in]    ptaad    dest ptaa; add to this one
- * \param[in]    ptaas    source ptaa; add from this one
- * \param[in]    istart   starting index in ptaas
- * \param[in]    iend     ending index in ptaas; use -1 to cat all
+ * \param[in]    ptaad  dest ptaa; add to this one
+ * \param[in]    ptaas  source ptaa; add from this one
+ * \param[in]    istart  starting index in ptaas
+ * \param[in]    iend  ending index in ptaas; use -1 to cat all
  * \return  0 if OK, 1 on error
  *
  * <pre>
@@ -210,7 +198,7 @@ l_int32  n, i, x, y;
  *      (3) if ptas == NULL, this is a no-op
  * </pre>
  */
-l_ok
+l_int32
 ptaaJoin(PTAA    *ptaad,
          PTAA    *ptaas,
          l_int32  istart,
@@ -219,8 +207,10 @@ ptaaJoin(PTAA    *ptaad,
 l_int32  n, i;
 PTA     *pta;
 
+    PROCNAME("ptaaJoin");
+
     if (!ptaad)
-        return ERROR_INT("ptaad not defined", __func__, 1);
+        return ERROR_INT("ptaad not defined", procName, 1);
     if (!ptaas)
         return 0;
 
@@ -230,7 +220,7 @@ PTA     *pta;
     if (iend < 0 || iend >= n)
         iend = n - 1;
     if (istart > iend)
-        return ERROR_INT("istart > iend; no pts", __func__, 1);
+        return ERROR_INT("istart > iend; no pts", procName, 1);
 
     for (i = istart; i <= iend; i++) {
         pta = ptaaGetPta(ptaas, i, L_CLONE);
@@ -245,7 +235,7 @@ PTA     *pta;
  * \brief   ptaReverse()
  *
  * \param[in]    ptas
- * \param[in]    type     0 for float values; 1 for integer values
+ * \param[in]    type  0 for float values; 1 for integer values
  * \return  ptad reversed pta, or NULL on error
  */
 PTA  *
@@ -256,12 +246,14 @@ l_int32    n, i, ix, iy;
 l_float32  x, y;
 PTA       *ptad;
 
+    PROCNAME("ptaReverse");
+
     if (!ptas)
-        return (PTA *)ERROR_PTR("ptas not defined", __func__, NULL);
+        return (PTA *)ERROR_PTR("ptas not defined", procName, NULL);
 
     n = ptaGetCount(ptas);
     if ((ptad = ptaCreate(n)) == NULL)
-        return (PTA *)ERROR_PTR("ptad not made", __func__, NULL);
+        return (PTA *)ERROR_PTR("ptad not made", procName, NULL);
     for (i = n - 1; i >= 0; i--) {
         if (type == 0) {
             ptaGetPt(ptas, i, &x, &y);
@@ -289,12 +281,14 @@ l_int32    n, i;
 l_float32  x, y;
 PTA       *ptad;
 
+    PROCNAME("ptaTranspose");
+
     if (!ptas)
-        return (PTA *)ERROR_PTR("ptas not defined", __func__, NULL);
+        return (PTA *)ERROR_PTR("ptas not defined", procName, NULL);
 
     n = ptaGetCount(ptas);
     if ((ptad = ptaCreate(n)) == NULL)
-        return (PTA *)ERROR_PTR("ptad not made", __func__, NULL);
+        return (PTA *)ERROR_PTR("ptad not made", procName, NULL);
     for (i = 0; i < n; i++) {
         ptaGetPt(ptas, i, &x, &y);
         ptaAddPt(ptad, y, x);
@@ -308,7 +302,7 @@ PTA       *ptad;
  * \brief   ptaCyclicPerm()
  *
  * \param[in]    ptas
- * \param[in]    xs, ys     start point; must be in ptas
+ * \param[in]    xs, ys  start point; must be in ptas
  * \return  ptad cyclic permutation, starting and ending at (xs, ys,
  *              or NULL on error
  *
@@ -329,8 +323,10 @@ l_int32  n, i, x, y, j, index, state;
 l_int32  x1, y1, x2, y2;
 PTA     *ptad;
 
+    PROCNAME("ptaCyclicPerm");
+
     if (!ptas)
-        return (PTA *)ERROR_PTR("ptas not defined", __func__, NULL);
+        return (PTA *)ERROR_PTR("ptas not defined", procName, NULL);
 
     n = ptaGetCount(ptas);
 
@@ -338,7 +334,7 @@ PTA     *ptad;
     ptaGetIPt(ptas, 0, &x1, &y1);
     ptaGetIPt(ptas, n - 1, &x2, &y2);
     if (x1 != x2 || y1 != y2)
-        return (PTA *)ERROR_PTR("start and end pts not same", __func__, NULL);
+        return (PTA *)ERROR_PTR("start and end pts not same", procName, NULL);
     state = L_NOT_FOUND;
     for (i = 0; i < n; i++) {
         ptaGetIPt(ptas, i, &x, &y);
@@ -348,10 +344,10 @@ PTA     *ptad;
         }
     }
     if (state == L_NOT_FOUND)
-        return (PTA *)ERROR_PTR("start pt not in ptas", __func__, NULL);
+        return (PTA *)ERROR_PTR("start pt not in ptas", procName, NULL);
 
     if ((ptad = ptaCreate(n)) == NULL)
-        return (PTA *)ERROR_PTR("ptad not made", __func__, NULL);
+        return (PTA *)ERROR_PTR("ptad not made", procName, NULL);
     for (j = 0; j < n - 1; j++) {
         if (i + j < n - 1)
             index = i + j;
@@ -371,7 +367,7 @@ PTA     *ptad;
  *
  * \param[in]    ptas
  * \param[in]    first    use 0 to select from the beginning
- * \param[in]    last     use -1 to select to the end
+ * \param[in]    last     use 0 to select to the end
  * \return  ptad, or NULL on error
  */
 PTA *
@@ -383,23 +379,20 @@ l_int32    n, npt, i;
 l_float32  x, y;
 PTA       *ptad;
 
+    PROCNAME("ptaSelectRange");
+
     if (!ptas)
-        return (PTA *)ERROR_PTR("ptas not defined", __func__, NULL);
+        return (PTA *)ERROR_PTR("ptas not defined", procName, NULL);
     if ((n = ptaGetCount(ptas)) == 0) {
-        L_WARNING("ptas is empty\n", __func__);
+        L_WARNING("ptas is empty\n", procName);
         return ptaCopy(ptas);
     }
     first = L_MAX(0, first);
-    if (last < 0) last = n - 1;
+    if (last <= 0) last = n - 1;
     if (first >= n)
-        return (PTA *)ERROR_PTR("invalid first", __func__, NULL);
-    if (last >= n) {
-        L_WARNING("last = %d is beyond max index = %d; adjusting\n",
-                  __func__, last, n - 1);
-        last = n - 1;
-    }
+        return (PTA *)ERROR_PTR("invalid first", procName, NULL);
     if (first > last)
-        return (PTA *)ERROR_PTR("first > last", __func__, NULL);
+        return (PTA *)ERROR_PTR("first > last", procName, NULL);
 
     npt = last - first + 1;
     ptad = ptaCreate(npt);
@@ -432,8 +425,10 @@ ptaGetBoundingRegion(PTA  *pta)
 {
 l_int32  n, i, x, y, minx, maxx, miny, maxy;
 
+    PROCNAME("ptaGetBoundingRegion");
+
     if (!pta)
-        return (BOX *)ERROR_PTR("pta not defined", __func__, NULL);
+        return (BOX *)ERROR_PTR("pta not defined", procName, NULL);
 
     minx = 10000000;
     miny = 10000000;
@@ -456,10 +451,10 @@ l_int32  n, i, x, y, minx, maxx, miny, maxy;
  * \brief   ptaGetRange()
  *
  * \param[in]    pta
- * \param[out]   pminx    [optional] min value of x
- * \param[out]   pmaxx    [optional] max value of x
- * \param[out]   pminy    [optional] min value of y
- * \param[out]   pmaxy    [optional] max value of y
+ * \param[out]   pminx [optional] min value of x
+ * \param[out]   pmaxx [optional] max value of x
+ * \param[out]   pminy [optional] min value of y
+ * \param[out]   pmaxy [optional] max value of y
  * \return  0 if OK, 1 on error
  *
  * <pre>
@@ -469,7 +464,7 @@ l_int32  n, i, x, y, minx, maxx, miny, maxy;
  *          example, the pts can represent a general function y(x).
  * </pre>
  */
-l_ok
+l_int32
 ptaGetRange(PTA        *pta,
             l_float32  *pminx,
             l_float32  *pmaxx,
@@ -479,16 +474,18 @@ ptaGetRange(PTA        *pta,
 l_int32    n, i;
 l_float32  x, y, minx, maxx, miny, maxy;
 
+    PROCNAME("ptaGetRange");
+
     if (!pminx && !pmaxx && !pminy && !pmaxy)
-        return ERROR_INT("no output requested", __func__, 1);
+        return ERROR_INT("no output requested", procName, 1);
     if (pminx) *pminx = 0;
     if (pmaxx) *pmaxx = 0;
     if (pminy) *pminy = 0;
     if (pmaxy) *pmaxy = 0;
     if (!pta)
-        return ERROR_INT("pta not defined", __func__, 1);
+        return ERROR_INT("pta not defined", procName, 1);
     if ((n = ptaGetCount(pta)) == 0)
-        return ERROR_INT("no points in pta", __func__, 1);
+        return ERROR_INT("no points in pta", procName, 1);
 
     ptaGetPt(pta, 0, &x, &y);
     minx = x;
@@ -513,7 +510,7 @@ l_float32  x, y, minx, maxx, miny, maxy;
 /*!
  * \brief   ptaGetInsideBox()
  *
- * \param[in]    ptas    input pts
+ * \param[in]    ptas input pts
  * \param[in]    box
  * \return  ptad of pts in ptas that are inside the box, or NULL on error
  */
@@ -525,10 +522,12 @@ PTA       *ptad;
 l_int32    n, i, contains;
 l_float32  x, y;
 
+    PROCNAME("ptaGetInsideBox");
+
     if (!ptas)
-        return (PTA *)ERROR_PTR("ptas not defined", __func__, NULL);
+        return (PTA *)ERROR_PTR("ptas not defined", procName, NULL);
     if (!box)
-        return (PTA *)ERROR_PTR("box not defined", __func__, NULL);
+        return (PTA *)ERROR_PTR("box not defined", procName, NULL);
 
     n = ptaGetCount(ptas);
     ptad = ptaCreate(0);
@@ -546,7 +545,7 @@ l_float32  x, y;
 /*!
  * \brief   pixFindCornerPixels()
  *
- * \param[in]    pixs    1 bpp
+ * \param[in]    pixs 1 bpp
  * \return  pta, or NULL on error
  *
  * <pre>
@@ -562,10 +561,12 @@ l_int32    i, j, x, y, w, h, wpl, mindim, found;
 l_uint32  *data, *line;
 PTA       *pta;
 
+    PROCNAME("pixFindCornerPixels");
+
     if (!pixs)
-        return (PTA *)ERROR_PTR("pixs not defined", __func__, NULL);
+        return (PTA *)ERROR_PTR("pixs not defined", procName, NULL);
     if (pixGetDepth(pixs) != 1)
-        return (PTA *)ERROR_PTR("pixs not 1 bpp", __func__, NULL);
+        return (PTA *)ERROR_PTR("pixs not 1 bpp", procName, NULL);
 
     w = pixGetWidth(pixs);
     h = pixGetHeight(pixs);
@@ -574,7 +575,7 @@ PTA       *pta;
     wpl = pixGetWpl(pixs);
 
     if ((pta = ptaCreate(4)) == NULL)
-        return (PTA *)ERROR_PTR("pta not made", __func__, NULL);
+        return (PTA *)ERROR_PTR("pta not made", procName, NULL);
 
     for (found = FALSE, i = 0; i < mindim; i++) {
         for (j = 0; j <= i; j++) {
@@ -642,7 +643,7 @@ PTA       *pta;
  * \brief   ptaContainsPt()
  *
  * \param[in]    pta
- * \param[in]    x, y     point
+ * \param[in]    x, y  point
  * \return  1 if contained, 0 otherwise or on error
  */
 l_int32
@@ -652,8 +653,10 @@ ptaContainsPt(PTA     *pta,
 {
 l_int32  i, n, ix, iy;
 
+    PROCNAME("ptaContainsPt");
+
     if (!pta)
-        return ERROR_INT("pta not defined", __func__, 0);
+        return ERROR_INT("pta not defined", procName, 0);
 
     n = ptaGetCount(pta);
     for (i = 0; i < n; i++) {
@@ -678,10 +681,12 @@ ptaTestIntersection(PTA  *pta1,
 {
 l_int32  i, j, n1, n2, x1, y1, x2, y2;
 
+    PROCNAME("ptaTestIntersection");
+
     if (!pta1)
-        return ERROR_INT("pta1 not defined", __func__, 0);
+        return ERROR_INT("pta1 not defined", procName, 0);
     if (!pta2)
-        return ERROR_INT("pta2 not defined", __func__, 0);
+        return ERROR_INT("pta2 not defined", procName, 0);
 
     n1 = ptaGetCount(pta1);
     n2 = ptaGetCount(pta2);
@@ -721,8 +726,10 @@ ptaTransform(PTA       *ptas,
 l_int32  n, i, x, y;
 PTA     *ptad;
 
+    PROCNAME("ptaTransform");
+
     if (!ptas)
-        return (PTA *)ERROR_PTR("ptas not defined", __func__, NULL);
+        return (PTA *)ERROR_PTR("ptas not defined", procName, NULL);
     n = ptaGetCount(ptas);
     ptad = ptaCreate(n);
     for (i = 0; i < n; i++) {
@@ -739,9 +746,9 @@ PTA     *ptad;
 /*!
  * \brief   ptaPtInsidePolygon()
  *
- * \param[in]    pta       vertices of a polygon
- * \param[in]    x, y      point to be tested
- * \param[out]   pinside   1 if inside; 0 if outside or on boundary
+ * \param[in]    pta vertices of a polygon
+ * \param[in]    x, y point to be tested
+ * \param[out]   pinside 1 if inside; 0 if outside or on boundary
  * \return  1 if OK, 0 on error
  *
  *  The abs value of the sum of the angles subtended from a point by
@@ -758,11 +765,13 @@ ptaPtInsidePolygon(PTA       *pta,
 l_int32    i, n;
 l_float32  sum, x1, y1, x2, y2, xp1, yp1, xp2, yp2;
 
+    PROCNAME("ptaPtInsidePolygon");
+
     if (!pinside)
-        return ERROR_INT("&inside not defined", __func__, 1);
+        return ERROR_INT("&inside not defined", procName, 1);
     *pinside = 0;
     if (!pta)
-        return ERROR_INT("pta not defined", __func__, 1);
+        return ERROR_INT("pta not defined", procName, 1);
 
         /* Think of (x1,y1) as the end point of a vector that starts
          * from the origin (0,0), and ditto for (x2,y2). */
@@ -787,8 +796,8 @@ l_float32  sum, x1, y1, x2, y2, xp1, yp1, xp2, yp2;
 /*!
  * \brief   l_angleBetweenVectors()
  *
- * \param[in]    x1, y1     end point of first vector
- * \param[in]    x2, y2     end point of second vector
+ * \param[in]    x1, y1 end point of first vector
+ * \param[in]    x2, y2 end point of second vector
  * \return  angle radians, or 0.0 on error
  *
  * <pre>
@@ -814,61 +823,6 @@ l_float64  ang;
 }
 
 
-/*!
- * \brief   ptaPolygonIsConvex()
- *
- * \param[in]     pta      corners of polygon
- * \param[out]    pisconvex   1 if convex; 0 otherwise
- * \return  0 if OK, 1 on error
- *
- * <pre>
- * Notes:
- *      (1) A Pta of size n describes a polygon with n sides, where
- *          the n-th side goes from point[n - 1] to point[0].
- *      (2) The pta must describe a CLOCKWISE traversal of the boundary
- *          of the polygon.
- *      (3) Algorithm: traversing the boundary in a cw direction, the
- *          polygon interior is always on the right.  If the polygon is
- *          convex, for each set of 3 points, the third point is either
- *          on the ray extending from the first point and going through
- *          the second point, or to the right of it.
- * </pre>
- */
-l_int32
-ptaPolygonIsConvex(PTA      *pta,
-                   l_int32  *pisconvex)
-{
-l_int32    i, n;
-l_float32  x0, y0, x1, y1, x2, y2;
-l_float64  cprod;
-
-    if (!pisconvex)
-        return ERROR_INT("&isconvex not defined", __func__, 1);
-    *pisconvex = 0;
-    if (!pta)
-        return ERROR_INT("pta not defined", __func__, 1);
-    if ((n = ptaGetCount(pta)) < 3)
-        return ERROR_INT("pta has < 3 pts", __func__, 1);
-
-    for (i = 0; i < n; i++) {
-        ptaGetPt(pta, i, &x0, &y0);
-        ptaGetPt(pta, (i + 1) % n, &x1, &y1);
-        ptaGetPt(pta, (i + 2) % n, &x2, &y2);
-            /* The vector v02 from p0 to p2 must be to the right of the
-               vector v01 from p0 to p1.  This is true if the cross
-               product v02 x v01 > 0.  In coordinates:
-                   v02x * v01y - v01x * v02y, where
-                   v01x = x1 - x0, v01y = y1 - y0,
-                   v02x = x2 - x0, v02y = y2 - y0   */
-        cprod = (x2 - x0) * (y1 - y0) - (x1 - x0) * (y2 - y0);
-        if (cprod < -0.0001)  /* small delta for float accuracy; test fails */
-            return 0;
-    }
-    *pisconvex = 1;
-    return 0;
-}
-
-
 /*---------------------------------------------------------------------*
  *                       Min/max and filtering                         *
  *---------------------------------------------------------------------*/
@@ -876,14 +830,14 @@ l_float64  cprod;
  * \brief   ptaGetMinMax()
  *
  * \param[in]    pta
- * \param[out]   pxmin   [optional] min of x
- * \param[out]   pymin   [optional] min of y
- * \param[out]   pxmax   [optional] max of x
- * \param[out]   pymax   [optional] max of y
+ * \param[out]   pxmin  [optional] min of x
+ * \param[out]   pymin  [optional] min of y
+ * \param[out]   pxmax  [optional] max of x
+ * \param[out]   pymax  [optional] max of y
  * \return  0 if OK, 1 on error.  If pta is empty, requested
  *              values are returned as -1.0.
  */
-l_ok
+l_int32
 ptaGetMinMax(PTA        *pta,
              l_float32  *pxmin,
              l_float32  *pymin,
@@ -893,21 +847,23 @@ ptaGetMinMax(PTA        *pta,
 l_int32    i, n;
 l_float32  x, y, xmin, ymin, xmax, ymax;
 
+    PROCNAME("ptaGetMinMax");
+
     if (pxmin) *pxmin = -1.0;
     if (pymin) *pymin = -1.0;
     if (pxmax) *pxmax = -1.0;
     if (pymax) *pymax = -1.0;
     if (!pta)
-        return ERROR_INT("pta not defined", __func__, 1);
+        return ERROR_INT("pta not defined", procName, 1);
     if (!pxmin && !pxmax && !pymin && !pymax)
-        return ERROR_INT("no output requested", __func__, 1);
+        return ERROR_INT("no output requested", procName, 1);
     if ((n = ptaGetCount(pta)) == 0) {
-        L_WARNING("pta is empty\n", __func__);
+        L_WARNING("pta is empty\n", procName);
         return 0;
     }
 
-    xmin = ymin = 1.0e20f;
-    xmax = ymax = -1.0e20f;
+    xmin = ymin = 1.0e20;
+    xmax = ymax = -1.0e20;
     for (i = 0; i < n; i++) {
         ptaGetPt(pta, i, &x, &y);
         if (x < xmin) xmin = x;
@@ -927,11 +883,11 @@ l_float32  x, y, xmin, ymin, xmax, ymax;
  * \brief   ptaSelectByValue()
  *
  * \param[in]    ptas
- * \param[in]    xth, yth    threshold values
- * \param[in]    type        L_SELECT_XVAL, L_SELECT_YVAL,
- *                           L_SELECT_IF_EITHER, L_SELECT_IF_BOTH
- * \param[in]    relation    L_SELECT_IF_LT, L_SELECT_IF_GT,
- *                           L_SELECT_IF_LTE, L_SELECT_IF_GTE
+ * \param[in]    xth, yth threshold values
+ * \param[in]    type L_SELECT_XVAL, L_SELECT_YVAL,
+ *                    L_SELECT_IF_EITHER, L_SELECT_IF_BOTH
+ * \param[in]    relation L_SELECT_IF_LT, L_SELECT_IF_GT,
+ *                        L_SELECT_IF_LTE, L_SELECT_IF_GTE
  * \return  ptad filtered set, or NULL on error
  */
 PTA *
@@ -945,18 +901,20 @@ l_int32    i, n;
 l_float32  x, y;
 PTA       *ptad;
 
+    PROCNAME("ptaSelectByValue");
+
     if (!ptas)
-        return (PTA *)ERROR_PTR("ptas not defined", __func__, NULL);
+        return (PTA *)ERROR_PTR("ptas not defined", procName, NULL);
     if (ptaGetCount(ptas) == 0) {
-        L_WARNING("ptas is empty\n", __func__);
+        L_WARNING("ptas is empty\n", procName);
         return ptaCopy(ptas);
     }
     if (type != L_SELECT_XVAL && type != L_SELECT_YVAL &&
         type != L_SELECT_IF_EITHER && type != L_SELECT_IF_BOTH)
-        return (PTA *)ERROR_PTR("invalid type", __func__, NULL);
+        return (PTA *)ERROR_PTR("invalid type", procName, NULL);
     if (relation != L_SELECT_IF_LT && relation != L_SELECT_IF_GT &&
         relation != L_SELECT_IF_LTE && relation != L_SELECT_IF_GTE)
-        return (PTA *)ERROR_PTR("invalid relation", __func__, NULL);
+        return (PTA *)ERROR_PTR("invalid relation", procName, NULL);
 
     n = ptaGetCount(ptas);
     ptad = ptaCreate(n);
@@ -996,8 +954,8 @@ PTA       *ptad;
 /*!
  * \brief   ptaCropToMask()
  *
- * \param[in]    ptas    input pta
- * \param[in]    pixm    1 bpp mask
+ * \param[in]    ptas  input pta
+ * \param[in]    pixm  1 bpp mask
  * \return  ptad  with only pts under the mask fg, or NULL on error
  */
 PTA *
@@ -1008,12 +966,14 @@ l_int32   i, n, x, y;
 l_uint32  val;
 PTA      *ptad;
 
+    PROCNAME("ptaCropToMask");
+
     if (!ptas)
-        return (PTA *)ERROR_PTR("ptas not defined", __func__, NULL);
+        return (PTA *)ERROR_PTR("ptas not defined", procName, NULL);
     if (!pixm || pixGetDepth(pixm) != 1)
-        return (PTA *)ERROR_PTR("pixm undefined or not 1 bpp", __func__, NULL);
+        return (PTA *)ERROR_PTR("pixm undefined or not 1 bpp", procName, NULL);
     if (ptaGetCount(ptas) == 0) {
-        L_INFO("ptas is empty\n", __func__);
+        L_INFO("ptas is empty\n", procName);
         return ptaCopy(ptas);
     }
 
@@ -1036,9 +996,9 @@ PTA      *ptad;
  * \brief   ptaGetLinearLSF()
  *
  * \param[in]    pta
- * \param[out]   pa      [optional] slope a of least square fit: y = ax + b
- * \param[out]   pb      [optional] intercept b of least square fit
- * \param[out]   pnafit  [optional] numa of least square fit
+ * \param[out]   pa  [optional] slope a of least square fit: y = ax + b
+ * \param[out]   pb  [optional] intercept b of least square fit
+ * \param[out]   pnafit [optional] numa of least square fit
  * \return  0 if OK, 1 on error
  *
  * <pre>
@@ -1065,7 +1025,7 @@ PTA      *ptad;
  *          Get the nax array using ptaGetArrays(pta, &nax, NULL);
  * </pre>
  */
-l_ok
+l_int32
 ptaGetLinearLSF(PTA        *pta,
                 l_float32  *pa,
                 l_float32  *pb,
@@ -1075,15 +1035,17 @@ l_int32     n, i;
 l_float32   a, b, factor, sx, sy, sxx, sxy, val;
 l_float32  *xa, *ya;
 
+    PROCNAME("ptaGetLinearLSF");
+
     if (pa) *pa = 0.0;
     if (pb) *pb = 0.0;
     if (pnafit) *pnafit = NULL;
     if (!pa && !pb && !pnafit)
-        return ERROR_INT("no output requested", __func__, 1);
+        return ERROR_INT("no output requested", procName, 1);
     if (!pta)
-        return ERROR_INT("pta not defined", __func__, 1);
+        return ERROR_INT("pta not defined", procName, 1);
     if ((n = ptaGetCount(pta)) < 2)
-        return ERROR_INT("less than 2 pts found", __func__, 1);
+        return ERROR_INT("less than 2 pts found", procName, 1);
 
     xa = pta->x;  /* not a copy */
     ya = pta->y;  /* not a copy */
@@ -1097,8 +1059,8 @@ l_float32  *xa, *ya;
         }
         factor = n * sxx - sx * sx;
         if (factor == 0.0)
-            return ERROR_INT("no solution found", __func__, 1);
-        factor = 1.f / factor;
+            return ERROR_INT("no solution found", procName, 1);
+        factor = 1. / factor;
 
         a = factor * ((l_float32)n * sxy - sx * sy);
         b = factor * (sxx * sy - sx * sxy);
@@ -1108,7 +1070,7 @@ l_float32  *xa, *ya;
             sxy += xa[i] * ya[i];
         }
         if (sxx == 0.0)
-            return ERROR_INT("no solution found", __func__, 1);
+            return ERROR_INT("no solution found", procName, 1);
         a = sxy / sxx;
         b = 0.0;
     } else {  /* a = 0; horizontal line */
@@ -1136,10 +1098,10 @@ l_float32  *xa, *ya;
  * \brief   ptaGetQuadraticLSF()
  *
  * \param[in]    pta
- * \param[out]   pa      [optional] coeff a of LSF: y = ax^2 + bx + c
- * \param[out]   pb      [optional] coeff b of LSF: y = ax^2 + bx + c
- * \param[out]   pc      [optional] coeff c of LSF: y = ax^2 + bx + c
- * \param[out]   pnafit  [optional] numa of least square fit
+ * \param[out]   pa  [optional] coeff a of LSF: y = ax^2 + bx + c
+ * \param[out]   pb  [optional] coeff b of LSF: y = ax^2 + bx + c
+ * \param[out]   pc  [optional] coeff c of LSF: y = ax^2 + bx + c
+ * \param[out]   pnafit [optional] numa of least square fit
  * \return  0 if OK, 1 on error
  *
  * <pre>
@@ -1164,7 +1126,7 @@ l_float32  *xa, *ya;
  *          Get the nax array using ptaGetArrays(pta, &nax, NULL);
  * </pre>
  */
-l_ok
+l_int32
 ptaGetQuadraticLSF(PTA        *pta,
                    l_float32  *pa,
                    l_float32  *pb,
@@ -1177,16 +1139,18 @@ l_float32  *xa, *ya;
 l_float32  *f[3];
 l_float32   g[3];
 
+    PROCNAME("ptaGetQuadraticLSF");
+
     if (pa) *pa = 0.0;
     if (pb) *pb = 0.0;
     if (pc) *pc = 0.0;
     if (pnafit) *pnafit = NULL;
     if (!pa && !pb && !pc && !pnafit)
-        return ERROR_INT("no output requested", __func__, 1);
+        return ERROR_INT("no output requested", procName, 1);
     if (!pta)
-        return ERROR_INT("pta not defined", __func__, 1);
+        return ERROR_INT("pta not defined", procName, 1);
     if ((n = ptaGetCount(pta)) < 3)
-        return ERROR_INT("less than 3 pts found", __func__, 1);
+        return ERROR_INT("less than 3 pts found", procName, 1);
 
     xa = pta->x;  /* not a copy */
     ya = pta->y;  /* not a copy */
@@ -1223,7 +1187,7 @@ l_float32   g[3];
     for (i = 0; i < 3; i++)
         LEPT_FREE(f[i]);
     if (ret)
-        return ERROR_INT("quadratic solution failed", __func__, 1);
+        return ERROR_INT("quadratic solution failed", procName, 1);
 
     if (pa) *pa = g[0];
     if (pb) *pb = g[1];
@@ -1244,11 +1208,11 @@ l_float32   g[3];
  * \brief   ptaGetCubicLSF()
  *
  * \param[in]    pta
- * \param[out]   pa      [optional] coeff a of LSF: y = ax^3 + bx^2 + cx + d
- * \param[out]   pb      [optional] coeff b of LSF
- * \param[out]   pc      [optional] coeff c of LSF
- * \param[out]   pd      [optional] coeff d of LSF
- * \param[out]   pnafit  [optional] numa of least square fit
+ * \param[out]   pa  [optional] coeff a of LSF: y = ax^3 + bx^2 + cx + d
+ * \param[out]   pb  [optional] coeff b of LSF
+ * \param[out]   pc  [optional] coeff c of LSF
+ * \param[out]   pd  [optional] coeff d of LSF
+ * \param[out]   pnafit [optional] numa of least square fit
  * \return  0 if OK, 1 on error
  *
  * <pre>
@@ -1275,7 +1239,7 @@ l_float32   g[3];
  *          Get the nax array using ptaGetArrays(pta, &nax, NULL);
  * </pre>
  */
-l_ok
+l_int32
 ptaGetCubicLSF(PTA        *pta,
                l_float32  *pa,
                l_float32  *pb,
@@ -1289,17 +1253,19 @@ l_float32  *xa, *ya;
 l_float32  *f[4];
 l_float32   g[4];
 
+    PROCNAME("ptaGetCubicLSF");
+
     if (pa) *pa = 0.0;
     if (pb) *pb = 0.0;
     if (pc) *pc = 0.0;
     if (pd) *pd = 0.0;
     if (pnafit) *pnafit = NULL;
     if (!pa && !pb && !pc && !pd && !pnafit)
-        return ERROR_INT("no output requested", __func__, 1);
+        return ERROR_INT("no output requested", procName, 1);
     if (!pta)
-        return ERROR_INT("pta not defined", __func__, 1);
+        return ERROR_INT("pta not defined", procName, 1);
     if ((n = ptaGetCount(pta)) < 4)
-        return ERROR_INT("less than 4 pts found", __func__, 1);
+        return ERROR_INT("less than 4 pts found", procName, 1);
 
     xa = pta->x;  /* not a copy */
     ya = pta->y;  /* not a copy */
@@ -1347,7 +1313,7 @@ l_float32   g[4];
     for (i = 0; i < 4; i++)
         LEPT_FREE(f[i]);
     if (ret)
-        return ERROR_INT("cubic solution failed", __func__, 1);
+        return ERROR_INT("cubic solution failed", procName, 1);
 
     if (pa) *pa = g[0];
     if (pb) *pb = g[1];
@@ -1369,13 +1335,13 @@ l_float32   g[4];
  * \brief   ptaGetQuarticLSF()
  *
  * \param[in]    pta
- * \param[out]   pa      [optional] coeff a of LSF:
- *                            y = ax^4 + bx^3 + cx^2 + dx + e
- * \param[out]   pb      [optional] coeff b of LSF
- * \param[out]   pc      [optional] coeff c of LSF
- * \param[out]   pd      [optional] coeff d of LSF
- * \param[out]   pe      [optional] coeff e of LSF
- * \param[out]   pnafit  [optional] numa of least square fit
+ * \param[out]   pa  [optional] coeff a of LSF:
+ *                        y = ax^4 + bx^3 + cx^2 + dx + e
+ * \param[out]   pb  [optional] coeff b of LSF
+ * \param[out]   pc  [optional] coeff c of LSF
+ * \param[out]   pd  [optional] coeff d of LSF
+ * \param[out]   pe  [optional] coeff e of LSF
+ * \param[out]   pnafit [optional] numa of least square fit
  * \return  0 if OK, 1 on error
  *
  * <pre>
@@ -1403,7 +1369,7 @@ l_float32   g[4];
  *          Get the nax array using ptaGetArrays(pta, &nax, NULL);
  * </pre>
  */
-l_ok
+l_int32
 ptaGetQuarticLSF(PTA        *pta,
                  l_float32  *pa,
                  l_float32  *pb,
@@ -1419,6 +1385,8 @@ l_float32  *xa, *ya;
 l_float32  *f[5];
 l_float32   g[5];
 
+    PROCNAME("ptaGetQuarticLSF");
+
     if (pa) *pa = 0.0;
     if (pb) *pb = 0.0;
     if (pc) *pc = 0.0;
@@ -1426,11 +1394,11 @@ l_float32   g[5];
     if (pe) *pe = 0.0;
     if (pnafit) *pnafit = NULL;
     if (!pa && !pb && !pc && !pd && !pe && !pnafit)
-        return ERROR_INT("no output requested", __func__, 1);
+        return ERROR_INT("no output requested", procName, 1);
     if (!pta)
-        return ERROR_INT("pta not defined", __func__, 1);
+        return ERROR_INT("pta not defined", procName, 1);
     if ((n = ptaGetCount(pta)) < 5)
-        return ERROR_INT("less than 5 pts found", __func__, 1);
+        return ERROR_INT("less than 5 pts found", procName, 1);
 
     xa = pta->x;  /* not a copy */
     ya = pta->y;  /* not a copy */
@@ -1492,7 +1460,7 @@ l_float32   g[5];
     for (i = 0; i < 5; i++)
         LEPT_FREE(f[i]);
     if (ret)
-        return ERROR_INT("quartic solution failed", __func__, 1);
+        return ERROR_INT("quartic solution failed", procName, 1);
 
     if (pa) *pa = g[0];
     if (pb) *pb = g[1];
@@ -1516,13 +1484,13 @@ l_float32   g[5];
  * \brief   ptaNoisyLinearLSF()
  *
  * \param[in]    pta
- * \param[in]    factor    reject outliers with error greater than this
- *                         number of medians; typically ~ 3
- * \param[out]   pptad     [optional] with outliers removed
- * \param[out]   pa        [optional] slope a of least square fit: y = ax + b
- * \param[out]   pb        [optional] intercept b of least square fit
- * \param[out]   pmederr   [optional] median error
- * \param[out]   pnafit    [optional] numa of least square fit to ptad
+ * \param[in]    factor reject outliers with error greater than this
+ *                      number of medians; typically ~ 3
+ * \param[out]   pptad [optional] with outliers removed
+ * \param[out]   pa  [optional] slope a of least square fit: y = ax + b
+ * \param[out]   pb  [optional] intercept b of least square fit
+ * \param[out]   pmederr [optional] median error
+ * \param[out]   pnafit [optional] numa of least square fit to ptad
  * \return  0 if OK, 1 on error
  *
  * <pre>
@@ -1537,7 +1505,7 @@ l_float32   g[5];
  *          is likely to be.
  * </pre>
  */
-l_ok
+l_int32
 ptaNoisyLinearLSF(PTA        *pta,
                   l_float32   factor,
                   PTA       **pptad,
@@ -1551,22 +1519,24 @@ l_float32  x, y, yf, val, mederr;
 NUMA      *nafit, *naerror;
 PTA       *ptad;
 
+    PROCNAME("ptaNoisyLinearLSF");
+
     if (pptad) *pptad = NULL;
     if (pa) *pa = 0.0;
     if (pb) *pb = 0.0;
     if (pmederr) *pmederr = 0.0;
     if (pnafit) *pnafit = NULL;
     if (!pptad && !pa && !pb && !pnafit)
-        return ERROR_INT("no output requested", __func__, 1);
+        return ERROR_INT("no output requested", procName, 1);
     if (!pta)
-        return ERROR_INT("pta not defined", __func__, 1);
+        return ERROR_INT("pta not defined", procName, 1);
     if (factor <= 0.0)
-        return ERROR_INT("factor must be > 0.0", __func__, 1);
+        return ERROR_INT("factor must be > 0.0", procName, 1);
     if ((n = ptaGetCount(pta)) < 3)
-        return ERROR_INT("less than 2 pts found", __func__, 1);
+        return ERROR_INT("less than 2 pts found", procName, 1);
 
     if (ptaGetLinearLSF(pta, pa, pb, &nafit) != 0)
-        return ERROR_INT("error in linear LSF", __func__, 1);
+        return ERROR_INT("error in linear LSF", procName, 1);
 
         /* Get the median error */
     naerror = numaCreate(n);
@@ -1604,14 +1574,14 @@ PTA       *ptad;
  * \brief   ptaNoisyQuadraticLSF()
  *
  * \param[in]    pta
- * \param[in]    factor    reject outliers with error greater than this
- *                         number of medians; typically ~ 3
- * \param[out]   pptad     [optional] with outliers removed
- * \param[out]   pa        [optional] coeff a of LSF: y = ax^2 + bx + c
- * \param[out]   pb        [optional] coeff b of LSF: y = ax^2 + bx + c
- * \param[out]   pc        [optional] coeff c of LSF: y = ax^2 + bx + c
- * \param[out]   pmederr   [optional] median error
- * \param[out]   pnafit    [optional] numa of least square fit to ptad
+ * \param[in]    factor reject outliers with error greater than this
+ *                      number of medians; typically ~ 3
+ * \param[out]   pptad [optional] with outliers removed
+ * \param[out]   pa  [optional] coeff a of LSF: y = ax^2 + bx + c
+ * \param[out]   pb  [optional] coeff b of LSF: y = ax^2 + bx + c
+ * \param[out]   pc  [optional] coeff c of LSF: y = ax^2 + bx + c
+ * \param[out]   pmederr [optional] median error
+ * \param[out]   pnafit [optional] numa of least square fit to ptad
  * \return  0 if OK, 1 on error
  *
  * <pre>
@@ -1622,7 +1592,7 @@ PTA       *ptad;
  *          a quadratic LSF on the resulting points.
  * </pre>
  */
-l_ok
+l_int32
 ptaNoisyQuadraticLSF(PTA        *pta,
                      l_float32   factor,
                      PTA       **pptad,
@@ -1637,6 +1607,8 @@ l_float32  x, y, yf, val, mederr;
 NUMA      *nafit, *naerror;
 PTA       *ptad;
 
+    PROCNAME("ptaNoisyQuadraticLSF");
+
     if (pptad) *pptad = NULL;
     if (pa) *pa = 0.0;
     if (pb) *pb = 0.0;
@@ -1644,16 +1616,16 @@ PTA       *ptad;
     if (pmederr) *pmederr = 0.0;
     if (pnafit) *pnafit = NULL;
     if (!pptad && !pa && !pb && !pc && !pnafit)
-        return ERROR_INT("no output requested", __func__, 1);
+        return ERROR_INT("no output requested", procName, 1);
     if (factor <= 0.0)
-        return ERROR_INT("factor must be > 0.0", __func__, 1);
+        return ERROR_INT("factor must be > 0.0", procName, 1);
     if (!pta)
-        return ERROR_INT("pta not defined", __func__, 1);
+        return ERROR_INT("pta not defined", procName, 1);
     if ((n = ptaGetCount(pta)) < 3)
-        return ERROR_INT("less than 3 pts found", __func__, 1);
+        return ERROR_INT("less than 3 pts found", procName, 1);
 
     if (ptaGetQuadraticLSF(pta, NULL, NULL, NULL, &nafit) != 0)
-        return ERROR_INT("error in quadratic LSF", __func__, 1);
+        return ERROR_INT("error in quadratic LSF", procName, 1);
 
         /* Get the median error */
     naerror = numaCreate(n);
@@ -1678,7 +1650,7 @@ PTA       *ptad;
     n = ptaGetCount(ptad);
     if ((n = ptaGetCount(ptad)) < 3) {
         ptaDestroy(&ptad);
-        return ERROR_INT("less than 3 pts found", __func__, 1);
+        return ERROR_INT("less than 3 pts found", procName, 1);
     }
 
        /* Do LSF again */
@@ -1695,19 +1667,21 @@ PTA       *ptad;
 /*!
  * \brief   applyLinearFit()
  *
- * \param[in]   a, b    linear fit coefficients
+ * \param[in]   a, b linear fit coefficients
  * \param[in]   x
- * \param[out]  py      y = a * x + b
+ * \param[out]  py y = a * x + b
  * \return  0 if OK, 1 on error
  */
-l_ok
+l_int32
 applyLinearFit(l_float32   a,
                   l_float32   b,
                   l_float32   x,
                   l_float32  *py)
 {
+    PROCNAME("applyLinearFit");
+
     if (!py)
-        return ERROR_INT("&y not defined", __func__, 1);
+        return ERROR_INT("&y not defined", procName, 1);
 
     *py = a * x + b;
     return 0;
@@ -1717,20 +1691,22 @@ applyLinearFit(l_float32   a,
 /*!
  * \brief   applyQuadraticFit()
  *
- * \param[in]   a, b, c    quadratic fit coefficients
+ * \param[in]   a, b, c quadratic fit coefficients
  * \param[in]   x
- * \param[out]  py         y = a * x^2 + b * x + c
+ * \param[out]  py y = a * x^2 + b * x + c
  * \return  0 if OK, 1 on error
  */
-l_ok
+l_int32
 applyQuadraticFit(l_float32   a,
                   l_float32   b,
                   l_float32   c,
                   l_float32   x,
                   l_float32  *py)
 {
+    PROCNAME("applyQuadraticFit");
+
     if (!py)
-        return ERROR_INT("&y not defined", __func__, 1);
+        return ERROR_INT("&y not defined", procName, 1);
 
     *py = a * x * x + b * x + c;
     return 0;
@@ -1740,12 +1716,12 @@ applyQuadraticFit(l_float32   a,
 /*!
  * \brief   applyCubicFit()
  *
- * \param[in]   a, b, c, d   cubic fit coefficients
+ * \param[in]   a, b, c, d cubic fit coefficients
  * \param[in]   x
- * \param[out]  py           y = a * x^3 + b * x^2  + c * x + d
+ * \param[out]  py y = a * x^3 + b * x^2  + c * x + d
  * \return  0 if OK, 1 on error
  */
-l_ok
+l_int32
 applyCubicFit(l_float32   a,
               l_float32   b,
               l_float32   c,
@@ -1753,8 +1729,10 @@ applyCubicFit(l_float32   a,
               l_float32   x,
               l_float32  *py)
 {
+    PROCNAME("applyCubicFit");
+
     if (!py)
-        return ERROR_INT("&y not defined", __func__, 1);
+        return ERROR_INT("&y not defined", procName, 1);
 
     *py = a * x * x * x + b * x * x + c * x + d;
     return 0;
@@ -1764,12 +1742,12 @@ applyCubicFit(l_float32   a,
 /*!
  * \brief   applyQuarticFit()
  *
- * \param[in]   a, b, c, d, e   quartic fit coefficients
+ * \param[in]   a, b, c, d, e quartic fit coefficients
  * \param[in]   x
- * \param[out]  py              y = a * x^4 + b * x^3  + c * x^2 + d * x + e
+ * \param[out]  py y = a * x^4 + b * x^3  + c * x^2 + d * x + e
  * \return  0 if OK, 1 on error
  */
-l_ok
+l_int32
 applyQuarticFit(l_float32   a,
                 l_float32   b,
                 l_float32   c,
@@ -1780,8 +1758,10 @@ applyQuarticFit(l_float32   a,
 {
 l_float32  x2;
 
+    PROCNAME("applyQuarticFit");
+
     if (!py)
-        return ERROR_INT("&y not defined", __func__, 1);
+        return ERROR_INT("&y not defined", procName, 1);
 
     x2 = x * x;
     *py = a * x2 * x2 + b * x2 * x + c * x2 + d * x + e;
@@ -1795,10 +1775,10 @@ l_float32  x2;
 /*!
  * \brief   pixPlotAlongPta()
  *
- * \param[in]   pixs        any depth
- * \param[in]   pta         set of points on which to plot
- * \param[in]   outformat   GPLOT_PNG, GPLOT_PS, GPLOT_EPS, GPLOT_LATEX
- * \param[in]   title       [optional] for plot; can be null
+ * \param[in]   pixs any depth
+ * \param[in]   pta set of points on which to plot
+ * \param[in]   outformat GPLOT_PNG, GPLOT_PS, GPLOT_EPS, GPLOT_LATEX
+ * \param[in]   title [optional] for plot; can be null
  * \return  0 if OK, 1 on error
  *
  * <pre>
@@ -1808,7 +1788,7 @@ l_float32  x2;
  *      (3) If the image is RGB, three separate plots are generated.
  * </pre>
  */
-l_ok
+l_int32
 pixPlotAlongPta(PIX         *pixs,
                 PTA         *pta,
                 l_int32      outformat,
@@ -1822,15 +1802,17 @@ l_uint32        val;
 NUMA           *na, *nar, *nag, *nab;
 PIX            *pixt;
 
+    PROCNAME("pixPlotAlongPta");
+
     lept_mkdir("lept/plot");
 
     if (!pixs)
-        return ERROR_INT("pixs not defined", __func__, 1);
+        return ERROR_INT("pixs not defined", procName, 1);
     if (!pta)
-        return ERROR_INT("pta not defined", __func__, 1);
+        return ERROR_INT("pta not defined", procName, 1);
     if (outformat != GPLOT_PNG && outformat != GPLOT_PS &&
         outformat != GPLOT_EPS && outformat != GPLOT_LATEX) {
-        L_WARNING("outformat invalid; using GPLOT_PNG\n", __func__);
+        L_WARNING("outformat invalid; using GPLOT_PNG\n", procName);
         outformat = GPLOT_PNG;
     }
 
@@ -1897,8 +1879,8 @@ PIX            *pixt;
 /*!
  * \brief   ptaGetPixelsFromPix()
  *
- * \param[in]    pixs     1 bpp
- * \param[in]    box      [optional] can be null
+ * \param[in]    pixs 1 bpp
+ * \param[in]    box [optional] can be null
  * \return  pta, or NULL on error
  *
  * <pre>
@@ -1915,8 +1897,10 @@ l_int32    i, j, w, h, wpl, xstart, xend, ystart, yend, bw, bh;
 l_uint32  *data, *line;
 PTA       *pta;
 
+    PROCNAME("ptaGetPixelsFromPix");
+
     if (!pixs || (pixGetDepth(pixs) != 1))
-        return (PTA *)ERROR_PTR("pixs undefined or not 1 bpp", __func__, NULL);
+        return (PTA *)ERROR_PTR("pixs undefined or not 1 bpp", procName, NULL);
 
     pixGetDimensions(pixs, &w, &h, NULL);
     data = pixGetData(pixs);
@@ -1931,7 +1915,7 @@ PTA       *pta;
     }
 
     if ((pta = ptaCreate(0)) == NULL)
-        return (PTA *)ERROR_PTR("pta not made", __func__, NULL);
+        return (PTA *)ERROR_PTR("pta not made", procName, NULL);
     for (i = ystart; i <= yend; i++) {
         line = data + i * wpl;
         for (j = xstart; j <= xend; j++) {
@@ -1948,7 +1932,7 @@ PTA       *pta;
  * \brief   pixGenerateFromPta()
  *
  * \param[in]    pta
- * \param[in]    w, h    of pix
+ * \param[in]    w, h of pix
  * \return  pix 1 bpp, or NULL on error
  *
  * <pre>
@@ -1966,11 +1950,13 @@ pixGenerateFromPta(PTA     *pta,
 l_int32  n, i, x, y;
 PIX     *pix;
 
+    PROCNAME("pixGenerateFromPta");
+
     if (!pta)
-        return (PIX *)ERROR_PTR("pta not defined", __func__, NULL);
+        return (PIX *)ERROR_PTR("pta not defined", procName, NULL);
 
     if ((pix = pixCreate(w, h, 1)) == NULL)
-        return (PIX *)ERROR_PTR("pix not made", __func__, NULL);
+        return (PIX *)ERROR_PTR("pix not made", procName, NULL);
     n = ptaGetCount(pta);
     for (i = 0; i < n; i++) {
         ptaGetIPt(pta, i, &x, &y);
@@ -1986,8 +1972,8 @@ PIX     *pix;
 /*!
  * \brief   ptaGetBoundaryPixels()
  *
- * \param[in]    pixs    1 bpp
- * \param[in]    type    L_BOUNDARY_FG, L_BOUNDARY_BG
+ * \param[in]    pixs 1 bpp
+ * \param[in]    type L_BOUNDARY_FG, L_BOUNDARY_BG
  * \return  pta, or NULL on error
  *
  * <pre>
@@ -2004,10 +1990,12 @@ ptaGetBoundaryPixels(PIX     *pixs,
 PIX  *pixt;
 PTA  *pta;
 
+    PROCNAME("ptaGetBoundaryPixels");
+
     if (!pixs || (pixGetDepth(pixs) != 1))
-        return (PTA *)ERROR_PTR("pixs undefined or not 1 bpp", __func__, NULL);
+        return (PTA *)ERROR_PTR("pixs undefined or not 1 bpp", procName, NULL);
     if (type != L_BOUNDARY_FG && type != L_BOUNDARY_BG)
-        return (PTA *)ERROR_PTR("invalid type", __func__, NULL);
+        return (PTA *)ERROR_PTR("invalid type", procName, NULL);
 
     if (type == L_BOUNDARY_FG)
         pixt = pixMorphSequence(pixs, "e3.3", 0);
@@ -2024,11 +2012,11 @@ PTA  *pta;
 /*!
  * \brief   ptaaGetBoundaryPixels()
  *
- * \param[in]    pixs          1 bpp
- * \param[in]    type          L_BOUNDARY_FG, L_BOUNDARY_BG
- * \param[in]    connectivity  4 or 8
- * \param[out]   pboxa         [optional] bounding boxes of the c.c.
- * \param[out]   ppixa         [optional] pixa of the c.c.
+ * \param[in]    pixs 1 bpp
+ * \param[in]    type L_BOUNDARY_FG, L_BOUNDARY_BG
+ * \param[in]    connectivity 4 or 8
+ * \param[out]   pboxa [optional] bounding boxes of the c.c.
+ * \param[out]   ppixa [optional] pixa of the c.c.
  * \return  ptaa, or NULL on error
  *
  * <pre>
@@ -2058,14 +2046,16 @@ PIXA    *pixa;
 PTA     *pta1, *pta2;
 PTAA    *ptaa;
 
+    PROCNAME("ptaaGetBoundaryPixels");
+
     if (pboxa) *pboxa = NULL;
     if (ppixa) *ppixa = NULL;
     if (!pixs || (pixGetDepth(pixs) != 1))
-        return (PTAA *)ERROR_PTR("pixs undefined or not 1 bpp", __func__, NULL);
+        return (PTAA *)ERROR_PTR("pixs undefined or not 1 bpp", procName, NULL);
     if (type != L_BOUNDARY_FG && type != L_BOUNDARY_BG)
-        return (PTAA *)ERROR_PTR("invalid type", __func__, NULL);
+        return (PTAA *)ERROR_PTR("invalid type", procName, NULL);
     if (connectivity != 4 && connectivity != 8)
-        return (PTAA *)ERROR_PTR("connectivity not 4 or 8", __func__, NULL);
+        return (PTAA *)ERROR_PTR("connectivity not 4 or 8", procName, NULL);
 
     pixGetDimensions(pixs, &w, &h, NULL);
     boxa = pixConnComp(pixs, &pixa, connectivity);
@@ -2107,8 +2097,8 @@ PTAA    *ptaa;
 /*!
  * \brief   ptaaIndexLabeledPixels()
  *
- * \param[in]    pixs     32 bpp, of indices of c.c.
- * \param[out]   pncc     [optional] number of connected components
+ * \param[in]    pixs 32 bpp, of indices of c.c.
+ * \param[out]   pncc [optional] number of connected components
  * \return  ptaa, or NULL on error
  *
  * <pre>
@@ -2119,7 +2109,7 @@ PTAA    *ptaa;
  *          the generating 1 bpp pix are represented in %pixs by 0.
  *          We do not check that the pixel values are correctly labelled.
  *      (2) Each pta in the returned ptaa gives the pixel locations
- *          corresponding to a connected component, with the label of each
+ *          correspnding to a connected component, with the label of each
  *          given by the index of the pta into the ptaa.
  *      (3) Initialize with the first pta in ptaa being empty and
  *          representing the background value (index 0) in the pix.
@@ -2135,9 +2125,11 @@ l_uint32  *data, *line;
 PTA       *pta;
 PTAA      *ptaa;
 
+    PROCNAME("ptaaIndexLabeledPixels");
+
     if (pncc) *pncc = 0;
     if (!pixs || (pixGetDepth(pixs) != 32))
-        return (PTAA *)ERROR_PTR("pixs undef or not 32 bpp", __func__, NULL);
+        return (PTAA *)ERROR_PTR("pixs undef or not 32 bpp", procName, NULL);
 
         /* The number of c.c. is the maximum pixel value.  Use this to
          * initialize ptaa with sufficient pta arrays */
@@ -2169,9 +2161,9 @@ PTAA      *ptaa;
 /*!
  * \brief   ptaGetNeighborPixLocs()
  *
- * \param[in]    pixs    any depth
- * \param[in]    x, y    pixel from which we search for nearest neighbors
- * \param[in]    conn    4 or 8 connectivity
+ * \param[in]    pixs any depth
+ * \param[in]    x, y pixel from which we search for nearest neighbors
+ *              conn (4 or 8 connectivity
  * \return  pta, or NULL on error
  *
  * <pre>
@@ -2189,13 +2181,15 @@ ptaGetNeighborPixLocs(PIX  *pixs,
 l_int32  w, h;
 PTA     *pta;
 
+    PROCNAME("ptaGetNeighborPixLocs");
+
     if (!pixs)
-        return (PTA *)ERROR_PTR("pixs not defined", __func__, NULL);
+        return (PTA *)ERROR_PTR("pixs not defined", procName, NULL);
     pixGetDimensions(pixs, &w, &h, NULL);
     if (x < 0 || x >= w || y < 0 || y >= h)
-        return (PTA *)ERROR_PTR("(x,y) not in pixs", __func__, NULL);
+        return (PTA *)ERROR_PTR("(x,y) not in pixs", procName, NULL);
     if (conn != 4 && conn != 8)
-        return (PTA *)ERROR_PTR("conn not 4 or 8", __func__, NULL);
+        return (PTA *)ERROR_PTR("conn not 4 or 8", procName, NULL);
 
     pta = ptaCreate(conn);
     if (x > 0)
@@ -2241,8 +2235,10 @@ l_int32    i, n;
 l_float32  startx, delx, val;
 PTA       *pta;
 
+    PROCNAME("numaConvertToPta1");
+
     if (!na)
-        return (PTA *)ERROR_PTR("na not defined", __func__, NULL);
+        return (PTA *)ERROR_PTR("na not defined", procName, NULL);
 
     n = numaGetCount(na);
     pta = ptaCreate(n);
@@ -2270,14 +2266,16 @@ l_int32    i, n, nx, ny;
 l_float32  valx, valy;
 PTA       *pta;
 
+    PROCNAME("numaConvertToPta2");
+
     if (!nax || !nay)
-        return (PTA *)ERROR_PTR("nax and nay not both defined", __func__, NULL);
+        return (PTA *)ERROR_PTR("nax and nay not both defined", procName, NULL);
 
     nx = numaGetCount(nax);
     ny = numaGetCount(nay);
     n = L_MIN(nx, ny);
     if (nx != ny)
-        L_WARNING("nx = %d does not equal ny = %d\n", __func__, nx, ny);
+        L_WARNING("nx = %d does not equal ny = %d\n", procName, nx, ny);
     pta = ptaCreate(n);
     for (i = 0; i < n; i++) {
         numaGetFValue(nax, i, &valx);
@@ -2296,7 +2294,7 @@ PTA       *pta;
  * \param[out]  pnay    addr of nay
  * \return  0 if OK, 1 on error
  */
-l_ok
+l_int32
 ptaConvertToNuma(PTA    *pta,
                  NUMA  **pnax,
                  NUMA  **pnay)
@@ -2304,12 +2302,14 @@ ptaConvertToNuma(PTA    *pta,
 l_int32    i, n;
 l_float32  valx, valy;
 
+    PROCNAME("ptaConvertToNuma");
+
     if (pnax) *pnax = NULL;
     if (pnay) *pnay = NULL;
     if (!pnax || !pnay)
-        return ERROR_INT("&nax and &nay not both defined", __func__, 1);
+        return ERROR_INT("&nax and &nay not both defined", procName, 1);
     if (!pta)
-        return ERROR_INT("pta not defined", __func__, 1);
+        return ERROR_INT("pta not defined", procName, 1);
 
     n = ptaGetCount(pta);
     *pnax = numaCreate(n);
@@ -2329,9 +2329,9 @@ l_float32  valx, valy;
 /*!
  * \brief   pixDisplayPta()
  *
- * \param[in]    pixd    can be same as pixs or NULL; 32 bpp if in-place
- * \param[in]    pixs    1, 2, 4, 8, 16 or 32 bpp
- * \param[in]    pta     of path to be plotted
+ * \param[in]    pixd can be same as pixs or NULL; 32 bpp if in-place
+ * \param[in]    pixs 1, 2, 4, 8, 16 or 32 bpp
+ * \param[in]    pta of path to be plotted
  * \return  pixd 32 bpp RGB version of pixs, with path in green.
  *
  * <pre>
@@ -2353,12 +2353,14 @@ pixDisplayPta(PIX  *pixd,
 l_int32   i, n, w, h, x, y;
 l_uint32  rpixel, gpixel, bpixel;
 
+    PROCNAME("pixDisplayPta");
+
     if (!pixs)
-        return (PIX *)ERROR_PTR("pixs not defined", __func__, pixd);
+        return (PIX *)ERROR_PTR("pixs not defined", procName, pixd);
     if (!pta)
-        return (PIX *)ERROR_PTR("pta not defined", __func__, pixd);
+        return (PIX *)ERROR_PTR("pta not defined", procName, pixd);
     if (pixd && (pixd != pixs || pixGetDepth(pixd) != 32))
-        return (PIX *)ERROR_PTR("invalid pixd", __func__, pixd);
+        return (PIX *)ERROR_PTR("invalid pixd", procName, pixd);
 
     if (!pixd)
         pixd = pixConvertTo32(pixs);
@@ -2387,12 +2389,12 @@ l_uint32  rpixel, gpixel, bpixel;
 /*!
  * \brief   pixDisplayPtaaPattern()
  *
- * \param[in]    pixd     32 bpp
- * \param[in]    pixs     1, 2, 4, 8, 16 or 32 bpp; 32 bpp if in place
- * \param[in]    ptaa     giving locations at which the pattern is displayed
- * \param[in]    pixp     1 bpp pattern to be placed such that its reference
- *                        point co-locates with each point in pta
- * \param[in]    cx, cy   reference point in pattern
+ * \param[in]    pixd 32 bpp
+ * \param[in]    pixs 1, 2, 4, 8, 16 or 32 bpp; 32 bpp if in place
+ * \param[in]    ptaa giving locations at which the pattern is displayed
+ * \param[in]    pixp 1 bpp pattern to be placed such that its reference
+ *                    point co-locates with each point in pta
+ * \param[in]    cx, cy reference point in pattern
  * \return  pixd 32 bpp RGB version of pixs.
  *
  * <pre>
@@ -2422,14 +2424,16 @@ l_uint32  color;
 PIXCMAP  *cmap;
 PTA      *pta;
 
+    PROCNAME("pixDisplayPtaaPattern");
+
     if (!pixs)
-        return (PIX *)ERROR_PTR("pixs not defined", __func__, pixd);
+        return (PIX *)ERROR_PTR("pixs not defined", procName, pixd);
     if (!ptaa)
-        return (PIX *)ERROR_PTR("ptaa not defined", __func__, pixd);
+        return (PIX *)ERROR_PTR("ptaa not defined", procName, pixd);
     if (pixd && (pixd != pixs || pixGetDepth(pixd) != 32))
-        return (PIX *)ERROR_PTR("invalid pixd", __func__, pixd);
+        return (PIX *)ERROR_PTR("invalid pixd", procName, pixd);
     if (!pixp)
-        return (PIX *)ERROR_PTR("pixp not defined", __func__, pixd);
+        return (PIX *)ERROR_PTR("pixp not defined", procName, pixd);
 
     if (!pixd)
         pixd = pixConvertTo32(pixs);
@@ -2452,13 +2456,13 @@ PTA      *pta;
 /*!
  * \brief   pixDisplayPtaPattern()
  *
- * \param[in]    pixd     can be same as pixs or NULL; 32 bpp if in-place
- * \param[in]    pixs     1, 2, 4, 8, 16 or 32 bpp
- * \param[in]    pta      giving locations at which the pattern is displayed
- * \param[in]    pixp     1 bpp pattern to be placed such that its reference
- *                        point co-locates with each point in pta
- * \param[in]    cx, cy   reference point in pattern
- * \param[in]    color    in 0xrrggbb00 format
+ * \param[in]    pixd can be same as pixs or NULL; 32 bpp if in-place
+ * \param[in]    pixs 1, 2, 4, 8, 16 or 32 bpp
+ * \param[in]    pta giving locations at which the pattern is displayed
+ * \param[in]    pixp 1 bpp pattern to be placed such that its reference
+ *                    point co-locates with each point in pta
+ * \param[in]    cx, cy reference point in pattern
+ * \param[in]    color in 0xrrggbb00 format
  * \return  pixd 32 bpp RGB version of pixs.
  *
  * <pre>
@@ -2486,14 +2490,16 @@ pixDisplayPtaPattern(PIX      *pixd,
 l_int32  i, n, w, h, x, y;
 PTA     *ptat;
 
+    PROCNAME("pixDisplayPtaPattern");
+
     if (!pixs)
-        return (PIX *)ERROR_PTR("pixs not defined", __func__, pixd);
+        return (PIX *)ERROR_PTR("pixs not defined", procName, pixd);
     if (!pta)
-        return (PIX *)ERROR_PTR("pta not defined", __func__, pixd);
+        return (PIX *)ERROR_PTR("pta not defined", procName, pixd);
     if (pixd && (pixd != pixs || pixGetDepth(pixd) != 32))
-        return (PIX *)ERROR_PTR("invalid pixd", __func__, pixd);
+        return (PIX *)ERROR_PTR("invalid pixd", procName, pixd);
     if (!pixp)
-        return (PIX *)ERROR_PTR("pixp not defined", __func__, pixd);
+        return (PIX *)ERROR_PTR("pixp not defined", procName, pixd);
 
     if (!pixd)
         pixd = pixConvertTo32(pixs);
@@ -2516,12 +2522,11 @@ PTA     *ptat;
 /*!
  * \brief   ptaReplicatePattern()
  *
- * \param[in]    ptas    "sparse" input pta
- * \param[in]    pixp    [optional] 1 bpp pattern, to be replicated
- *                                  in output pta
- * \param[in]    ptap    [optional] set of pts, to be replicated in output pta
- * \param[in]    cx, cy  reference point in pattern
- * \param[in]    w, h    clipping sizes for output pta
+ * \param[in]    ptas "sparse" input pta
+ * \param[in]    pixp [optional] 1 bpp pattern, to be replicated in output pta
+ * \param[in]    ptap [optional] set of pts, to be replicated in output pta
+ * \param[in]    cx, cy reference point in pattern
+ * \param[in]    w, h clipping sizes for output pta
  * \return  ptad with all points of replicated pattern, or NULL on error
  *
  * <pre>
@@ -2545,12 +2550,14 @@ ptaReplicatePattern(PTA     *ptas,
 l_int32  i, j, n, np, x, y, xp, yp, xf, yf;
 PTA     *ptat, *ptad;
 
+    PROCNAME("ptaReplicatePattern");
+
     if (!ptas)
-        return (PTA *)ERROR_PTR("ptas not defined", __func__, NULL);
+        return (PTA *)ERROR_PTR("ptas not defined", procName, NULL);
     if (!pixp && !ptap)
-        return (PTA *)ERROR_PTR("no pattern is defined", __func__, NULL);
+        return (PTA *)ERROR_PTR("no pattern is defined", procName, NULL);
     if (pixp && ptap)
-        L_WARNING("pixp and ptap defined; using ptap\n", __func__);
+        L_WARNING("pixp and ptap defined; using ptap\n", procName);
 
     n = ptaGetCount(ptas);
     ptad = ptaCreate(n);
@@ -2578,8 +2585,8 @@ PTA     *ptat, *ptad;
 /*!
  * \brief   pixDisplayPtaa()
  *
- * \param[in]    pixs    1, 2, 4, 8, 16 or 32 bpp
- * \param[in]    ptaa    array of paths to be plotted
+ * \param[in]    pixs 1, 2, 4, 8, 16 or 32 bpp
+ * \param[in]    ptaa array of paths to be plotted
  * \return  pixd 32 bpp RGB version of pixs, with paths plotted
  *                    in different colors, or NULL on error
  */
@@ -2593,22 +2600,24 @@ NUMA      *na1, *na2, *na3;
 PIX       *pixd;
 PTA       *pta;
 
+    PROCNAME("pixDisplayPtaa");
+
     if (!pixs)
-        return (PIX *)ERROR_PTR("pixs not defined", __func__, NULL);
+        return (PIX *)ERROR_PTR("pixs not defined", procName, NULL);
     if (!ptaa)
-        return (PIX *)ERROR_PTR("ptaa not defined", __func__, NULL);
+        return (PIX *)ERROR_PTR("ptaa not defined", procName, NULL);
     npta = ptaaGetCount(ptaa);
     if (npta == 0)
-        return (PIX *)ERROR_PTR("no pta", __func__, NULL);
+        return (PIX *)ERROR_PTR("no pta", procName, NULL);
 
     if ((pixd = pixConvertTo32(pixs)) == NULL)
-        return (PIX *)ERROR_PTR("pixd not made", __func__, NULL);
+        return (PIX *)ERROR_PTR("pixd not made", procName, NULL);
     pixGetDimensions(pixd, &w, &h, NULL);
 
         /* Make a colormap for the paths */
     if ((pixela = (l_uint32 *)LEPT_CALLOC(npta, sizeof(l_uint32))) == NULL) {
         pixDestroy(&pixd);
-        return (PIX *)ERROR_PTR("calloc fail for pixela", __func__, NULL);
+        return (PIX *)ERROR_PTR("calloc fail for pixela", procName, NULL);
     }
     na1 = numaPseudorandomSequence(256, 14657);
     na2 = numaPseudorandomSequence(256, 34631);

@@ -30,33 +30,31 @@
  *
  *    This file tests the main functions in the generic
  *    list facility, given in list.c and list.h.
+ *
  */
 
-#ifdef HAVE_CONFIG_H
-#include <config_auto.h>
-#endif  /* HAVE_CONFIG_H */
-
 #include "allheaders.h"
-#include "pix_internal.h"
 
 int main(int    argc,
          char **argv)
 {
-char    *filein;
-l_int32  i, n, w, h, samecount, count;
-BOX     *box, *boxc;
-BOXA    *boxa, *boxan;
-DLLIST  *head, *tail, *head2, *tail2, *elem, *nextelem;
-PIX     *pixs;
+char        *filein;
+l_int32      i, n, w, h, samecount, count;
+BOX         *box, *boxc;
+BOXA        *boxa, *boxan;
+DLLIST      *head, *tail, *head2, *tail2, *elem, *nextelem;
+PIX         *pixs;
+static char  mainName[] = "listtest";
 
     if (argc != 2)
-        return ERROR_INT(" Syntax:  listtest filein", __func__, 1);
+        return ERROR_INT(" Syntax:  listtest filein", mainName, 1);
+
     filein = argv[1];
-    setLeptDebugOK(1);
 
     boxa = boxan = NULL;
+
     if ((pixs = pixRead(filein)) == NULL)
-        return ERROR_INT("pix not made", __func__, 1);
+        return ERROR_INT("pix not made", mainName, 1);
 
         /* start with a boxa */
     boxa = pixConnComp(pixs, NULL, 4);
@@ -92,13 +90,13 @@ PIX     *pixs;
     listJoin(&head, &head2);
 
     count = listGetCount(head);
-    lept_stderr("%d items in list\n", count);
+    fprintf(stderr, "%d items in list\n", count);
     listReverse(&head);
     count = listGetCount(head);
-    lept_stderr("%d items in reversed list\n", count);
+    fprintf(stderr, "%d items in reversed list\n", count);
     listReverse(&head);
     count = listGetCount(head);
-    lept_stderr("%d items in doubly reversed list\n", count);
+    fprintf(stderr, "%d items in doubly reversed list\n", count);
 
     boxan = boxaCreate(n);
 
@@ -148,8 +146,8 @@ PIX     *pixs;
                 boxa->box[i]->h == boxan->box[i]->h)
                 samecount++;
         }
-        lept_stderr(" num boxes = %d, same count = %d\n",
-                    boxaGetCount(boxa), samecount);
+        fprintf(stderr, " num boxes = %d, same count = %d\n",
+                boxaGetCount(boxa), samecount);
     } else if (0) {
             /* boxa and boxan are same when list made with listAddToTail() */
         L_BEGIN_LIST_FORWARD(head, elem)
@@ -163,8 +161,8 @@ PIX     *pixs;
                 boxa->box[i]->h == boxan->box[i]->h)
                 samecount++;
         }
-        lept_stderr(" num boxes = %d, same count = %d\n",
-                    boxaGetCount(boxa), samecount);
+        fprintf(stderr, " num boxes = %d, same count = %d\n",
+                boxaGetCount(boxa), samecount);
     } else if (0) {
             /* Destroy the boxes and then the list */
         L_BEGIN_LIST_FORWARD(head, elem)
@@ -209,7 +207,7 @@ PIX     *pixs;
             boxDestroy(&box);
             count++;
         }
-        lept_stderr("removed %d items\n", count);
+        fprintf(stderr, "removed %d items\n", count);
     } else if (0) {
             /* Another version to test listRemoveFromHead(), using
              * an iterator macro. */
@@ -219,7 +217,7 @@ PIX     *pixs;
             boxDestroy(&box);
             count++;
         L_END_LIST
-        lept_stderr("removed %d items\n", count);
+        fprintf(stderr, "removed %d items\n", count);
     } else if (0) {
             /* test listRemoveFromTail(), to successively remove
              * the tail of the list for all elements. */
@@ -230,7 +228,7 @@ PIX     *pixs;
             boxDestroy(&box);
             count++;
         }
-        lept_stderr("removed %d items\n", count);
+        fprintf(stderr, "removed %d items\n", count);
     } else if (0) {
             /* another version to test listRemoveFromTail(), using
              * an iterator macro. */
@@ -241,7 +239,7 @@ PIX     *pixs;
             boxDestroy(&box);
             count++;
         L_END_LIST
-        lept_stderr("removed %d items\n", count);
+        fprintf(stderr, "removed %d items\n", count);
     } else if (0) {
         /* Iterate backwards over the box array, and use
          * listFindElement() to find each corresponding data structure
@@ -261,15 +259,15 @@ PIX     *pixs;
                 count++;
             }
         }
-        lept_stderr("removed %d items\n", count);
+        fprintf(stderr, "removed %d items\n", count);
     }
 
-    lept_stderr("boxa count = %d; boxan count = %d\n",
-                boxaGetCount(boxa), boxaGetCount(boxan));
+    fprintf(stderr, "boxa count = %d; boxan count = %d\n",
+                     boxaGetCount(boxa), boxaGetCount(boxan));
     boxaGetExtent(boxa, &w, &h, NULL);
-    lept_stderr("boxa extent = (%d, %d)\n", w, h);
+    fprintf(stderr, "boxa extent = (%d, %d)\n", w, h);
     boxaGetExtent(boxan, &w, &h, NULL);
-    lept_stderr("boxan extent = (%d, %d)\n", w, h);
+    fprintf(stderr, "boxan extent = (%d, %d)\n", w, h);
 
     pixDestroy(&pixs);
     boxaDestroy(&boxa);

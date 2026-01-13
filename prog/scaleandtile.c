@@ -43,10 +43,6 @@
  *    Note: this program is Unix only; it will not compile under cygwin.
  */
 
-#ifdef HAVE_CONFIG_H
-#include <config_auto.h>
-#endif  /* HAVE_CONFIG_H */
-
 #include <string.h>
 #include "allheaders.h"
 
@@ -59,31 +55,28 @@ static const l_int32  BLACK_BORDER = 2;  /* surrounding each image */
 int main(int    argc,
          char **argv)
 {
-char    *dirin, *substr, *fileout;
-l_int32  depth, width, ncols;
-PIX     *pixd;
-PIXA    *pixa;
+char        *dirin, *substr, *fileout;
+l_int32      depth, width, ncols;
+PIX         *pixd;
+PIXA        *pixa;
+static char  mainName[] = "scaleandtile";
 
     if (argc != 7)
 	return ERROR_INT(
 	    "Syntax:  scaleandtile dirin substr depth width ncols fileout",
-	    __func__, 1);
+	    mainName, 1);
+
     dirin = argv[1];
     substr = argv[2];
     depth = atoi(argv[3]);
     width = atoi(argv[4]);
     ncols = atoi(argv[5]);
     fileout = argv[6];
-    setLeptDebugOK(1);
-
-        /* Avoid division by zero if ncols == 0 and require a positive value. */
-    if (ncols <= 0)
-        return ERROR_INT("Expected a positive value for ncols", __func__, 1);
 
         /* Read the specified images from file */
     if ((pixa = pixaReadFiles(dirin, substr)) == NULL)
-	return ERROR_INT("safiles not made", __func__, 1);
-    lept_stderr("Number of pix: %d\n", pixaGetCount(pixa));
+	return ERROR_INT("safiles not made", mainName, 1);
+    fprintf(stderr, "Number of pix: %d\n", pixaGetCount(pixa));
 
     	/* Tile them */
     pixd = pixaDisplayTiledAndScaled(pixa, depth, width, ncols,

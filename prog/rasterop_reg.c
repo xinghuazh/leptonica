@@ -31,37 +31,28 @@
  *     It demonstrates both that the results are correct
  *     with many different rop configurations, and,
  *     if done under valgrind, that no memory violations occur.
- *     We use it on an image with FG extending to the edges.
+ *
+ *     Use it on images with a significant amount of FG
+ *     that extends to the edges.
  */
-
-#ifdef HAVE_CONFIG_H
-#include <config_auto.h>
-#endif  /* HAVE_CONFIG_H */
 
 #include "allheaders.h"
 
 int main(int    argc,
          char **argv)
 {
-l_int32       i, j, w, h, same, width, height, cx, cy;
-l_uint32      val;
-BOX          *box;
-PIX          *pix0, *pixs, *pixse, *pixd1, *pixd2;
-SEL          *sel;
-L_REGPARAMS  *rp;
+l_int32      i, j, w, h, same, width, height, cx, cy;
+l_uint32     val;
+PIX         *pixs, *pixse, *pixd1, *pixd2;
+SEL         *sel;
+static char  mainName[] = "rasterop_reg";
 
-    if (regTestSetup(argc, argv, &rp))
-        return 1;
+    if (argc != 1)
+	return ERROR_INT(" Syntax:  rasterop_reg", mainName, 1);
+    pixs = pixRead("feyn.tif");
 
-    pix0 = pixRead("feyn-fract.tif");
-    box = boxCreate(293, 37, pixGetWidth(pix0) - 691, pixGetHeight(pix0) -145);
-    pixs = pixClipRectangle(pix0, box, NULL);
-    boxDestroy(&box);
-    if (rp->display) pixDisplay(pixs, 100, 100);
-
-        /* Test 63 different sizes */
-    for (width = 1; width <= 25; width += 3) {   /* 9 values */
-	for (height = 1; height <= 25; height += 4) {  /* 7 values */
+    for (width = 1; width <= 25; width += 3) {
+	for (height = 1; height <= 25; height += 4) {
 
 	    cx = width / 2;
 	    cy = height / 2;
@@ -86,10 +77,15 @@ L_REGPARAMS  *rp;
 	    }
 
 	    pixEqual(pixd1, pixd2, &same);
-            regTestCompareValues(rp, 1, same, 0.0);  /* 0 - 62 */
-	    if (same == 0)
-		lept_stderr("Results differ for SE (width,height) = (%d,%d)\n",
-                            width, height);
+	    if (same == 1)
+		fprintf(stderr, "Correct for (%d,%d)\n", width, height);
+	    else {
+		fprintf(stderr, "Error: results are different!\n");
+		fprintf(stderr, "SE: width = %d, height = %d\n", width, height);
+		pixWrite("/tmp/junkout1", pixd1, IFF_PNG);
+		pixWrite("/tmp/junkout2", pixd2, IFF_PNG);
+                return 1;
+	    }
 
 	    pixDestroy(&pixse);
 	    pixDestroy(&pixd1);
@@ -97,7 +93,6 @@ L_REGPARAMS  *rp;
 	    selDestroy(&sel);
 	}
     }
-    pixDestroy(&pix0);
     pixDestroy(&pixs);
-    return regTestCleanup(rp);
+    return 0;
 }

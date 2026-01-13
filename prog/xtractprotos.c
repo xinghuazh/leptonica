@@ -84,29 +84,28 @@
  *   Cygwin needs to prevent it from appending ".exe" to the filename.)
  */
 
-#ifdef HAVE_CONFIG_H
-#include <config_auto.h>
-#endif  /* HAVE_CONFIG_H */
-
 #include <string.h>
 #include "allheaders.h"
 
-#define L_BUFSIZE 512  /* hardcoded below in sscanf() */
+static const l_int32  L_BUF_SIZE = 512;
 static const char *version = "1.5";
 
 
 int main(int    argc,
          char **argv)
 {
-char     *filein, *str, *tempfile, *prestring, *outprotos, *protostr;
-char      buf[L_BUFSIZE];
-l_int32   i, maxindex, in_line, nflags, protos_added, firstfile, len, ret;
-size_t    nbytes;
-L_BYTEA  *ba, *ba2;
-SARRAY   *sa;
+char        *filein, *str, *tempfile, *prestring, *outprotos, *protostr;
+const char  *spacestr = " ";
+char         buf[L_BUF_SIZE];
+l_uint8     *allheaders;
+l_int32      i, maxindex, in_line, nflags, protos_added, firstfile, len, ret;
+size_t       nbytes;
+L_BYTEA     *ba, *ba2;
+SARRAY      *sa, *safirst;
+static char  mainName[] = "xtractprotos";
 
     if (argc == 1) {
-        lept_stderr(
+        fprintf(stderr,
                 "xtractprotos [-prestring=<string>] [-protos=<where>] "
                 "[list of C files]\n"
                 "where the prestring is prepended to each prototype, and \n"
@@ -114,8 +113,6 @@ SARRAY   *sa;
                 "prototype file\n");
         return 1;
     }
-
-    setLeptDebugOK(1);
 
     /* ---------------------------------------------------------------- */
     /* Parse input flags and find prestring and outprotos, if requested */
@@ -128,13 +125,13 @@ SARRAY   *sa;
         if (argv[i][0] == '-') {
             if (!strncmp(argv[i], "-prestring", 10)) {
                 nflags++;
-                ret = sscanf(argv[i] + 1, "prestring=%490s", buf);
+                ret = sscanf(argv[i] + 1, "prestring=%s", buf);
                 if (ret != 1) {
-                    lept_stderr("parse failure for prestring\n");
+                    fprintf(stderr, "parse failure for prestring\n");
                     return 1;
                 }
-                if ((len = strlen(buf)) > L_BUFSIZE - 3) {
-                    L_WARNING("prestring too large; omitting!\n", __func__);
+                if ((len = strlen(buf)) > L_BUF_SIZE - 3) {
+                    L_WARNING("prestring too large; omitting!\n", mainName);
                 } else {
                     buf[len] = ' ';
                     buf[len + 1] = '\0';
@@ -142,9 +139,9 @@ SARRAY   *sa;
                 }
             } else if (!strncmp(argv[i], "-protos", 7)) {
                 nflags++;
-                ret = sscanf(argv[i] + 1, "protos=%490s", buf);
+                ret = sscanf(argv[i] + 1, "protos=%s", buf);
                 if (ret != 1) {
-                    lept_stderr("parse failure for protos\n");
+                    fprintf(stderr, "parse failure for protos\n");
                     return 1;
                 }
                 outprotos = stringNew(buf);
@@ -155,7 +152,7 @@ SARRAY   *sa;
     }
 
     if (argc - nflags < 2) {
-        lept_stderr("no files specified!\n");
+        fprintf(stderr, "no files specified!\n");
         return 1;
     }
 
@@ -167,15 +164,15 @@ SARRAY   *sa;
 
         /* First the extern C head */
     sa = sarrayCreate(0);
-    sarrayAddString(sa, "/*", L_COPY);
-    snprintf(buf, L_BUFSIZE,
+    sarrayAddString(sa, (char *)"/*", L_COPY);
+    snprintf(buf, L_BUF_SIZE,
              " *  These prototypes were autogen'd by xtractprotos, v. %s",
              version);
     sarrayAddString(sa, buf, L_COPY);
-    sarrayAddString(sa, " */", L_COPY);
-    sarrayAddString(sa, "#ifdef __cplusplus", L_COPY);
-    sarrayAddString(sa, "extern \"C\" {", L_COPY);
-    sarrayAddString(sa, "#endif  /* __cplusplus */\n", L_COPY);
+    sarrayAddString(sa, (char *)" */", L_COPY);
+    sarrayAddString(sa, (char *)"#ifdef __cplusplus", L_COPY);
+    sarrayAddString(sa, (char *)"extern \"C\" {", L_COPY);
+    sarrayAddString(sa, (char *)"#endif  /* __cplusplus */\n", L_COPY);
     str = sarrayToString(sa, 1);
     l_byteaAppendString(ba, str);
     lept_free(str);
@@ -185,7 +182,7 @@ SARRAY   *sa;
     firstfile = 1 + nflags;
     protos_added = FALSE;
     if ((tempfile = l_makeTempFilename()) == NULL) {
-        lept_stderr("failure to make a writeable temp file\n");
+        fprintf(stderr, "failure to make a writeable temp file\n");
         return 1;
     }
     for (i = firstfile; i < argc; i++) {
@@ -193,16 +190,16 @@ SARRAY   *sa;
         len = strlen(filein);
         if (filein[len - 1] == 'h')  /* skip .h files */
             continue;
-        snprintf(buf, L_BUFSIZE, "cpp -ansi -DNO_PROTOS %s %s",
+        snprintf(buf, L_BUF_SIZE, "cpp -ansi -DNO_PROTOS %s %s",
                  filein, tempfile);
-        ret = callSystemDebug(buf);  /* cpp */
+        ret = system(buf);  /* cpp */
         if (ret) {
-            lept_stderr("cpp failure for %s; continuing\n", filein);
+            fprintf(stderr, "cpp failure for %s; continuing\n", filein);
             continue;
         }
 
         if ((str = parseForProtos(tempfile, prestring)) == NULL) {
-            lept_stderr("parse failure for %s; continuing\n", filein);
+            fprintf(stderr, "parse failure for %s; continuing\n", filein);
             continue;
         }
         if (strlen(str) > 1) {  /* strlen(str) == 1 is a file without protos */
@@ -216,9 +213,9 @@ SARRAY   *sa;
 
         /* Lastly the extern C tail */
     sa = sarrayCreate(0);
-    sarrayAddString(sa, "\n#ifdef __cplusplus", L_COPY);
-    sarrayAddString(sa, "}", L_COPY);
-    sarrayAddString(sa, "#endif  /* __cplusplus */", L_COPY);
+    sarrayAddString(sa, (char *)"\n#ifdef __cplusplus", L_COPY);
+    sarrayAddString(sa, (char *)"}", L_COPY);
+    sarrayAddString(sa, (char *)"#endif  /* __cplusplus */", L_COPY);
     str = sarrayToString(sa, 1);
     l_byteaAppendString(ba, str);
     lept_free(str);
@@ -232,14 +229,14 @@ SARRAY   *sa;
     /*                       Generate the output                        */
     /* ---------------------------------------------------------------- */
     if (!outprotos) {  /* just write to stdout */
-        lept_stderr("%s\n", protostr);
+        fprintf(stderr, "%s\n", protostr);
         lept_free(protostr);
         return 0;
     }
 
         /* If no protos were found, do nothing further */
     if (!protos_added) {
-        lept_stderr("No protos found\n");
+        fprintf(stderr, "No protos found\n");
         lept_free(protostr);
         return 1;
     }

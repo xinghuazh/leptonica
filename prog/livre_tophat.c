@@ -28,21 +28,17 @@
  * livre_tophat.c
  */
 
-#ifdef HAVE_CONFIG_H
-#include <config_auto.h>
-#endif  /* HAVE_CONFIG_H */
-
 #include "allheaders.h"
 
 int main(int    argc,
          char **argv)
 {
-PIX   *pixs, *pixsg, *pix1, *pix2;
-PIXA  *pixa;
+PIX         *pixs, *pixsg, *pix1, *pix2;
+PIXA        *pixa;
+static char  mainName[] = "livre_tophat";
 
     if (argc != 1)
-	return ERROR_INT(" Syntax: livre_tophat", __func__, 1);
-    setLeptDebugOK(1);
+	return ERROR_INT(" Syntax: livre_tophat", mainName, 1);
 
         /* Read the image in at 150 ppi. */
     pixs = pixRead("brothers.150.jpg");
@@ -62,7 +58,7 @@ PIXA  *pixa;
 
         /* Generate the output image */
     lept_mkdir("lept/livre");
-    lept_stderr("Writing to: /tmp/lept/livre/tophat.jpg\n");
+    fprintf(stderr, "Writing to: /tmp/lept/livre/tophat.jpg\n");
     pix1 = pixaDisplayTiledAndScaled(pixa, 8, 350, 3, 0, 25, 2);
     pixWrite("/tmp/lept/livre/tophat.jpg", pix1, IFF_JFIF_JPEG);
     pixDisplay(pix1, 1200, 800);

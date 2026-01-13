@@ -31,14 +31,7 @@
  *      connected), including regeneration of the original
  *      image from the components.  This is also an implicit
  *      test of rasterop.
- *
- *      Also tests iterative covering of connected components by
- *      minimum spanning rectangles.
  */
-
-#ifdef HAVE_CONFIG_H
-#include <config_auto.h>
-#endif  /* HAVE_CONFIG_H */
 
 #include "allheaders.h"
 
@@ -46,11 +39,11 @@ int main(int    argc,
          char **argv)
 {
 l_uint8      *array1, *array2;
-l_int32       i, n1, n2, n3;
+l_int32       n1, n2, n3;
 size_t        size1, size2;
 FILE         *fp;
 BOXA         *boxa1, *boxa2;
-PIX          *pixs, *pix1, *pix2, *pix3;
+PIX          *pixs, *pix1;
 PIXA         *pixa1;
 PIXCMAP      *cmap;
 L_REGPARAMS  *rp;
@@ -70,7 +63,8 @@ L_REGPARAMS  *rp;
     boxa2= pixConnComp(pixs, NULL, 4);
     n2 = boxaGetCount(boxa2);
     pixCountConnComp(pixs, 4, &n3);
-    lept_stderr("Number of 4 c.c.:  n1 = %d; n2 = %d, n3 = %d\n", n1, n2, n3);
+    fprintf(stderr, "Number of 4 c.c.:  n1 = %d; n2 = %d, n3 = %d\n",
+            n1, n2, n3);
     regTestCompareValues(rp, n1, n2, 0);  /* 0 */
     regTestCompareValues(rp, n1, n3, 0);  /* 1 */
     regTestCompareValues(rp, n1, 4452, 0);  /* 2 */
@@ -88,7 +82,8 @@ L_REGPARAMS  *rp;
     boxa2= pixConnComp(pixs, NULL, 8);
     n2 = boxaGetCount(boxa2);
     pixCountConnComp(pixs, 8, &n3);
-    lept_stderr("Number of 8 c.c.:  n1 = %d; n2 = %d, n3 = %d\n", n1, n2, n3);
+    fprintf(stderr, "Number of 8 c.c.:  n1 = %d; n2 = %d, n3 = %d\n",
+            n1, n2, n3);
     regTestCompareValues(rp, n1, n2, 0);  /* 5 */
     regTestCompareValues(rp, n1, n3, 0);  /* 6 */
     regTestCompareValues(rp, n1, 4305, 0);  /* 7 */
@@ -99,6 +94,7 @@ L_REGPARAMS  *rp;
     boxaDestroy(&boxa1);
     boxaDestroy(&boxa2);
     pixDestroy(&pix1);
+
 
     /* --------------------------------------------------------------- *
      *                        Test boxa I/O                            *
@@ -122,6 +118,7 @@ L_REGPARAMS  *rp;
     boxaDestroy(&boxa1);
     boxaDestroy(&boxa2);
 
+
     /* --------------------------------------------------------------- *
      *    Just for fun, display each component as a random color in    *
      *    cmapped 8 bpp.  Background is color 0; it is set to white.   *
@@ -131,32 +128,12 @@ L_REGPARAMS  *rp;
     cmap = pixGetColormap(pix1);
     pixcmapResetColor(cmap, 0, 255, 255, 255);  /* reset background to white */
     regTestWritePixAndCheck(rp, pix1, IFF_PNG);  /* 11 */
-    if (rp->display) pixDisplay(pix1, 100, 0);
+    if (rp->display) pixDisplay(pix1, 100, 100);
     boxaDestroy(&boxa1);
     pixDestroy(&pix1);
     pixaDestroy(&pixa1);
+
     pixDestroy(&pixs);
-
-    /* --------------------------------------------------------------- *
-     *  Test iterative covering of connected components by rectangles  *
-     * --------------------------------------------------------------- */
-    pixa1 = pixaCreate(0);
-    pix1 = pixRead("rabi.png");
-    pix2 = pixReduceRankBinaryCascade(pix1, 1, 1, 1, 0);
-    regTestWritePixAndCheck(rp, pix2, IFF_PNG);  /* 12 -  */
-    pixaAddPix(pixa1, pix2, L_INSERT);
-    for (i = 1; i < 6; i++) {
-        pix3 = pixMakeCoveringOfRectangles(pix2, i);
-        regTestWritePixAndCheck(rp, pix3, IFF_PNG);  /* 13 - 17 */
-        pixaAddPix(pixa1, pix3, L_INSERT);
-    }
-    pix3 = pixaDisplayTiledInRows(pixa1, 1, 2500, 1.0, 0, 30, 0);
-    regTestWritePixAndCheck(rp, pix3, IFF_PNG);  /* 18 */
-    pixDisplayWithTitle(pix3, 100, 900, NULL, rp->display);
-    pixDestroy(&pix1);
-    pixDestroy(&pix3);
-    pixaDestroy(&pixa1);
-
     return regTestCleanup(rp);
 }
 

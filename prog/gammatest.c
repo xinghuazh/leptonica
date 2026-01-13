@@ -28,10 +28,6 @@
  * gammatest.c
  */
 
-#ifdef HAVE_CONFIG_H
-#include <config_auto.h>
-#endif  /* HAVE_CONFIG_H */
-
 #include <math.h>
 #include "allheaders.h"
 
@@ -41,34 +37,34 @@
 int main(int    argc,
          char **argv)
 {
-char      *filein, *fileout;
-char       buf[512];
-l_int32    iplot, same;
-l_float32  gam;
-l_float64  gamma[] = {.5, 1.0, 1.5, 2.0, 2.5, -1.0};
-GPLOT     *gplot;
-NUMA      *na, *nax;
-PIX       *pixs, *pixd;
+char        *filein, *fileout;
+char         bigbuf[512];
+l_int32      iplot, same;
+l_float32    gam;
+l_float64    gamma[] = {.5, 1.0, 1.5, 2.0, 2.5, -1.0};
+GPLOT       *gplot;
+NUMA        *na, *nax;
+PIX         *pixs, *pixd;
+static char  mainName[] = "gammatest";
 
     if (argc != 4)
-        return ERROR_INT(" Syntax:  gammatest filein gam fileout", __func__, 1);
+        return ERROR_INT(" Syntax:  gammatest filein gam fileout", mainName, 1);
+
+    lept_mkdir("lept/gamma");
+
     filein = argv[1];
     gam = atof(argv[2]);
     fileout = argv[3];
-
-    setLeptDebugOK(1);
-    lept_mkdir("lept/gamma");
-
     if ((pixs = pixRead(filein)) == NULL)
-        return ERROR_INT("pixs not made", __func__, 1);
+        return ERROR_INT("pixs not made", mainName, 1);
 
     startTimer();
     pixd = pixGammaTRC(NULL, pixs, gam, MINVAL, MAXVAL);
-    lept_stderr("Time for gamma: %7.3f sec\n", stopTimer());
+    fprintf(stderr, "Time for gamma: %7.3f sec\n", stopTimer());
     pixGammaTRC(pixs, pixs, gam, MINVAL, MAXVAL);
     pixEqual(pixs, pixd, &same);
     if (!same)
-        lept_stderr("Error in pixGammaTRC!\n");
+        fprintf(stderr, "Error in pixGammaTRC!\n");
     pixWrite(fileout, pixs, IFF_JFIF_JPEG);
     pixDestroy(&pixs);
 
@@ -84,8 +80,8 @@ PIX       *pixs, *pixd;
     nax = numaMakeSequence(0.0, 1.0, 256);
     for (iplot = 0; gamma[iplot] >= 0.0; iplot++) {
         na = numaGammaTRC(gamma[iplot], 30, 215);
-        snprintf(buf, sizeof(buf), "gamma = %3.1f", gamma[iplot]);
-        gplotAddPlot(gplot, nax, na, GPLOT_LINES, buf);
+        sprintf(bigbuf, "gamma = %3.1f", gamma[iplot]);
+        gplotAddPlot(gplot, nax, na, GPLOT_LINES, bigbuf);
         numaDestroy(&na);
     }
     gplotMakeOutput(gplot);

@@ -34,29 +34,29 @@
  *      4- and 8-connected components: counts, bounding boxes and images
  *
  *      Top-level calls:
- *            BOXA     *pixConnComp()
- *            BOXA     *pixConnCompPixa()
- *            BOXA     *pixConnCompBB()
- *            l_int32   pixCountConnComp()
+ *           BOXA     *pixConnComp()
+ *           BOXA     *pixConnCompPixa()
+ *           BOXA     *pixConnCompBB()
+ *           l_int32   pixCountConnComp()
  *
  *      Identify the next c.c. to be erased:
- *            l_int32   nextOnPixelInRaster()
- *    static  l_int32   nextOnPixelInRasterLow()
+ *           l_int32   nextOnPixelInRaster()
+ *           l_int32   nextOnPixelInRasterLow()
  *
  *      Erase the c.c., saving the b.b.:
- *            BOX      *pixSeedfillBB()
- *            BOX      *pixSeedfill4BB()
- *            BOX      *pixSeedfill8BB()
+ *           BOX      *pixSeedfillBB()
+ *           BOX      *pixSeedfill4BB()
+ *           BOX      *pixSeedfill8BB()
  *
  *      Just erase the c.c.:
- *            l_int32   pixSeedfill()
- *            l_int32   pixSeedfill4()
- *            l_int32   pixSeedfill8()
+ *           l_int32   pixSeedfill()
+ *           l_int32   pixSeedfill4()
+ *           l_int32   pixSeedfill8()
  *
  *      Static stack helper functions for single raster line seedfill:
- *            static void    pushFillsegBB()
- *            static void    pushFillseg()
- *            static void    popFillseg()
+ *           static void    pushFillsegBB()
+ *           static void    pushFillseg()
+ *           static void    popFillseg()
  *
  *  The basic method in pixConnCompBB() is very simple.  We scan the
  *  image in raster order, looking for the next ON pixel.  When it
@@ -88,12 +88,7 @@
  * </pre>
  */
 
-#ifdef HAVE_CONFIG_H
-#include <config_auto.h>
-#endif  /* HAVE_CONFIG_H */
-
 #include "allheaders.h"
-#include "pix_internal.h"
 
 /*!
  * \brief   The struct FillSeg is used by the Heckbert seedfill algorithm to
@@ -110,9 +105,6 @@ struct FillSeg
 };
 typedef struct FillSeg    FILLSEG;
 
-static l_int32 nextOnPixelInRasterLow(l_uint32 *data, l_int32 w, l_int32 h,
-                                      l_int32 wpl, l_int32 xstart,
-                                      l_int32 ystart, l_int32 *px, l_int32 *py);
 
     /* Static accessors for FillSegs on a stack */
 static void pushFillsegBB(L_STACK *stack, l_int32 xleft, l_int32 xright,
@@ -136,9 +128,9 @@ static void popFillseg(L_STACK *stack, l_int32 *pxleft, l_int32 *pxright,
 /*!
  * \brief   pixConnComp()
  *
- * \param[in]    pixs           1 bpp
- * \param[out]   ppixa          [optional] pixa of each c.c.
- * \param[in]    connectivity   4 or 8
+ * \param[in]    pixs 1 bpp
+ * \param[out]   ppixa   [optional] pixa of each c.c.
+ * \param[in]    connectivity 4 or 8
  * \return  boxa, or NULL on error
  *
  * <pre>
@@ -154,11 +146,15 @@ pixConnComp(PIX     *pixs,
             l_int32  connectivity)
 {
 
+    PROCNAME("pixConnComp");
+
     if (ppixa) *ppixa = NULL;
-    if (!pixs || pixGetDepth(pixs) != 1)
-        return (BOXA *)ERROR_PTR("pixs undefined or not 1 bpp", __func__, NULL);
+    if (!pixs)
+        return (BOXA *)ERROR_PTR("pixs not defined", procName, NULL);
+    if (pixGetDepth(pixs) != 1)
+        return (BOXA *)ERROR_PTR("pixs not 1 bpp", procName, NULL);
     if (connectivity != 4 && connectivity != 8)
-        return (BOXA *)ERROR_PTR("connectivity not 4 or 8", __func__, NULL);
+        return (BOXA *)ERROR_PTR("connectivity not 4 or 8", procName, NULL);
 
     if (!ppixa)
         return pixConnCompBB(pixs, connectivity);
@@ -170,9 +166,9 @@ pixConnComp(PIX     *pixs,
 /*!
  * \brief   pixConnCompPixa()
  *
- * \param[in]    pixs           1 bpp
- * \param[out]   ppixa          pixa of each c.c.
- * \param[in]    connectivity   4 or 8
+ * \param[in]    pixs 1 bpp
+ * \param[out]   ppixa pixa of each c.c.
+ * \param[in]    connectivity 4 or 8
  * \return  boxa, or NULL on error
  *
  * <pre>
@@ -203,13 +199,15 @@ BOX      *box;
 BOXA     *boxa;
 L_STACK  *stack, *auxstack;
 
+    PROCNAME("pixConnCompPixa");
+
     if (!ppixa)
-        return (BOXA *)ERROR_PTR("&pixa not defined", __func__, NULL);
+        return (BOXA *)ERROR_PTR("&pixa not defined", procName, NULL);
     *ppixa = NULL;
     if (!pixs || pixGetDepth(pixs) != 1)
-        return (BOXA *)ERROR_PTR("pixs undefined or not 1 bpp", __func__, NULL);
+        return (BOXA *)ERROR_PTR("pixs undefined or not 1 bpp", procName, NULL);
     if (connectivity != 4 && connectivity != 8)
-        return (BOXA *)ERROR_PTR("connectivity not 4 or 8", __func__, NULL);
+        return (BOXA *)ERROR_PTR("connectivity not 4 or 8", procName, NULL);
 
     pix1 = pix2 = pix3 = pix4 = NULL;
     stack = NULL;
@@ -220,18 +218,17 @@ L_STACK  *stack, *auxstack;
     if (iszero)
         return boxaCreate(1);  /* return empty boxa and empty pixa */
 
-    pixSetPadBits(pixs, 0);
     pix1 = pixCopy(NULL, pixs);
     pix2 = pixCopy(NULL, pixs);
     if (!pix1 || !pix2) {
-        L_ERROR("pix1 or pix2 not made\n", __func__);
+        L_ERROR("pix1 or pix2 not made\n", procName);
         pixaDestroy(ppixa);
         goto cleanup;
     }
 
     h = pixGetHeight(pixs);
     if ((stack = lstackCreate(h)) == NULL) {
-        L_ERROR("stack not made\n", __func__);
+        L_ERROR("stack not made\n", procName);
         pixaDestroy(ppixa);
         goto cleanup;
     }
@@ -248,7 +245,7 @@ L_STACK  *stack, *auxstack;
         if ((box = pixSeedfillBB(pix1, stack, x, y, connectivity)) == NULL) {
             boxaDestroy(&boxa);
             pixaDestroy(ppixa);
-            L_ERROR("box not made\n", __func__);
+            L_ERROR("box not made\n", procName);
             goto cleanup;
         }
         boxaAddBox(boxa, box, L_INSERT);
@@ -268,9 +265,8 @@ L_STACK  *stack, *auxstack;
 
 #if  DEBUG
     pixCountPixels(pix1, &iszero, NULL);
-    lept_stderr("Number of remaining pixels = %d\n", iszero);
-    lept_mkdir("lept/cc");
-    pixWriteDebug("/tmp/lept/cc/remain.png", pix1, IFF_PNG);
+    fprintf(stderr, "Number of remaining pixels = %d\n", iszero);
+    pixWrite("junkremain", pix1, IFF_PNG);
 #endif  /* DEBUG */
 
         /* Remove old boxa of pixa and replace with a copy */
@@ -290,8 +286,8 @@ cleanup:
 /*!
  * \brief   pixConnCompBB()
  *
- * \param[in]    pixs           1 bpp
- * \param[in]    connectivity   4 or 8
+ * \param[in]    pixs 1 bpp
+ * \param[in]    connectivity 4 or 8
  * \return  boxa, or NULL on error
  *
  * <pre>
@@ -314,10 +310,12 @@ BOX      *box;
 BOXA     *boxa;
 L_STACK  *stack, *auxstack;
 
+    PROCNAME("pixConnCompBB");
+
     if (!pixs || pixGetDepth(pixs) != 1)
-        return (BOXA *)ERROR_PTR("pixs undefined or not 1 bpp", __func__, NULL);
+        return (BOXA *)ERROR_PTR("pixs undefined or not 1 bpp", procName, NULL);
     if (connectivity != 4 && connectivity != 8)
-        return (BOXA *)ERROR_PTR("connectivity not 4 or 8", __func__, NULL);
+        return (BOXA *)ERROR_PTR("connectivity not 4 or 8", procName, NULL);
 
     boxa = NULL;
     pix1 = NULL;
@@ -326,13 +324,12 @@ L_STACK  *stack, *auxstack;
     if (iszero)
         return boxaCreate(1);  /* return empty boxa */
 
-    pixSetPadBits(pixs, 0);
     if ((pix1 = pixCopy(NULL, pixs)) == NULL)
-        return (BOXA *)ERROR_PTR("pix1 not made", __func__, NULL);
+        return (BOXA *)ERROR_PTR("pix1 not made", procName, NULL);
 
     h = pixGetHeight(pixs);
     if ((stack = lstackCreate(h)) == NULL) {
-        L_ERROR("stack not made\n", __func__);
+        L_ERROR("stack not made\n", procName);
         goto cleanup;
     }
     auxstack = lstackCreate(0);
@@ -346,7 +343,7 @@ L_STACK  *stack, *auxstack;
             break;
 
         if ((box = pixSeedfillBB(pix1, stack, x, y, connectivity)) == NULL) {
-            L_ERROR("box not made\n", __func__);
+            L_ERROR("box not made\n", procName);
             boxaDestroy(&boxa);
             goto cleanup;
         }
@@ -358,9 +355,8 @@ L_STACK  *stack, *auxstack;
 
 #if  DEBUG
     pixCountPixels(pix1, &iszero, NULL);
-    lept_stderr("Number of remaining pixels = %d\n", iszero);
-    lept_mkdir("lept/cc");
-    pixWriteDebug("/tmp/lept/cc/remain.png", pix1, IFF_PNG);
+    fprintf(stderr, "Number of remaining pixels = %d\n", iszero);
+    pixWrite("junkremain", pix1, IFF_PNG);
 #endif  /* DEBUG */
 
         /* Cleanup, freeing the fillsegs on each stack */
@@ -374,8 +370,8 @@ cleanup:
 /*!
  * \brief   pixCountConnComp()
  *
- * \param[in]    pixs           1 bpp
- * \param[in]    connectivity   4 or 8
+ * \param[in]    pixs 1 bpp
+ * \param[in]    connectivity 4 or 8
  * \param[out]   pcount
  * \return  0 if OK, 1 on error
  *
@@ -385,7 +381,7 @@ cleanup:
  *     2 It works on a copy of the input pix.  The c.c. are located
  *         in raster order and erased one at a time.
  */
-l_ok
+l_int32
 pixCountConnComp(PIX      *pixs,
                  l_int32   connectivity,
                  l_int32  *pcount)
@@ -395,26 +391,27 @@ l_int32   x, y, xstart, ystart;
 PIX      *pix1;
 L_STACK  *stack, *auxstack;
 
+    PROCNAME("pixCountConnComp");
+
     if (!pcount)
-        return ERROR_INT("&count not defined", __func__, 1);
+        return ERROR_INT("&count not defined", procName, 1);
     *pcount = 0;  /* initialize the count to 0 */
     if (!pixs || pixGetDepth(pixs) != 1)
-        return ERROR_INT("pixs not defined or not 1 bpp", __func__, 1);
+        return ERROR_INT("pixs not defined or not 1 bpp", procName, 1);
     if (connectivity != 4 && connectivity != 8)
-        return ERROR_INT("connectivity not 4 or 8", __func__, 1);
+        return ERROR_INT("connectivity not 4 or 8", procName, 1);
 
     stack = NULL;
     pixZero(pixs, &iszero);
     if (iszero)
         return 0;
 
-    pixSetPadBits(pixs, 0);
     if ((pix1 = pixCopy(NULL, pixs)) == NULL)
-        return ERROR_INT("pix1 not made", __func__, 1);
+        return ERROR_INT("pix1 not made", procName, 1);
     h = pixGetHeight(pixs);
     if ((stack = lstackCreate(h)) == NULL) {
         pixDestroy(&pix1);
-        return ERROR_INT("stack not made\n", __func__, 1);
+        return ERROR_INT("stack not made\n", procName, 1);
     }
     auxstack = lstackCreate(0);
     stack->auxstack = auxstack;
@@ -441,9 +438,9 @@ L_STACK  *stack, *auxstack;
 /*!
  * \brief   nextOnPixelInRaster()
  *
- * \param[in]    pixs             1 bpp
- * \param[in]    xstart, ystart   starting point for search
- * \param[out]   px, py           coord value of next ON pixel
+ * \param[in]    pixs 1 bpp
+ * \param[in]    xstart, ystart  starting point for search
+ * \param[out]   px, py  coord value of next ON pixel
  * \return  1 if a pixel is found; 0 otherwise or on error
  */
 l_int32
@@ -456,11 +453,13 @@ nextOnPixelInRaster(PIX      *pixs,
 l_int32    w, h, d, wpl;
 l_uint32  *data;
 
+    PROCNAME("nextOnPixelInRaster");
+
     if (!pixs)
-        return ERROR_INT("pixs not defined", __func__, 0);
+        return ERROR_INT("pixs not defined", procName, 0);
     pixGetDimensions(pixs, &w, &h, &d);
     if (d != 1)
-        return ERROR_INT("pixs not 1 bpp", __func__, 0);
+        return ERROR_INT("pixs not 1 bpp", procName, 0);
 
     wpl = pixGetWpl(pixs);
     data = pixGetData(pixs);
@@ -471,14 +470,14 @@ l_uint32  *data;
 /*!
  * \brief   nextOnPixelInRasterLow()
  *
- * \param[in]    data             pix data
- * \param[in]    w, h             width and height
- * \param[in]    wpl              words per line
- * \param[in]    xstart, ystart   starting point for search
- * \param[out]   px, py           coord value of next ON pixel
+ * \param[in]    data pix data
+ * \param[in]    w, h width and height
+ * \param[in]    wpl  words per line
+ * \param[in]    xstart, ystart  starting point for search
+ * \param[out]   px, py  coord value of next ON pixel
  * \return  1 if a pixel is found; 0 otherwise or on error
  */
-static l_int32
+l_int32
 nextOnPixelInRasterLow(l_uint32  *data,
                        l_int32    w,
                        l_int32    h,
@@ -543,10 +542,10 @@ l_uint32  *line, *pword;
 /*!
  * \brief   pixSeedfillBB()
  *
- * \param[in]    pixs           1 bpp
- * \param[in]    stack          for holding fillsegs
- * \param[in]    x,y            location of seed pixel
- * \param[in]    connectivity   4 or 8
+ * \param[in]    pixs 1 bpp
+ * \param[in]    stack for holding fillsegs
+ * \param[in]    x,y   location of seed pixel
+ * \param[in]    connectivity  4 or 8
  * \return  box or NULL on error
  *
  * <pre>
@@ -564,21 +563,23 @@ pixSeedfillBB(PIX      *pixs,
 {
 BOX  *box;
 
+    PROCNAME("pixSeedfillBB");
+
     if (!pixs || pixGetDepth(pixs) != 1)
-        return (BOX *)ERROR_PTR("pixs undefined or not 1 bpp", __func__, NULL);
+        return (BOX *)ERROR_PTR("pixs undefined or not 1 bpp", procName, NULL);
     if (!stack)
-        return (BOX *)ERROR_PTR("stack not defined", __func__, NULL);
+        return (BOX *)ERROR_PTR("stack not defined", procName, NULL);
     if (connectivity != 4 && connectivity != 8)
-        return (BOX *)ERROR_PTR("connectivity not 4 or 8", __func__, NULL);
+        return (BOX *)ERROR_PTR("connectivity not 4 or 8", procName, NULL);
 
     if (connectivity == 4) {
         if ((box = pixSeedfill4BB(pixs, stack, x, y)) == NULL)
-            return (BOX *)ERROR_PTR("box not made", __func__, NULL);
+            return (BOX *)ERROR_PTR("box not made", procName, NULL);
     } else if (connectivity == 8) {
         if ((box = pixSeedfill8BB(pixs, stack, x, y)) == NULL)
-            return (BOX *)ERROR_PTR("box not made", __func__, NULL);
+            return (BOX *)ERROR_PTR("box not made", procName, NULL);
     } else {
-        return (BOX *)ERROR_PTR("connectivity not 4 or 8", __func__, NULL);
+        return (BOX *)ERROR_PTR("connectivity not 4 or 8", procName, NULL);
     }
 
     return box;
@@ -588,9 +589,9 @@ BOX  *box;
 /*!
  * \brief   pixSeedfill4BB()
  *
- * \param[in]    pixs     1 bpp
- * \param[in]    stack    for holding fillsegs
- * \param[in]    x,y      location of seed pixel
+ * \param[in]    pixs 1 bpp
+ * \param[in]    stack for holding fillsegs
+ * \param[in]    x,y   location of seed pixel
  * \return  box or NULL on error.
  *
  * <pre>
@@ -628,10 +629,12 @@ l_int32    minx, maxx, miny, maxy;  /* for bounding box of this c.c. */
 l_uint32  *data, *line;
 BOX       *box;
 
+    PROCNAME("pixSeedfill4BB");
+
     if (!pixs || pixGetDepth(pixs) != 1)
-        return (BOX *)ERROR_PTR("pixs undefined or not 1 bpp", __func__, NULL);
+        return (BOX *)ERROR_PTR("pixs undefined or not 1 bpp", procName, NULL);
     if (!stack)
-        return (BOX *)ERROR_PTR("stack not defined", __func__, NULL);
+        return (BOX *)ERROR_PTR("stack not defined", procName, NULL);
     if (!stack->auxstack)
         stack->auxstack = lstackCreate(0);
 
@@ -700,7 +703,7 @@ BOX       *box;
 
     if ((box = boxCreate(minx, miny, maxx - minx + 1, maxy - miny + 1))
             == NULL)
-        return (BOX *)ERROR_PTR("box not made", __func__, NULL);
+        return (BOX *)ERROR_PTR("box not made", procName, NULL);
     return box;
 }
 
@@ -708,9 +711,9 @@ BOX       *box;
 /*!
  * \brief   pixSeedfill8BB()
  *
- * \param[in]    pixs    1 bpp
- * \param[in]    stack   for holding fillsegs
- * \param[in]    x,y     location of seed pixel
+ * \param[in]    pixs 1 bpp
+ * \param[in]    stack for holding fillsegs
+ * \param[in]    x,y   location of seed pixel
  * \return  box or NULL on error.
  *
  * <pre>
@@ -741,10 +744,12 @@ l_int32    minx, maxx, miny, maxy;  /* for bounding box of this c.c. */
 l_uint32  *data, *line;
 BOX       *box;
 
+    PROCNAME("pixSeedfill8BB");
+
     if (!pixs || pixGetDepth(pixs) != 1)
-        return (BOX *)ERROR_PTR("pixs undefined or not 1 bpp", __func__, NULL);
+        return (BOX *)ERROR_PTR("pixs undefined or not 1 bpp", procName, NULL);
     if (!stack)
-        return (BOX *)ERROR_PTR("stack not defined", __func__, NULL);
+        return (BOX *)ERROR_PTR("stack not defined", procName, NULL);
     if (!stack->auxstack)
         stack->auxstack = lstackCreate(0);
 
@@ -813,7 +818,7 @@ BOX       *box;
 
     if ((box = boxCreate(minx, miny, maxx - minx + 1, maxy - miny + 1))
             == NULL)
-        return (BOX *)ERROR_PTR("box not made", __func__, NULL);
+        return (BOX *)ERROR_PTR("box not made", procName, NULL);
     return box;
 }
 
@@ -821,10 +826,10 @@ BOX       *box;
 /*!
  * \brief   pixSeedfill()
  *
- * \param[in]    pixs           1 bpp
- * \param[in]    stack          for holding fillsegs
- * \param[in]    x,y            location of seed pixel
- * \param[in]    connectivity   4 or 8
+ * \param[in]    pixs 1 bpp
+ * \param[in]    stack for holding fillsegs
+ * \param[in]    x,y   location of seed pixel
+ * \param[in]    connectivity  4 or 8
  * \return  0 if OK, 1 on error
  *
  * <pre>
@@ -833,7 +838,7 @@ BOX       *box;
  *      (2) See pixSeedfill4() and pixSeedfill8() for details.
  * </pre>
  */
-l_ok
+l_int32
 pixSeedfill(PIX      *pixs,
             L_STACK  *stack,
             l_int32   x,
@@ -842,12 +847,14 @@ pixSeedfill(PIX      *pixs,
 {
 l_int32  retval;
 
+    PROCNAME("pixSeedfill");
+
     if (!pixs || pixGetDepth(pixs) != 1)
-        return ERROR_INT("pixs not defined or not 1 bpp", __func__, 1);
+        return ERROR_INT("pixs not defined or not 1 bpp", procName, 1);
     if (!stack)
-        return ERROR_INT("stack not defined", __func__, 1);
+        return ERROR_INT("stack not defined", procName, 1);
     if (connectivity != 4 && connectivity != 8)
-        return ERROR_INT("connectivity not 4 or 8", __func__, 1);
+        return ERROR_INT("connectivity not 4 or 8", procName, 1);
 
     if (connectivity == 4)
         retval = pixSeedfill4(pixs, stack, x, y);
@@ -861,9 +868,9 @@ l_int32  retval;
 /*!
  * \brief   pixSeedfill4()
  *
- * \param[in]    pixs    1 bpp
- * \param[in]    stack   for holding fillsegs
- * \param[in]    x,y     location of seed pixel
+ * \param[in]    pixs 1 bpp
+ * \param[in]    stack for holding fillsegs
+ * \param[in]    x,y   location of seed pixel
  * \return  0 if OK, 1 on error
  *
  * <pre>
@@ -875,7 +882,7 @@ l_int32  retval;
  *      (3) Reference: see pixSeedFill4BB()
  * </pre>
  */
-l_ok
+l_int32
 pixSeedfill4(PIX      *pixs,
              L_STACK  *stack,
              l_int32   x,
@@ -885,10 +892,12 @@ l_int32    w, h, xstart, wpl, x1, x2, dy;
 l_int32    xmax, ymax;
 l_uint32  *data, *line;
 
+    PROCNAME("pixSeedfill4");
+
     if (!pixs || pixGetDepth(pixs) != 1)
-        return ERROR_INT("pixs not defined or not 1 bpp", __func__, 1);
+        return ERROR_INT("pixs not defined or not 1 bpp", procName, 1);
     if (!stack)
-        return ERROR_INT("stack not defined", __func__, 1);
+        return ERROR_INT("stack not defined", procName, 1);
     if (!stack->auxstack)
         stack->auxstack = lstackCreate(0);
 
@@ -953,9 +962,9 @@ l_uint32  *data, *line;
 /*!
  * \brief   pixSeedfill8()
  *
- * \param[in]    pixs    1 bpp
- * \param[in]    stack   for holding fillsegs
- * \param[in]    x,y     location of seed pixel
+ * \param[in]    pixs 1 bpp
+ * \param[in]    stack for holding fillsegs
+ * \param[in]    x,y   location of seed pixel
  * \return  0 if OK, 1 on error
  *
  * <pre>
@@ -967,7 +976,7 @@ l_uint32  *data, *line;
  *      (3) Reference: see pixSeedFill8BB()
  * </pre>
  */
-l_ok
+l_int32
 pixSeedfill8(PIX      *pixs,
              L_STACK  *stack,
              l_int32   x,
@@ -977,10 +986,12 @@ l_int32    w, h, xstart, wpl, x1, x2, dy;
 l_int32    xmax, ymax;
 l_uint32  *data, *line;
 
+    PROCNAME("pixSeedfill8");
+
     if (!pixs || pixGetDepth(pixs) != 1)
-        return ERROR_INT("pixs not defined or not 1 bpp", __func__, 1);
+        return ERROR_INT("pixs not defined or not 1 bpp", procName, 1);
     if (!stack)
-        return ERROR_INT("stack not defined", __func__, 1);
+        return ERROR_INT("stack not defined", procName, 1);
     if (!stack->auxstack)
         stack->auxstack = lstackCreate(0);
 
@@ -1054,10 +1065,10 @@ l_uint32  *data, *line;
  * \param[in]    y
  * \param[in]    dy
  * \param[in]    ymax
- * \param[out]   pminx            minimum x
- * \param[out]   pmaxx            maximum x
- * \param[out]   pminy            minimum y
- * \param[out]   pmaxy            maximum y
+ * \param[out]   pminx minimum x
+ * \param[out]   pmaxx maximum x
+ * \param[out]   pminy minimum y
+ * \param[out]   pmaxy maximum y
  * \return  void
  *
  * <pre>
@@ -1083,8 +1094,10 @@ pushFillsegBB(L_STACK  *stack,
 FILLSEG  *fseg;
 L_STACK  *auxstack;
 
+    PROCNAME("pushFillsegBB");
+
     if (!stack) {
-        L_ERROR("stack not defined\n", __func__);
+        L_ERROR("stack not defined\n", procName);
         return;
     }
 
@@ -1095,21 +1108,27 @@ L_STACK  *auxstack;
 
     if (y + dy >= 0 && y + dy <= ymax) {
         if ((auxstack = stack->auxstack) == NULL) {
-            L_ERROR("auxstack not defined\n", __func__);
+            L_ERROR("auxstack not defined\n", procName);
             return;
         }
 
             /* Get a fillseg to use */
-        if (lstackGetCount(auxstack) > 0)
+        if (lstackGetCount(auxstack) > 0) {
             fseg = (FILLSEG *)lstackRemove(auxstack);
-        else
-            fseg = (FILLSEG *)LEPT_CALLOC(1, sizeof(FILLSEG));
+        } else {
+            if ((fseg = (FILLSEG *)LEPT_CALLOC(1, sizeof(FILLSEG))) == NULL) {
+                L_ERROR("fillseg not made\n", procName);
+                return;
+            }
+        }
+
         fseg->xleft = xleft;
         fseg->xright = xright;
         fseg->y = y;
         fseg->dy = dy;
         lstackAdd(stack, fseg);
     }
+    return;
 }
 
 
@@ -1142,28 +1161,36 @@ pushFillseg(L_STACK  *stack,
 FILLSEG  *fseg;
 L_STACK  *auxstack;
 
+    PROCNAME("pushFillseg");
+
     if (!stack) {
-        L_ERROR("stack not defined\n", __func__);
+        L_ERROR("stack not defined\n", procName);
         return;
     }
 
     if (y + dy >= 0 && y + dy <= ymax) {
         if ((auxstack = stack->auxstack) == NULL) {
-            L_ERROR("auxstack not defined\n", __func__);
+            L_ERROR("auxstack not defined\n", procName);
             return;
         }
 
             /* Get a fillseg to use */
-        if (lstackGetCount(auxstack) > 0)
+        if (lstackGetCount(auxstack) > 0) {
             fseg = (FILLSEG *)lstackRemove(auxstack);
-        else
-            fseg = (FILLSEG *)LEPT_CALLOC(1, sizeof(FILLSEG));
+        } else {
+            if ((fseg = (FILLSEG *)LEPT_CALLOC(1, sizeof(FILLSEG))) == NULL) {
+                L_ERROR("fillseg not made\n", procName);
+                return;
+            }
+        }
+
         fseg->xleft = xleft;
         fseg->xright = xright;
         fseg->y = y;
         fseg->dy = dy;
         lstackAdd(stack, fseg);
     }
+    return;
 }
 
 
@@ -1171,10 +1198,10 @@ L_STACK  *auxstack;
  * \brief   popFillseg()
  *
  * \param[in]    stack
- * \param[out]   pxleft    left x
- * \param[out]   pxright   right x
- * \param[out]   py        y coordinate
- * \param[out]   pdy       delta y
+ * \param[out]   pxleft left x
+ * \param[out]   pxright right x
+ * \param[out]   py y coordinate
+ * \param[out]   pdy delta y
  * \return  void
  *
  * <pre>
@@ -1194,12 +1221,14 @@ popFillseg(L_STACK  *stack,
 FILLSEG  *fseg;
 L_STACK  *auxstack;
 
+    PROCNAME("popFillseg");
+
     if (!stack) {
-        L_ERROR("stack not defined\n", __func__);
+        L_ERROR("stack not defined\n", procName);
         return;
     }
     if ((auxstack = stack->auxstack) == NULL) {
-        L_ERROR("auxstack not defined\n", __func__);
+        L_ERROR("auxstack not defined\n", procName);
         return;
     }
 
@@ -1213,4 +1242,5 @@ L_STACK  *auxstack;
 
         /* Save it for re-use */
     lstackAdd(auxstack, fseg);
+    return;
 }

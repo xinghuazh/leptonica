@@ -34,10 +34,6 @@
  *     single characters.  Compare with recogtest4.c.
  */
 
-#ifdef HAVE_CONFIG_H
-#include <config_auto.h>
-#endif  /* HAVE_CONFIG_H */
-
 #include "string.h"
 #include "allheaders.h"
 
@@ -47,28 +43,29 @@ static PIX *GetBigComponent(PIX *pixs);
 l_int32 main(int    argc,
              char **argv)
 {
-l_int32   i, item;
+char      buf[256];
+l_int32   i, n, item;
 l_int32   example[6] = {17, 20, 21, 22, 23, 24};  /* for decoding */
-PIX      *pix1, *pix2, *pix3;
+BOXA     *boxa;
+PIX      *pix1, *pix2, *pix3, *pixdb;
 PIXA     *pixa1, *pixa2, *pixa3;
 L_RECOG  *recog;
 
     if (argc != 1) {
-        lept_stderr(" Syntax: recogtest5\n");
+        fprintf(stderr, " Syntax: recogtest5\n");
         return 1;
     }
 
-    setLeptDebugOK(1);
     lept_mkdir("lept/recog");
 
         /* Generate the recognizer */
     pixa1 = pixaRead("recog/sets/train01.pa");
     recog = recogCreateFromPixa(pixa1, 0, 0, 0, 128, 1);  /* no scaling */
-    recogAverageSamples(recog, 1);
+    recogAverageSamples(&recog, 1);
     recogWrite("/tmp/lept/recog/rec1.rec", recog);
 
         /* Show the templates */
-    recogDebugAverages(recog, 1);
+    recogDebugAverages(&recog, 1);
     recogShowMatchesInRange(recog, recog->pixa_tr, 0.0, 1.0, 1);
 
         /* Get a set of problem images to decode */

@@ -119,10 +119,6 @@
  * </pre>
  */
 
-#ifdef HAVE_CONFIG_H
-#include <config_auto.h>
-#endif  /* HAVE_CONFIG_H */
-
 #include "allheaders.h"
 
     /* Special static operations for 3x1, 1x3 and 3x3 structuring elements */
@@ -169,18 +165,20 @@ l_int32    leftpix, rightpix, toppix, bottompix, maxsize;
 l_uint32  *datab, *datat;
 PIX       *pixb, *pixt, *pixd;
 
+    PROCNAME("pixErodeGray");
+
     if (!pixs)
-        return (PIX *)ERROR_PTR("pixs not defined", __func__, NULL);
+        return (PIX *)ERROR_PTR("pixs not defined", procName, NULL);
     if (pixGetDepth(pixs) != 8)
-        return (PIX *)ERROR_PTR("pixs not 8 bpp", __func__, NULL);
+        return (PIX *)ERROR_PTR("pixs not 8 bpp", procName, NULL);
     if (hsize < 1 || vsize < 1)
-        return (PIX *)ERROR_PTR("hsize or vsize < 1", __func__, NULL);
+        return (PIX *)ERROR_PTR("hsize or vsize < 1", procName, NULL);
     if ((hsize & 1) == 0 ) {
-        L_WARNING("horiz sel size must be odd; increasing by 1\n", __func__);
+        L_WARNING("horiz sel size must be odd; increasing by 1\n", procName);
         hsize++;
     }
     if ((vsize & 1) == 0 ) {
-        L_WARNING("vert sel size must be odd; increasing by 1\n", __func__);
+        L_WARNING("vert sel size must be odd; increasing by 1\n", procName);
         vsize++;
     }
 
@@ -210,7 +208,7 @@ PIX       *pixb, *pixt, *pixd;
     pixb = pixAddBorderGeneral(pixs, leftpix, rightpix, toppix, bottompix, 255);
     pixt = pixCreateTemplate(pixb);
     if (!pixb || !pixt) {
-        L_ERROR("pixb and pixt not made\n", __func__);
+        L_ERROR("pixb and pixt not made\n", procName);
         goto cleanup;
     }
 
@@ -224,7 +222,7 @@ PIX       *pixb, *pixt, *pixd;
     maxsize = L_MAX(hsize, vsize);
     minarray = (l_uint8 *)LEPT_CALLOC(2 * maxsize, sizeof(l_uint8));
     if (!buffer || !minarray) {
-        L_ERROR("buffer and minarray not made\n", __func__);
+        L_ERROR("buffer and minarray not made\n", procName);
         goto cleanup;
     }
 
@@ -247,7 +245,7 @@ PIX       *pixb, *pixt, *pixd;
 
     pixd = pixRemoveBorderGeneral(pixt, leftpix, rightpix, toppix, bottompix);
     if (!pixd)
-        L_ERROR("pixd not made\n", __func__);
+        L_ERROR("pixd not made\n", procName);
 
 cleanup:
     LEPT_FREE(buffer);
@@ -283,18 +281,20 @@ l_int32    leftpix, rightpix, toppix, bottompix, maxsize;
 l_uint32  *datab, *datat;
 PIX       *pixb, *pixt, *pixd;
 
+    PROCNAME("pixDilateGray");
+
     if (!pixs)
-        return (PIX *)ERROR_PTR("pixs not defined", __func__, NULL);
+        return (PIX *)ERROR_PTR("pixs not defined", procName, NULL);
     if (pixGetDepth(pixs) != 8)
-        return (PIX *)ERROR_PTR("pixs not 8 bpp", __func__, NULL);
+        return (PIX *)ERROR_PTR("pixs not 8 bpp", procName, NULL);
     if (hsize < 1 || vsize < 1)
-        return (PIX *)ERROR_PTR("hsize or vsize < 1", __func__, NULL);
+        return (PIX *)ERROR_PTR("hsize or vsize < 1", procName, NULL);
     if ((hsize & 1) == 0 ) {
-        L_WARNING("horiz sel size must be odd; increasing by 1\n", __func__);
+        L_WARNING("horiz sel size must be odd; increasing by 1\n", procName);
         hsize++;
     }
     if ((vsize & 1) == 0 ) {
-        L_WARNING("vert sel size must be odd; increasing by 1\n", __func__);
+        L_WARNING("vert sel size must be odd; increasing by 1\n", procName);
         vsize++;
     }
 
@@ -324,7 +324,7 @@ PIX       *pixb, *pixt, *pixd;
     pixb = pixAddBorderGeneral(pixs, leftpix, rightpix, toppix, bottompix, 0);
     pixt = pixCreateTemplate(pixb);
     if (!pixb || !pixt) {
-        L_ERROR("pixb and pixt not made\n", __func__);
+        L_ERROR("pixb and pixt not made\n", procName);
         goto cleanup;
     }
 
@@ -338,7 +338,7 @@ PIX       *pixb, *pixt, *pixd;
     maxsize = L_MAX(hsize, vsize);
     maxarray = (l_uint8 *)LEPT_CALLOC(2 * maxsize, sizeof(l_uint8));
     if (!buffer || !maxarray) {
-        L_ERROR("buffer and maxarray not made\n", __func__);
+        L_ERROR("buffer and maxarray not made\n", procName);
         goto cleanup;
     }
 
@@ -361,7 +361,7 @@ PIX       *pixb, *pixt, *pixd;
 
     pixd = pixRemoveBorderGeneral(pixt, leftpix, rightpix, toppix, bottompix);
     if (!pixd)
-        L_ERROR("pixd not made\n", __func__);
+        L_ERROR("pixd not made\n", procName);
 
 cleanup:
     LEPT_FREE(buffer);
@@ -398,18 +398,20 @@ l_int32    leftpix, rightpix, toppix, bottompix, maxsize;
 l_uint32  *datab, *datat;
 PIX       *pixb, *pixt, *pixd;
 
+    PROCNAME("pixOpenGray");
+
     if (!pixs)
-        return (PIX *)ERROR_PTR("pixs not defined", __func__, NULL);
+        return (PIX *)ERROR_PTR("pixs not defined", procName, NULL);
     if (pixGetDepth(pixs) != 8)
-        return (PIX *)ERROR_PTR("pixs not 8 bpp", __func__, NULL);
+        return (PIX *)ERROR_PTR("pixs not 8 bpp", procName, NULL);
     if (hsize < 1 || vsize < 1)
-        return (PIX *)ERROR_PTR("hsize or vsize < 1", __func__, NULL);
+        return (PIX *)ERROR_PTR("hsize or vsize < 1", procName, NULL);
     if ((hsize & 1) == 0 ) {
-        L_WARNING("horiz sel size must be odd; increasing by 1\n", __func__);
+        L_WARNING("horiz sel size must be odd; increasing by 1\n", procName);
         hsize++;
     }
     if ((vsize & 1) == 0 ) {
-        L_WARNING("vert sel size must be odd; increasing by 1\n", __func__);
+        L_WARNING("vert sel size must be odd; increasing by 1\n", procName);
         vsize++;
     }
 
@@ -439,7 +441,7 @@ PIX       *pixb, *pixt, *pixd;
     pixb = pixAddBorderGeneral(pixs, leftpix, rightpix, toppix, bottompix, 255);
     pixt = pixCreateTemplate(pixb);
     if (!pixb || !pixt) {
-        L_ERROR("pixb and pixt not made\n", __func__);
+        L_ERROR("pixb and pixt not made\n", procName);
         goto cleanup;
     }
 
@@ -453,7 +455,7 @@ PIX       *pixb, *pixt, *pixd;
     maxsize = L_MAX(hsize, vsize);
     array = (l_uint8 *)LEPT_CALLOC(2 * maxsize, sizeof(l_uint8));
     if (!buffer || !array) {
-        L_ERROR("buffer and array not made\n", __func__);
+        L_ERROR("buffer and array not made\n", procName);
         goto cleanup;
     }
 
@@ -491,7 +493,7 @@ PIX       *pixb, *pixt, *pixd;
 
     pixd = pixRemoveBorderGeneral(pixb, leftpix, rightpix, toppix, bottompix);
     if (!pixd)
-        L_ERROR("pixd not made\n", __func__);
+        L_ERROR("pixd not made\n", procName);
 
 cleanup:
     LEPT_FREE(buffer);
@@ -528,18 +530,20 @@ l_int32    leftpix, rightpix, toppix, bottompix, maxsize;
 l_uint32  *datab, *datat;
 PIX       *pixb, *pixt, *pixd;
 
+    PROCNAME("pixCloseGray");
+
     if (!pixs)
-        return (PIX *)ERROR_PTR("pixs not defined", __func__, NULL);
+        return (PIX *)ERROR_PTR("pixs not defined", procName, NULL);
     if (pixGetDepth(pixs) != 8)
-        return (PIX *)ERROR_PTR("pixs not 8 bpp", __func__, NULL);
+        return (PIX *)ERROR_PTR("pixs not 8 bpp", procName, NULL);
     if (hsize < 1 || vsize < 1)
-        return (PIX *)ERROR_PTR("hsize or vsize < 1", __func__, NULL);
+        return (PIX *)ERROR_PTR("hsize or vsize < 1", procName, NULL);
     if ((hsize & 1) == 0 ) {
-        L_WARNING("horiz sel size must be odd; increasing by 1\n", __func__);
+        L_WARNING("horiz sel size must be odd; increasing by 1\n", procName);
         hsize++;
     }
     if ((vsize & 1) == 0 ) {
-        L_WARNING("vert sel size must be odd; increasing by 1\n", __func__);
+        L_WARNING("vert sel size must be odd; increasing by 1\n", procName);
         vsize++;
     }
 
@@ -569,7 +573,7 @@ PIX       *pixb, *pixt, *pixd;
     pixb = pixAddBorderGeneral(pixs, leftpix, rightpix, toppix, bottompix, 0);
     pixt = pixCreateTemplate(pixb);
     if (!pixb || !pixt) {
-        L_ERROR("pixb and pixt not made\n", __func__);
+        L_ERROR("pixb and pixt not made\n", procName);
         goto cleanup;
     }
 
@@ -583,7 +587,7 @@ PIX       *pixb, *pixt, *pixd;
     maxsize = L_MAX(hsize, vsize);
     array = (l_uint8 *)LEPT_CALLOC(2 * maxsize, sizeof(l_uint8));
     if (!buffer || !array) {
-        L_ERROR("buffer and array not made\n", __func__);
+        L_ERROR("buffer and array not made\n", procName);
         goto cleanup;
     }
 
@@ -620,7 +624,7 @@ PIX       *pixb, *pixt, *pixd;
 
     pixd = pixRemoveBorderGeneral(pixb, leftpix, rightpix, toppix, bottompix);
     if (!pixd)
-        L_ERROR("pixd not made\n", __func__);
+        L_ERROR("pixd not made\n", procName);
 
 cleanup:
     LEPT_FREE(buffer);
@@ -637,9 +641,9 @@ cleanup:
 /*!
  * \brief   pixErodeGray3()
  *
- * \param[in]    pixs    8 bpp, not cmapped
- * \param[in]    hsize   1 or 3
- * \param[in]    vsize   1 or 3
+ * \param[in]    pixs 8 bpp, not cmapped
+ * \param[in]    hsize  1 or 3
+ * \param[in]    vsize  1 or 3
  * \return  pixd, or NULL on error
  *
  * <pre>
@@ -660,15 +664,17 @@ pixErodeGray3(PIX     *pixs,
 {
 PIX  *pixt, *pixb, *pixbd, *pixd;
 
+    PROCNAME("pixErodeGray3");
+
     if (!pixs)
-        return (PIX *)ERROR_PTR("pixs not defined", __func__, NULL);
+        return (PIX *)ERROR_PTR("pixs not defined", procName, NULL);
     if (pixGetDepth(pixs) != 8)
-        return (PIX *)ERROR_PTR("pixs not 8 bpp", __func__, NULL);
+        return (PIX *)ERROR_PTR("pixs not 8 bpp", procName, NULL);
     if (pixGetColormap(pixs))
-        return (PIX *)ERROR_PTR("pix has colormap", __func__, NULL);
+        return (PIX *)ERROR_PTR("pix has colormap", procName, NULL);
     if ((hsize != 1 && hsize != 3) ||
         (vsize != 1 && vsize != 3))
-        return (PIX *)ERROR_PTR("invalid size: must be 1 or 3", __func__, NULL);
+        return (PIX *)ERROR_PTR("invalid size: must be 1 or 3", procName, NULL);
 
     if (hsize == 1 && vsize == 1)
         return pixCopy(NULL, pixs);
@@ -695,7 +701,7 @@ PIX  *pixt, *pixb, *pixbd, *pixd;
 /*!
  * \brief   pixErodeGray3h()
  *
- * \param[in]    pixs    8 bpp, not cmapped
+ * \param[in]    pixs 8 bpp, not cmapped
  * \return  pixd, or NULL on error
  *
  * <pre>
@@ -712,10 +718,12 @@ l_int32    w, h, wpl, i, j;
 l_int32    val0, val1, val2, val3, val4, val5, val6, val7, val8, val9, minval;
 PIX       *pixd;
 
+    PROCNAME("pixErodeGray3h");
+
     if (!pixs)
-        return (PIX *)ERROR_PTR("pixs not defined", __func__, NULL);
+        return (PIX *)ERROR_PTR("pixs not defined", procName, NULL);
     if (pixGetDepth(pixs) != 8)
-        return (PIX *)ERROR_PTR("pixs not 8 bpp", __func__, NULL);
+        return (PIX *)ERROR_PTR("pixs not 8 bpp", procName, NULL);
 
     pixd = pixCreateTemplate(pixs);
     pixGetDimensions(pixs, &w, &h, NULL);
@@ -757,7 +765,7 @@ PIX       *pixd;
 /*!
  * \brief   pixErodeGray3v()
  *
- * \param[in]    pixs    8 bpp, not cmapped
+ * \param[in]    pixs 8 bpp, not cmapped
  * \return  pixd, or NULL on error
  *
  * <pre>
@@ -777,10 +785,12 @@ l_int32    w, h, wpl, i, j;
 l_int32    val0, val1, val2, val3, val4, val5, val6, val7, val8, val9, minval;
 PIX       *pixd;
 
+    PROCNAME("pixErodeGray3v");
+
     if (!pixs)
-        return (PIX *)ERROR_PTR("pixs not defined", __func__, NULL);
+        return (PIX *)ERROR_PTR("pixs not defined", procName, NULL);
     if (pixGetDepth(pixs) != 8)
-        return (PIX *)ERROR_PTR("pixs not 8 bpp", __func__, NULL);
+        return (PIX *)ERROR_PTR("pixs not 8 bpp", procName, NULL);
 
     pixd = pixCreateTemplate(pixs);
     pixGetDimensions(pixs, &w, &h, NULL);
@@ -822,9 +832,9 @@ PIX       *pixd;
 /*!
  * \brief   pixDilateGray3()
  *
- * \param[in]    pixs    8 bpp, not cmapped
- * \param[in]    hsize   1 or 3
- * \param[in]    vsize   1 or 3
+ * \param[in]    pixs 8 bpp, not cmapped
+ * \param[in]    hsize  1 or 3
+ * \param[in]    vsize  1 or 3
  * \return  pixd, or NULL on error
  *
  * <pre>
@@ -840,15 +850,17 @@ pixDilateGray3(PIX     *pixs,
 {
 PIX  *pixt, *pixb, *pixbd, *pixd;
 
+    PROCNAME("pixDilateGray3");
+
     if (!pixs)
-        return (PIX *)ERROR_PTR("pixs not defined", __func__, NULL);
+        return (PIX *)ERROR_PTR("pixs not defined", procName, NULL);
     if (pixGetDepth(pixs) != 8)
-        return (PIX *)ERROR_PTR("pixs not 8 bpp", __func__, NULL);
+        return (PIX *)ERROR_PTR("pixs not 8 bpp", procName, NULL);
     if (pixGetColormap(pixs))
-        return (PIX *)ERROR_PTR("pix has colormap", __func__, NULL);
+        return (PIX *)ERROR_PTR("pix has colormap", procName, NULL);
     if ((hsize != 1 && hsize != 3) ||
         (vsize != 1 && vsize != 3))
-        return (PIX *)ERROR_PTR("invalid size: must be 1 or 3", __func__, NULL);
+        return (PIX *)ERROR_PTR("invalid size: must be 1 or 3", procName, NULL);
 
     if (hsize == 1 && vsize == 1)
         return pixCopy(NULL, pixs);
@@ -875,7 +887,7 @@ PIX  *pixt, *pixb, *pixbd, *pixd;
 /*!
  * \brief   pixDilateGray3h()
  *
- * \param[in]    pixs    8 bpp, not cmapped
+ * \param[in]    pixs 8 bpp, not cmapped
  * \return  pixd, or NULL on error
  *
  * <pre>
@@ -892,10 +904,12 @@ l_int32    w, h, wpl, i, j;
 l_int32    val0, val1, val2, val3, val4, val5, val6, val7, val8, val9, maxval;
 PIX       *pixd;
 
+    PROCNAME("pixDilateGray3h");
+
     if (!pixs)
-        return (PIX *)ERROR_PTR("pixs not defined", __func__, NULL);
+        return (PIX *)ERROR_PTR("pixs not defined", procName, NULL);
     if (pixGetDepth(pixs) != 8)
-        return (PIX *)ERROR_PTR("pixs not 8 bpp", __func__, NULL);
+        return (PIX *)ERROR_PTR("pixs not 8 bpp", procName, NULL);
 
     pixd = pixCreateTemplate(pixs);
     pixGetDimensions(pixs, &w, &h, NULL);
@@ -937,7 +951,7 @@ PIX       *pixd;
 /*!
  * \brief   pixDilateGray3v()
  *
- * \param[in]    pixs    8 bpp, not cmapped
+ * \param[in]    pixs 8 bpp, not cmapped
  * \return  pixd, or NULL on error
  *
  * <pre>
@@ -954,10 +968,12 @@ l_int32    w, h, wpl, i, j;
 l_int32    val0, val1, val2, val3, val4, val5, val6, val7, val8, val9, maxval;
 PIX       *pixd;
 
+    PROCNAME("pixDilateGray3v");
+
     if (!pixs)
-        return (PIX *)ERROR_PTR("pixs not defined", __func__, NULL);
+        return (PIX *)ERROR_PTR("pixs not defined", procName, NULL);
     if (pixGetDepth(pixs) != 8)
-        return (PIX *)ERROR_PTR("pixs not 8 bpp", __func__, NULL);
+        return (PIX *)ERROR_PTR("pixs not 8 bpp", procName, NULL);
 
     pixd = pixCreateTemplate(pixs);
     pixGetDimensions(pixs, &w, &h, NULL);
@@ -999,9 +1015,9 @@ PIX       *pixd;
 /*!
  * \brief   pixOpenGray3()
  *
- * \param[in]    pixs    8 bpp, not cmapped
- * \param[in]    hsize   1 or 3
- * \param[in]    vsize   1 or 3
+ * \param[in]    pixs 8 bpp, not cmapped
+ * \param[in]    hsize  1 or 3
+ * \param[in]    vsize  1 or 3
  * \return  pixd, or NULL on error
  *
  * <pre>
@@ -1019,15 +1035,17 @@ pixOpenGray3(PIX     *pixs,
 {
 PIX  *pixt, *pixb, *pixbd, *pixd;
 
+    PROCNAME("pixOpenGray3");
+
     if (!pixs)
-        return (PIX *)ERROR_PTR("pixs not defined", __func__, NULL);
+        return (PIX *)ERROR_PTR("pixs not defined", procName, NULL);
     if (pixGetDepth(pixs) != 8)
-        return (PIX *)ERROR_PTR("pixs not 8 bpp", __func__, NULL);
+        return (PIX *)ERROR_PTR("pixs not 8 bpp", procName, NULL);
     if (pixGetColormap(pixs))
-        return (PIX *)ERROR_PTR("pix has colormap", __func__, NULL);
+        return (PIX *)ERROR_PTR("pix has colormap", procName, NULL);
     if ((hsize != 1 && hsize != 3) ||
         (vsize != 1 && vsize != 3))
-        return (PIX *)ERROR_PTR("invalid size: must be 1 or 3", __func__, NULL);
+        return (PIX *)ERROR_PTR("invalid size: must be 1 or 3", procName, NULL);
 
     if (hsize == 1 && vsize == 1)
         return pixCopy(NULL, pixs);
@@ -1065,9 +1083,9 @@ PIX  *pixt, *pixb, *pixbd, *pixd;
 /*!
  * \brief   pixCloseGray3()
  *
- * \param[in]    pixs    8 bpp, not cmapped
- * \param[in]    hsize   1 or 3
- * \param[in]    vsize   1 or 3
+ * \param[in]    pixs 8 bpp, not cmapped
+ * \param[in]    hsize  1 or 3
+ * \param[in]    vsize  1 or 3
  * \return  pixd, or NULL on error
  *
  * <pre>
@@ -1083,15 +1101,17 @@ pixCloseGray3(PIX     *pixs,
 {
 PIX  *pixt, *pixb, *pixbd, *pixd;
 
+    PROCNAME("pixCloseGray3");
+
     if (!pixs)
-        return (PIX *)ERROR_PTR("pixs not defined", __func__, NULL);
+        return (PIX *)ERROR_PTR("pixs not defined", procName, NULL);
     if (pixGetDepth(pixs) != 8)
-        return (PIX *)ERROR_PTR("pixs not 8 bpp", __func__, NULL);
+        return (PIX *)ERROR_PTR("pixs not 8 bpp", procName, NULL);
     if (pixGetColormap(pixs))
-        return (PIX *)ERROR_PTR("pix has colormap", __func__, NULL);
+        return (PIX *)ERROR_PTR("pix has colormap", procName, NULL);
     if ((hsize != 1 && hsize != 3) ||
         (vsize != 1 && vsize != 3))
-        return (PIX *)ERROR_PTR("invalid size: must be 1 or 3", __func__, NULL);
+        return (PIX *)ERROR_PTR("invalid size: must be 1 or 3", procName, NULL);
 
     if (hsize == 1 && vsize == 1)
         return pixCopy(NULL, pixs);
@@ -1132,15 +1152,12 @@ PIX  *pixt, *pixb, *pixbd, *pixd;
 /*!
  * \brief   dilateGrayLow()
  *
- * \param[in]    datad       8 bpp dsst image
- * \param[in]    w, h        dimensions of src and dest
- * \param[in]    wpld        words/line of dest
- * \param[in]    datas       8 bpp src image
- * \param[in]    wpls        words/line of src
- * \param[in]    size        full length of SEL; restricted to odd numbers
- * \param[in]    direction   L_HORIZ or L_VERT
- * \param[in]    buffer      holds full line or column of src image pixels
- * \param[in]    maxarray    array of dimension 2*size+1
+ * \param[in]    datad, w, h, wpld 8 bpp image
+ * \param[in]    datas, wpls  8 bpp image, of same dimensions
+ * \param[in]    size  full length of SEL; restricted to odd numbers
+ * \param[in]    direction  L_HORIZ or L_VERT
+ * \param[in]    buffer  holds full line or column of src image pixels
+ * \param[in]    maxarray  array of dimension 2*size+1
  * \return  void
  *
  * <pre>
@@ -1248,15 +1265,12 @@ l_uint32  *lines, *lined;
 /*!
  * \brief   erodeGrayLow()
  *
- * \param[in]    datad       8 bpp dsst image
- * \param[in]    w, h        dimensions of src and dest
- * \param[in]    wpld        words/line of dest
- * \param[in]    datas       8 bpp src image
- * \param[in]    wpls        words/line of src
- * \param[in]    size        full length of SEL; restricted to odd numbers
- * \param[in]    direction   L_HORIZ or L_VERT
- * \param[in]    buffer      holds full line or column of src image pixels
- * \param[in]    minarray    array of dimension 2*size+1
+ * \param[in]    datad, w, h, wpld 8 bpp image
+ * \param[in]    datas, wpls  8 bpp image, of same dimensions
+ * \param[in]    size  full length of SEL; restricted to odd numbers
+ * \param[in]    direction  L_HORIZ or L_VERT
+ * \param[in]    buffer  holds full line or column of src image pixels
+ * \param[in]    minarray  array of dimension 2*size+1
  * \return  void
  *
  * <pre>

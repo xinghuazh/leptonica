@@ -44,24 +44,20 @@
  *    using <n> = 2.
  */
 
-#ifdef HAVE_CONFIG_H
-#include <config_auto.h>
-#endif  /* HAVE_CONFIG_H */
-
 #include "allheaders.h"
 
 int main(int    argc,
          char **argv)
 {
-char    *filename;
-l_int32  index, ret;
-SELA    *sela;
+char        *filename;
+l_int32      index, ret;
+SELA        *sela;
+static char  mainName[] = "fcombautogen";
 
     if (argc != 2 && argc != 3)
         return ERROR_INT(" Syntax:  fcombautogen index <filename>",
-                         __func__, 1);
+                         mainName, 1);
 
-    setLeptDebugOK(1);
     index = atoi(argv[1]);
     sela = selaAddDwaCombs(NULL);
 

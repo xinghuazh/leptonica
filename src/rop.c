@@ -27,6 +27,7 @@
 /*!
  * \file rop.c
  * <pre>
+ *
  *      General rasterop
  *           l_int32    pixRasterop()
  *
@@ -40,22 +41,12 @@
  *
  *      Full image rasterop with no translation
  *           l_int32    pixRasteropFullImage()
- *
- *      Checking for invalid crop box
- *           static l_int32   checkRasteropCrop()
  * </pre>
  */
 
-#ifdef HAVE_CONFIG_H
-#include <config_auto.h>
-#endif  /* HAVE_CONFIG_H */
 
 #include <string.h>
 #include "allheaders.h"
-
-static l_int32 checkRasteropCrop(l_int32 pixw, l_int32 pixh, l_int32 dx,
-                                 l_int32 dy, l_int32 dw, l_int32 dh);
-
 
 /*--------------------------------------------------------------------*
  *                General rasterop (basic pix interface)              *
@@ -100,7 +91,7 @@ static l_int32 checkRasteropCrop(l_int32 pixw, l_int32 pixh, l_int32 dx,
  *  Three, PIX_CLR, PIX_SET, and PIX_NOT(PIX_DST) operate only on the dest.
  *  These are handled by the low-level rasteropUniLow().
  *
- *  The other 14 involve both the src and the dest, and depend on
+ *  The other 14 involve the both the src and the dest, and depend on
  *  the bit values of either just the src or the bit values of both
  *  src and dest.  They are handled by rasteropLow():
  *
@@ -200,7 +191,7 @@ static l_int32 checkRasteropCrop(l_int32 pixw, l_int32 pixh, l_int32 dx,
  *  There is a total of 4*3*2 = 24 ways these pairs can be permuted.
  * </pre>
  */
-l_ok
+l_int32
 pixRasterop(PIX     *pixd,
             l_int32  dx,
             l_int32  dy,
@@ -211,45 +202,44 @@ pixRasterop(PIX     *pixd,
             l_int32  sx,
             l_int32  sy)
 {
-l_int32  dpw, dph, dpd, spw, sph, spd;
+l_int32  dd;
+
+    PROCNAME("pixRasterop");
 
     if (!pixd)
-        return ERROR_INT("pixd not defined", __func__, 1);
+        return ERROR_INT("pixd not defined", procName, 1);
 
     if (op == PIX_DST)   /* no-op */
         return 0;
 
-    pixGetDimensions(pixd, &dpw, &dph, &dpd);
-#if 0
-    if (checkRasteropCrop(dpw, dph, dx, dy, dw, dh)) {
-        L_WARNING("dest crop box out of bounds\n", __func__);
-        return 1;
-    }
-#endif
-
         /* Check if operation is only on dest */
+    dd = pixGetDepth(pixd);
     if (op == PIX_CLR || op == PIX_SET || op == PIX_NOT(PIX_DST)) {
-        rasteropUniLow(pixGetData(pixd), dpw, dph, dpd, pixGetWpl(pixd),
-                       dx, dy, dw, dh, op);
+        rasteropUniLow(pixGetData(pixd),
+                       pixGetWidth(pixd), pixGetHeight(pixd), dd,
+                        pixGetWpl(pixd),
+                       dx, dy, dw, dh,
+                       op);
         return 0;
     }
 
-        /* Two-image rasterop; the depths must match */
     if (!pixs)
-        return ERROR_INT("pixs not defined", __func__, 1);
-    pixGetDimensions(pixs, &spw, &sph, &spd);
-    if (dpd != spd)
-        return ERROR_INT("depths of pixs and pixd differ", __func__, 1);
-#if 0
-    if (checkRasteropCrop(spw, sph, sx, sy, dw, dh)) {
-        L_WARNING("source crop box out of bounds\n", __func__);
-        return 1;
-    }
-#endif
+        return ERROR_INT("pixs not defined", procName, 1);
 
-    rasteropLow(pixGetData(pixd), dpw, dph, dpd, pixGetWpl(pixd),
-                dx, dy, dw, dh, op,
-                pixGetData(pixs), spw, sph, pixGetWpl(pixs), sx, sy);
+        /* Check depth of src and dest; these must agree */
+    if (dd != pixGetDepth(pixs))
+        return ERROR_INT("depths of pixs and pixd differ", procName, 1);
+
+    rasteropLow(pixGetData(pixd),
+                pixGetWidth(pixd), pixGetHeight(pixd), dd,
+                pixGetWpl(pixd),
+                dx, dy, dw, dh,
+                op,
+                pixGetData(pixs),
+                pixGetWidth(pixs), pixGetHeight(pixs),
+                pixGetWpl(pixs),
+                sx, sy);
+
     return 0;
 }
 
@@ -260,11 +250,11 @@ l_int32  dpw, dph, dpd, spw, sph, spd;
 /*!
  * \brief   pixRasteropVip()
  *
- * \param[in]    pixd     in-place
- * \param[in]    bx       left edge of vertical band
- * \param[in]    bw       width of vertical band
- * \param[in]    vshift   vertical shift of band; vshift > 0 is down
- * \param[in]    incolor  L_BRING_IN_WHITE, L_BRING_IN_BLACK
+ * \param[in]    pixd in-place
+ * \param[in]    bx  left edge of vertical band
+ * \param[in]    bw  width of vertical band
+ * \param[in]    vshift vertical shift of band; vshift > 0 is down
+ * \param[in]    incolor L_BRING_IN_WHITE, L_BRING_IN_BLACK
  * \return  0 if OK; 1 on error
  *
  * <pre>
@@ -277,7 +267,7 @@ l_int32  dpw, dph, dpd, spw, sph, spd;
  *          is brought in.
  * </pre>
  */
-l_ok
+l_int32
 pixRasteropVip(PIX     *pixd,
                l_int32  bx,
                l_int32  bw,
@@ -288,12 +278,14 @@ l_int32   w, h, d, index, op;
 PIX      *pixt;
 PIXCMAP  *cmap;
 
+    PROCNAME("pixRasteropVip");
+
     if (!pixd)
-        return ERROR_INT("pixd not defined", __func__, 1);
+        return ERROR_INT("pixd not defined", procName, 1);
     if (incolor != L_BRING_IN_WHITE && incolor != L_BRING_IN_BLACK)
-        return ERROR_INT("invalid value for incolor", __func__, 1);
+        return ERROR_INT("invalid value for incolor", procName, 1);
     if (bw <= 0)
-        return ERROR_INT("bw must be > 0", __func__, 1);
+        return ERROR_INT("bw must be > 0", procName, 1);
 
     if (vshift == 0)
         return 0;
@@ -336,11 +328,11 @@ PIXCMAP  *cmap;
 /*!
  * \brief   pixRasteropHip()
  *
- * \param[in]    pixd     in-place operation
- * \param[in]    by       top of horizontal band
- * \param[in]    bh       height of horizontal band
- * \param[in]    hshift   horizontal shift of band; hshift > 0 is to right
- * \param[in]    incolor  L_BRING_IN_WHITE, L_BRING_IN_BLACK
+ * \param[in]    pixd in-place operation
+ * \param[in]    by  top of horizontal band
+ * \param[in]    bh  height of horizontal band
+ * \param[in]    hshift horizontal shift of band; hshift > 0 is to right
+ * \param[in]    incolor L_BRING_IN_WHITE, L_BRING_IN_BLACK
  * \return  0 if OK; 1 on error
  *
  * <pre>
@@ -353,7 +345,7 @@ PIXCMAP  *cmap;
  *          is brought in.
  * </pre>
  */
-l_ok
+l_int32
 pixRasteropHip(PIX     *pixd,
                l_int32  by,
                l_int32  bh,
@@ -364,12 +356,14 @@ l_int32   w, h, d, index, op;
 PIX      *pixt;
 PIXCMAP  *cmap;
 
+    PROCNAME("pixRasteropHip");
+
     if (!pixd)
-        return ERROR_INT("pixd not defined", __func__, 1);
+        return ERROR_INT("pixd not defined", procName, 1);
     if (incolor != L_BRING_IN_WHITE && incolor != L_BRING_IN_BLACK)
-        return ERROR_INT("invalid value for incolor", __func__, 1);
+        return ERROR_INT("invalid value for incolor", procName, 1);
     if (bh <= 0)
-        return ERROR_INT("bh must be > 0", __func__, 1);
+        return ERROR_INT("bh must be > 0", procName, 1);
 
     if (hshift == 0)
         return 0;
@@ -415,12 +409,12 @@ PIXCMAP  *cmap;
 /*!
  * \brief   pixTranslate()
  *
- * \param[in]    pixd    [optional] destination: this can be null,
- *                        equal to pixs, or different from pixs
+ * \param[in]    pixd [optional] destination: this can be null,
+ *                    equal to pixs, or different from pixs
  * \param[in]    pixs
- * \param[in]    hshift   horizontal shift; hshift > 0 is to right
- * \param[in]    vshift   vertical shift; vshift > 0 is down
- * \param[in]    incolor  L_BRING_IN_WHITE, L_BRING_IN_BLACK
+ * \param[in]    hshift horizontal shift; hshift > 0 is to right
+ * \param[in]    vshift vertical shift; vshift > 0 is down
+ * \param[in]    incolor L_BRING_IN_WHITE, L_BRING_IN_BLACK
  * \return  pixd, or NULL on error.
  *
  * <pre>
@@ -442,12 +436,14 @@ pixTranslate(PIX     *pixd,
              l_int32  vshift,
              l_int32  incolor)
 {
+    PROCNAME("pixTranslate");
+
     if (!pixs)
-        return (PIX *)ERROR_PTR("pixs not defined", __func__, NULL);
+        return (PIX *)ERROR_PTR("pixs not defined", procName, NULL);
 
         /* Prepare pixd for in-place operation */
     if ((pixd = pixCopy(pixd, pixs)) == NULL)
-        return (PIX *)ERROR_PTR("pixd not made", __func__, NULL);
+        return (PIX *)ERROR_PTR("pixd not made", procName, NULL);
 
     pixRasteropIP(pixd, hshift, vshift, incolor);
     return pixd;
@@ -457,13 +453,13 @@ pixTranslate(PIX     *pixd,
 /*!
  * \brief   pixRasteropIP()
  *
- * \param[in]    pixd     in-place translation
- * \param[in]    hshift   horizontal shift; hshift > 0 is to right
- * \param[in]    vshift   vertical shift; vshift > 0 is down
- * \param[in]    incolor  L_BRING_IN_WHITE, L_BRING_IN_BLACK
+ * \param[in]    pixd in-place translation
+ * \param[in]    hshift horizontal shift; hshift > 0 is to right
+ * \param[in]    vshift vertical shift; vshift > 0 is down
+ * \param[in]    incolor L_BRING_IN_WHITE, L_BRING_IN_BLACK
  * \return  0 if OK; 1 on error
  */
-l_ok
+l_int32
 pixRasteropIP(PIX     *pixd,
               l_int32  hshift,
               l_int32  vshift,
@@ -471,8 +467,10 @@ pixRasteropIP(PIX     *pixd,
 {
 l_int32  w, h;
 
+    PROCNAME("pixRasteropIP");
+
     if (!pixd)
-        return ERROR_INT("pixd not defined", __func__, 1);
+        return ERROR_INT("pixd not defined", procName, 1);
 
     pixGetDimensions(pixd, &w, &h, NULL);
     pixRasteropHip(pixd, 0, h, hshift, incolor);
@@ -490,7 +488,7 @@ l_int32  w, h;
  *
  * \param[in]    pixd
  * \param[in]    pixs
- * \param[in]    op     any of the op-codes
+ * \param[in]    op any of the op-codes
  * \return  0 if OK; 1 on error
  *
  * <pre>
@@ -502,57 +500,19 @@ l_int32  w, h;
  *        of pixd is larger than pixs, some pixels in pixd will be unchanged
  * </pre>
  */
-l_ok
+l_int32
 pixRasteropFullImage(PIX     *pixd,
                      PIX     *pixs,
                      l_int32  op)
 {
+    PROCNAME("pixRasteropFullImage");
+
     if (!pixd)
-        return ERROR_INT("pixd not defined", __func__, 1);
+        return ERROR_INT("pixd not defined", procName, 1);
     if (!pixs)
-        return ERROR_INT("pixs not defined", __func__, 1);
+        return ERROR_INT("pixs not defined", procName, 1);
 
     pixRasterop(pixd, 0, 0, pixGetWidth(pixd), pixGetHeight(pixd), op,
                 pixs, 0, 0);
-    return 0;
-}
-
-
-/*--------------------------------------------------------------------*
- *                    Checking for invalid crop box                   *
- *--------------------------------------------------------------------*/
-/*!
- * \brief   checkRasteropCrop()
- *
- * \param[in]    pixw, pixh   pix dimensions
- * \param[in]    x, y, w, h   crop box parameters
- * \return  0 if OK, 1 if the crop box does not intersect with the pix.
- *
- * <pre>
- * Notes:
- *      (1) The widths and heights must all be positive, but %x and %y
- *          can take on any value.
- *      (2) This works for checking both the source and dest regions.
- *      (3) This has been used to verify rasteropLow() cropping is correct.
- *          It is not needed for pre-filtering in pixRasterop().
- * </pre>
- */
-static l_int32
-checkRasteropCrop(l_int32 pixw,
-                  l_int32 pixh,
-                  l_int32 x,
-                  l_int32 y,
-                  l_int32 w,
-                  l_int32 h)
-{
-    if (pixw < 1 || pixh < 1 || w < 1 || h < 1)
-        return ERROR_INT("dimension is <= 0", __func__, 1);
-
-    if (x + w <= 0 || y + h <= 0)
-        return ERROR_INT("box to left or above pix", __func__, 1);
-
-    if (x >= pixw || y >= pixh)
-        return ERROR_INT("box to right or below pix", __func__, 1);
-
     return 0;
 }

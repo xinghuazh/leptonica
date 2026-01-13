@@ -35,10 +35,6 @@
  *   which is a much simpler function.  See testmisc1.c for examples.
  */
 
-#ifdef HAVE_CONFIG_H
-#include <config_auto.h>
-#endif  /* HAVE_CONFIG_H */
-
 #include "allheaders.h"
 
 
@@ -64,21 +60,21 @@ static const char *seltext = "xxxxxxx"
 int main(int    argc,
          char **argv)
 {
-l_int32    w, h, d, w2, h2, i, ncols, same;
-l_float32  angle, conf;
-BOX       *box;
-BOXA      *boxa1, *boxa2;
-PIX       *pix, *pixs, *pixb, *pixb2;
-PIX       *pix1, *pix2, *pix3, *pix4;
-PIXA      *pixam;  /* mask with a single component over each column */
-PIXA      *pixa, *pixa1, *pixa2;
-PIXAA     *pixaa, *pixaa2;
-SEL       *selsplit;
+l_int32      w, h, d, w2, h2, i, ncols, same;
+l_float32    angle, conf;
+BOX         *box;
+BOXA        *boxa1, *boxa2;
+PIX         *pix, *pixs, *pixb, *pixb2;
+PIX         *pix1, *pix2, *pix3, *pix4;
+PIXA        *pixam;  /* mask with a single component over each column */
+PIXA        *pixa, *pixa1, *pixa2;
+PIXAA       *pixaa, *pixaa2;
+SEL         *selsplit;
+static char  mainName[] = "arabic_lines";
 
     if (argc != 1)
-        return ERROR_INT(" Syntax:  arabic_lines", __func__, 1);
+        return ERROR_INT(" Syntax:  arabic_lines", mainName, 1);
 
-    setLeptDebugOK(1);
     lept_mkdir("lept/lineseg");
     pixa = pixaCreate(0);
 
@@ -91,7 +87,7 @@ SEL       *selsplit;
         /* Deskew */
     pixb = pixFindSkewAndDeskew(pix, 1, &angle, &conf);
     pixDestroy(&pix);
-    lept_stderr("Skew angle: %7.2f degrees; %6.2f conf\n", angle, conf);
+    fprintf(stderr, "Skew angle: %7.2f degrees; %6.2f conf\n", angle, conf);
     pixaAddPix(pixa, pixb, L_INSERT);
 
         /* Use full image morphology to find columns, at 2x reduction.
@@ -101,7 +97,7 @@ SEL       *selsplit;
     pix1 = pixMorphCompSequence(pixb2, "c5.500 + o20.20", 0);
     boxa1 = pixConnComp(pix1, &pixam, 8);
     ncols = boxaGetCount(boxa1);
-    lept_stderr("Num columns: %d\n", ncols);
+    fprintf(stderr, "Num columns: %d\n", ncols);
     pixaAddPix(pixa, pix1, L_INSERT);
     boxaDestroy(&boxa1);
 
@@ -127,7 +123,8 @@ SEL       *selsplit;
         pixaaAddBox(pixaa, box, L_INSERT);
         pix4 = pixaDisplayRandomCmap(pixa1, 0, 0);
         pixaAddPix(pixa, pix4, L_INSERT);
-        lept_stderr("Num textlines in col %d: %d\n", i, boxaGetCount(boxa2));
+        fprintf(stderr, "Num textlines in col %d: %d\n", i,
+                boxaGetCount(boxa2));
         pixDestroy(&pix2);
         pixDestroy(&pix3);
         boxaDestroy(&boxa2);
@@ -151,7 +148,7 @@ SEL       *selsplit;
     filesAreIdentical("/tmp/lept/lineseg/pixaa", "/tmp/lept/lineseg/pixaa2",
                       &same);
     if (!same)
-       L_ERROR("pixaa I/O failure\n", __func__);
+       L_ERROR("pixaa I/O failure\n", mainName);
     pixaaDestroy(&pixaa2);
 
         /* Test pixaa display */

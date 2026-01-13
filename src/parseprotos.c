@@ -25,8 +25,7 @@
  *====================================================================*/
 
 /*
- * \file  parseprotos.c
- * <pre>
+ * parseprotos.c
  *
  *       char             *parseForProtos()
  *
@@ -42,17 +41,12 @@
  *       static l_int32    skipToSemicolon()
  *       static l_int32    getOffsetForCharacter()
  *       static l_int32    getOffsetForMatchingRP()
- * </pre>
  */
-
-#ifdef HAVE_CONFIG_H
-#include <config_auto.h>
-#endif  /* HAVE_CONFIG_H */
 
 #include <string.h>
 #include "allheaders.h"
 
-#define L_BUF_SIZE 2048    /* max token size */
+static const l_int32  L_BUF_SIZE = 512;    /* max token size */
 
 static l_int32 getNextNonCommentLine(SARRAY *sa, l_int32 start, l_int32 *pnext);
 static l_int32 getNextNonBlankLine(SARRAY *sa, l_int32 start, l_int32 *pnext);
@@ -78,15 +72,14 @@ static l_int32 getOffsetForMatchingRP(SARRAY *sa, l_int32 start,
 
 
 /*
- * \brief  parseForProtos()
+ *  parseForProtos()
  *
- * \param[in]   filein      output of cpp
- * \param[in]   prestring   [optional] string that prefaces each decl;
- *                          use NULL to omit
- * \return   parsestr  string of function prototypes, or NULL on error
+ *      Input:  filein (output of cpp)
+ *              prestring (<optional> string that prefaces each decl;
+ *                        use NULL to omit)
+ *      Return: parsestr (string of function prototypes), or NULL on error
  *
- * <pre>
- * Notes:
+ *  Notes:
  *      (1) We parse the output of cpp:
  *              cpp -ansi <filein>
  *          Three plans were attempted, with success on the third.
@@ -97,10 +90,10 @@ static l_int32 getOffsetForMatchingRP(SARRAY *sa, l_int32 start,
  *          without cpp comment lines, typically when there are no
  *          comments in the source that immediately precede the function.
  *      (3) Plan 2.  Consider the keywords in the language that start
- *          parts of the cpp file.  Some, like 'enum', 'union' and
- *          'struct', are followed after a while by '{', and eventually
- *          end with '}, plus an optional token and a final ';'.
- *          Others, like 'extern', 'static' and 'typedef', are never
+ *          parts of the cpp file.  Some, like 'typedef', 'enum',
+ *          'union' and 'struct', are followed after a while by '{',
+ *          and eventually end with '}, plus an optional token and a
+ *          final ';'  Others, like 'extern' and 'static', are never
  *          the beginnings of global function definitions.   Function
  *          prototypes have one or more sets of '(' followed eventually
  *          by a ')', and end with ';'.  But function definitions have
@@ -115,8 +108,7 @@ static l_int32 getOffsetForMatchingRP(SARRAY *sa, l_int32 start,
  *          the only keyword we need to consider is 'static'.
  *      (4) Plan 3.  Consider the parentheses and braces for various
  *          declarations.  A struct, enum, or union has a pair of
- *          braces followed by a semicolon.  With the exception of an
- *          __attribute__ declaration for a struct, they cannot have parentheses
+ *          braces followed by a semicolon.  They cannot have parentheses
  *          before the left brace, but a struct can have lots of parentheses
  *          within the brace set.  A function prototype has no braces.
  *          A function declaration can have sets of left and right
@@ -144,7 +136,6 @@ static l_int32 getOffsetForMatchingRP(SARRAY *sa, l_int32 start,
  *          Here, we set: %prestring = "LEPT_DLL ".  Note in particular
  *          the space character that will separate 'LEPT_DLL' from
  *          the standard unix prototype that follows.
- * </pre>
  */
 char *
 parseForProtos(const char *filein,
@@ -155,8 +146,10 @@ l_int32  start, next, stop, charindex, found;
 size_t   nbytes;
 SARRAY  *sa, *saout, *satest;
 
+    PROCNAME("parseForProtos");
+
     if (!filein)
-        return (char *)ERROR_PTR("filein not defined", __func__, NULL);
+        return (char *)ERROR_PTR("filein not defined", procName, NULL);
 
         /* Read in the cpp output into memory, one string for each
          * line in the file, omitting blank lines.  */
@@ -169,31 +162,26 @@ SARRAY  *sa, *saout, *satest;
         searchForProtoSignature(sa, next, &start, &stop, &charindex, &found);
         if (!found)
             break;
-/*        lept_stderr("  start = %d, stop = %d, charindex = %d\n",
-                      start, stop, charindex); */
+/*        fprintf(stderr, "  start = %d, stop = %d, charindex = %d\n",
+                start, stop, charindex); */
         str = captureProtoSignature(sa, start, stop, charindex);
 
-            /* Make sure that the signature found by cpp does not begin with
-             * static, extern or typedef.  We get 'extern' declarations
-             * from header files, and with some versions of cpp running on
+            /* Make sure that the signature found by cpp is neither
+             * static nor extern.  We get 'extern' declarations from
+             * header files, and with some versions of cpp running on
              * #include <sys/stat.h> we get something of the form:
              *    extern ... (( ... )) ... ( ... ) { ...
              * For this, the 1st '(' is the lp, the 2nd ')' is the rp,
-             * and there is a lot of garbage between the rp and the lp.
+             * and there is a lot of garbage between the rp and the lb.
              * It is easiest to simply reject any signature that starts
              * with 'extern'.  Note also that an 'extern' token has been
              * prepended to each prototype, so the 'static' or
              * 'extern' keywords we are looking for, if they exist,
-             * would be the second word.  We also have a typedef in
-             * bmpio.c that has the form:
-             *    typedef struct __attribute__((....)) { ...} ... ;
-             * This is avoided by blacklisting 'typedef' along with 'extern'
-             * and 'static'. */
+             * would be the second word. */
         satest = sarrayCreateWordsFromString(str);
         secondword = sarrayGetString(satest, 1, L_NOCOPY);
         if (strcmp(secondword, "static") &&  /* not static */
-            strcmp(secondword, "extern") &&  /* not extern */
-            strcmp(secondword, "typedef")) {  /* not typedef */
+            strcmp(secondword, "extern")) {  /* not extern */
             if (prestring) {  /* prepend it to the prototype */
                 newstr = stringJoin(prestring, str);
                 sarrayAddString(saout, newstr, L_INSERT);
@@ -221,18 +209,17 @@ SARRAY  *sa, *saout, *satest;
 
 
 /*
- * \brief  getNextNonCommentLine()
+ *  getNextNonCommentLine()
  *
- * \param[in]   sa      output from cpp, by line)
- * \param[in]   start   starting index to search)
- * \param[out]  pnext   index of first uncommented line after the start line
- * \return  0 if OK, o on error
+ *      Input:  sa (output from cpp, by line)
+ *              start (starting index to search)
+ *              &next (<return> index of first uncommented line after
+ *                     the start line)
+ *      Return: 0 if OK, 1 on error
  *
- * <pre>
- * Notes:
+ *  Notes:
  *      (1) Skips over all consecutive comment lines, beginning at 'start'
  *      (2) If all lines to the end are '#' comments, return next = -1
- * </pre>
  */
 static l_int32
 getNextNonCommentLine(SARRAY  *sa,
@@ -242,10 +229,12 @@ getNextNonCommentLine(SARRAY  *sa,
 char    *str;
 l_int32  i, n;
 
+    PROCNAME("getNextNonCommentLine");
+
     if (!sa)
-        return ERROR_INT("sa not defined", __func__, 1);
+        return ERROR_INT("sa not defined", procName, 1);
     if (!pnext)
-        return ERROR_INT("&pnext not defined", __func__, 1);
+        return ERROR_INT("&pnext not defined", procName, 1);
 
         /* Init for situation where this line and all following are comments */
     *pnext = -1;
@@ -253,7 +242,7 @@ l_int32  i, n;
     n = sarrayGetCount(sa);
     for (i = start; i < n; i++) {
         if ((str = sarrayGetString(sa, i, L_NOCOPY)) == NULL)
-            return ERROR_INT("str not returned; shouldn't happen", __func__, 1);
+            return ERROR_INT("str not returned; shouldn't happen", procName, 1);
         if (str[0] != '#') {
             *pnext = i;
             return 0;
@@ -265,19 +254,18 @@ l_int32  i, n;
 
 
 /*
- * \brief  getNextNonBlankLine()
+ *  getNextNonBlankLine()
  *
- * \param[in]    sa      output from cpp, by line
- * \param[in]    start   starting index to search
- * \param[out]   pnext   index of first nonblank line after the start line
- * \return   0 if OK, 1 on error
+ *      Input:  sa (output from cpp, by line)
+ *              start (starting index to search)
+ *              &next (<return> index of first nonblank line after
+ *                     the start line)
+ *      Return: 0 if OK, 1 on error
  *
- * <pre>
- * Notes:
+ *  Notes:
  *      (1) Skips over all consecutive blank lines, beginning at 'start'
  *      (2) A blank line has only whitespace characters (' ', '\t', '\n', '\r')
  *      (3) If all lines to the end are blank, return next = -1
- * </pre>
  */
 static l_int32
 getNextNonBlankLine(SARRAY  *sa,
@@ -287,10 +275,12 @@ getNextNonBlankLine(SARRAY  *sa,
 char    *str;
 l_int32  i, j, n, len;
 
+    PROCNAME("getNextNonBlankLine");
+
     if (!sa)
-        return ERROR_INT("sa not defined", __func__, 1);
+        return ERROR_INT("sa not defined", procName, 1);
     if (!pnext)
-        return ERROR_INT("&pnext not defined", __func__, 1);
+        return ERROR_INT("&pnext not defined", procName, 1);
 
         /* Init for situation where this line and all following are blank */
     *pnext = -1;
@@ -298,7 +288,7 @@ l_int32  i, j, n, len;
     n = sarrayGetCount(sa);
     for (i = start; i < n; i++) {
         if ((str = sarrayGetString(sa, i, L_NOCOPY)) == NULL)
-            return ERROR_INT("str not returned; shouldn't happen", __func__, 1);
+            return ERROR_INT("str not returned; shouldn't happen", procName, 1);
         len = strlen(str);
         for (j = 0; j < len; j++) {
             if (str[j] != ' ' && str[j] != '\t'
@@ -314,18 +304,17 @@ l_int32  i, j, n, len;
 
 
 /*
- * \brief  getNextNonDoubleSlashLine()
+ *  getNextNonDoubleSlashLine()
  *
- * \param[in]     sa      output from cpp, by line
- * \param[in]     start   starting index to search
- * \param[out]    pnext   index of first uncommented line after the start line
- * \return   0 if OK, 1 on error
+ *      Input:  sa (output from cpp, by line)
+ *              start (starting index to search)
+ *              &next (<return> index of first uncommented line after
+ *                     the start line)
+ *      Return: 0 if OK, 1 on error
  *
- * <pre>
- * Notes:
+ *  Notes:
  *      (1) Skips over all consecutive '//' lines, beginning at 'start'
  *      (2) If all lines to the end start with '//', return next = -1
- * </pre>
  */
 static l_int32
 getNextNonDoubleSlashLine(SARRAY  *sa,
@@ -335,10 +324,12 @@ getNextNonDoubleSlashLine(SARRAY  *sa,
 char    *str;
 l_int32  i, n, len;
 
+    PROCNAME("getNextNonDoubleSlashLine");
+
     if (!sa)
-        return ERROR_INT("sa not defined", __func__, 1);
+        return ERROR_INT("sa not defined", procName, 1);
     if (!pnext)
-        return ERROR_INT("&pnext not defined", __func__, 1);
+        return ERROR_INT("&pnext not defined", procName, 1);
 
         /* Init for situation where this line and all following
          * start with '//' */
@@ -347,7 +338,7 @@ l_int32  i, n, len;
     n = sarrayGetCount(sa);
     for (i = start; i < n; i++) {
         if ((str = sarrayGetString(sa, i, L_NOCOPY)) == NULL)
-            return ERROR_INT("str not returned; shouldn't happen", __func__, 1);
+            return ERROR_INT("str not returned; shouldn't happen", procName, 1);
         len = strlen(str);
         if (len < 2 || str[0] != '/' || str[1] != '/') {
             *pnext = i;
@@ -360,18 +351,17 @@ l_int32  i, n, len;
 
 
 /*
- * \brief  searchForProtoSignature()
+ *  searchForProtoSignature()
  *
- * \param[in]     sa           output from cpp, by line
- * \param[in]     begin        beginning index to search
- * \param[out]    pstart       starting index for function definition
- * \param[out]    pstop        index of line on which proto is completed
- * \param[out]    pcharindex   char index of completing ')' character
- * \param[out]    pfound       1 if valid signature is found; 0 otherwise
- * \return   0 if OK, 1 on error
+ *      Input:  sa (output from cpp, by line)
+ *              begin (beginning index to search)
+ *              &start (<return> starting index for function definition)
+ *              &stop (<return> index of line on which proto is completed)
+ *              &charindex (<return> char index of completing ')' character)
+ *              &found (<return> 1 if valid signature is found; 0 otherwise)
+ *      Return: 0 if OK, 1 on error
  *
- * <pre>
- * Notes:
+ *  Notes:
  *      (1) If this returns found == 0, it means that there are no
  *          more function definitions in the file.  Caller must check
  *          this value and exit the loop over the entire cpp file.
@@ -389,7 +379,6 @@ l_int32  i, n, len;
  *          with 'start' being the first line of the definition and
  *          'charindex' being the position of the ')' in line 'stop'
  *          at the end of the arg list.
- * </pre>
  */
 static l_int32
 searchForProtoSignature(SARRAY   *sa,
@@ -404,16 +393,18 @@ l_int32  soffsetlp, soffsetrp, soffsetlb, soffsetsc;
 l_int32  boffsetlp, boffsetrp, boffsetlb, boffsetsc;
 l_int32  toffsetlp, toffsetrp, toffsetlb, toffsetsc;
 
+    PROCNAME("searchForProtoSignature");
+
     if (!sa)
-        return ERROR_INT("sa not defined", __func__, 1);
+        return ERROR_INT("sa not defined", procName, 1);
     if (!pstart)
-        return ERROR_INT("&start not defined", __func__, 1);
+        return ERROR_INT("&start not defined", procName, 1);
     if (!pstop)
-        return ERROR_INT("&stop not defined", __func__, 1);
+        return ERROR_INT("&stop not defined", procName, 1);
     if (!pcharindex)
-        return ERROR_INT("&charindex not defined", __func__, 1);
+        return ERROR_INT("&charindex not defined", procName, 1);
     if (!pfound)
-        return ERROR_INT("&found not defined", __func__, 1);
+        return ERROR_INT("&found not defined", procName, 1);
 
     *pfound = FALSE;
 
@@ -498,18 +489,16 @@ l_int32  toffsetlp, toffsetrp, toffsetlb, toffsetsc;
 
 
 /*
- * \brief  captureProtoSignature()
+ *  captureProtoSignature()
  *
- * \param[in]    sa          output from cpp, by line
- * \param[in]    start       starting index to search; never a comment line
- * \param[in]    stop        index of line on which pattern is completed
- * \param[in]    charindex   char index of completing ')' character
- * \return  cleanstr   prototype string, or NULL on error
+ *      Input:  sa (output from cpp, by line)
+ *              start (starting index to search; never a comment line)
+ *              stop (index of line on which pattern is completed)
+ *              charindex (char index of completing ')' character)
+ *      Return: cleanstr (prototype string), or NULL on error
  *
- * <pre>
- * Notes:
+ *  Notes:
  *      (1) Return all characters, ending with a ';' after the ')'
- * </pre>
  */
 static char *
 captureProtoSignature(SARRAY  *sa,
@@ -521,8 +510,10 @@ char    *str, *newstr, *protostr, *cleanstr;
 SARRAY  *sap;
 l_int32  i;
 
+    PROCNAME("captureProtoSignature");
+
     if (!sa)
-        return (char *)ERROR_PTR("sa not defined", __func__, NULL);
+        return (char *)ERROR_PTR("sa not defined", procName, NULL);
 
     sap = sarrayCreate(0);
     for (i = start; i < stop; i++) {
@@ -544,16 +535,14 @@ l_int32  i;
 
 
 /*
- * \brief  cleanProtoSignature()
+ *  cleanProtoSignature()
  *
- * \param[in]   instr  input prototype string
- * \return  cleanstr   clean prototype string, or NULL on error
+ *      Input:  instr (input prototype string)
+ *      Return: cleanstr (clean prototype string), or NULL on error
  *
- * <pre>
- * Notes:
+ *  Notes:
  *      (1) Adds 'extern' at beginning and regularizes spaces
  *          between tokens.
- * </pre>
  */
 static char *
 cleanProtoSignature(char *instr)
@@ -564,8 +553,10 @@ char     externstring[] = "extern";
 l_int32  i, j, nwords, nchars, index, len;
 SARRAY  *sa, *saout;
 
+    PROCNAME("cleanProtoSignature");
+
     if (!instr)
-        return (char *)ERROR_PTR("instr not defined", __func__, NULL);
+        return (char *)ERROR_PTR("instr not defined", procName, NULL);
 
     sa = sarrayCreateWordsFromString(instr);
     nwords = sarrayGetCount(sa);
@@ -576,11 +567,8 @@ SARRAY  *sa, *saout;
         nchars = strlen(str);
         index = 0;
         for (j = 0; j < nchars; j++) {
-            if (index > L_BUF_SIZE - 6) {
-                sarrayDestroy(&sa);
-                sarrayDestroy(&saout);
-                return (char *)ERROR_PTR("token too large", __func__, NULL);
-            }
+            if (index > L_BUF_SIZE - 6)
+                return (char *)ERROR_PTR("token too large", procName, NULL);
             if (str[j] == '(') {
                 buf[index++] = ' ';
                 buf[index++] = '(';
@@ -609,13 +597,13 @@ SARRAY  *sa, *saout;
 
 
 /*
- * \brief  skipToEndOfFunction()
+ *  skipToEndOfFunction()
  *
- * \param[in]    sa        output from cpp, by line
- * \param[in]    start     index of starting line with left bracket to search
- * \param[in]    lbindex   starting char index for left bracket
- * \param[out]   pnext     index of line following the ending '}' for function
- * \return  0 if OK, 1 on error
+ *      Input:  sa (output from cpp, by line)
+ *              start (index of starting line with left bracket to search)
+ *              lbindex (starting char index for left bracket)
+ *              &next (index of line following the ending '}' for function
+ *      Return: 0 if OK, 1 on error
  */
 static l_int32
 skipToEndOfFunction(SARRAY   *sa,
@@ -626,10 +614,12 @@ skipToEndOfFunction(SARRAY   *sa,
 l_int32  end, rbindex;
 l_int32 soffsetlb, boffsetlb, toffsetlb;
 
+    PROCNAME("skipToEndOfFunction");
+
     if (!sa)
-        return ERROR_INT("sa not defined", __func__, 1);
+        return ERROR_INT("sa not defined", procName, 1);
     if (!pnext)
-        return ERROR_INT("&next not defined", __func__, 1);
+        return ERROR_INT("&next not defined", procName, 1);
 
     getOffsetForCharacter(sa, start, '{', &soffsetlb, &boffsetlb,
                 &toffsetlb);
@@ -645,20 +635,18 @@ l_int32 soffsetlb, boffsetlb, toffsetlb;
 
 
 /*
- * \brief  skipToMatchingBrace()
+ *  skipToMatchingBrace()
  *
- * \param[in]    sa         output from cpp, by line
- * \param[in]    start      index of starting line with left bracket to search
- * \param[in]    lbindex    starting char index for left bracket
- * \param[out]   pstop      index of line with the matching right bracket
- * \param[out]   prbindex   char index of matching right bracket
- * \return  0 if OK, 1 on error
+ *      Input:  sa (output from cpp, by line)
+ *              start (index of starting line with left bracket to search)
+ *              lbindex (starting char index for left bracket)
+ *              &stop (index of line with the matching right bracket)
+ *              &rbindex (char index of matching right bracket)
+ *      Return: 0 if OK, 1 on error
  *
- * <pre>
- * Notes:
+ *  Notes:
  *      (1) If the matching right brace is not found, returns
  *          stop = -1.  This shouldn't happen.
- * </pre>
  */
 static l_int32
 skipToMatchingBrace(SARRAY   *sa,
@@ -670,12 +658,14 @@ skipToMatchingBrace(SARRAY   *sa,
 char    *str;
 l_int32  i, j, jstart, n, sumbrace, found, instring, nchars;
 
+    PROCNAME("skipToMatchingBrace");
+
     if (!sa)
-        return ERROR_INT("sa not defined", __func__, 1);
+        return ERROR_INT("sa not defined", procName, 1);
     if (!pstop)
-        return ERROR_INT("&stop not defined", __func__, 1);
+        return ERROR_INT("&stop not defined", procName, 1);
     if (!prbindex)
-        return ERROR_INT("&rbindex not defined", __func__, 1);
+        return ERROR_INT("&rbindex not defined", procName, 1);
 
     instring = 0;  /* init to FALSE; toggle on double quotes */
     *pstop = -1;
@@ -714,26 +704,24 @@ l_int32  i, j, jstart, n, sumbrace, found, instring, nchars;
         }
     }
 
-    return ERROR_INT("matching right brace not found", __func__, 1);
+    return ERROR_INT("matching right brace not found", procName, 1);
 }
 
 
 /*
- * \brief  skipToSemicolon()
+ *  skipToSemicolon()
  *
- * \param[in]     sa          output from cpp, by line
- * \param[in]     start       index of starting line to search
- * \param[in]     charindex   starting char index for search
- * \param[out]    pnext       index of line containing the next ';'
- * \return  0 if OK, 1 on error
+ *      Input:  sa (output from cpp, by line)
+ *              start (index of starting line to search)
+ *              charindex (starting char index for search)
+ *              &next (index of line containing the next ';')
+ *      Return: 0 if OK, 1 on error
  *
- * <pre>
- * Notes:
+ *  Notes:
  *      (1) If the semicolon isn't found, returns next = -1.
  *          This shouldn't happen.
  *      (2) This is only used in contexts where the semicolon is
  *          not within a string.
- * </pre>
  */
 static l_int32
 skipToSemicolon(SARRAY   *sa,
@@ -744,10 +732,12 @@ skipToSemicolon(SARRAY   *sa,
 char    *str;
 l_int32  i, j, n, jstart, nchars, found;
 
+    PROCNAME("skipToSemicolon");
+
     if (!sa)
-        return ERROR_INT("sa not defined", __func__, 1);
+        return ERROR_INT("sa not defined", procName, 1);
     if (!pnext)
-        return ERROR_INT("&next not defined", __func__, 1);
+        return ERROR_INT("&next not defined", procName, 1);
 
     *pnext = -1;
     n = sarrayGetCount(sa);
@@ -770,27 +760,25 @@ l_int32  i, j, n, jstart, nchars, found;
         }
     }
 
-    return ERROR_INT("semicolon not found", __func__, 1);
+    return ERROR_INT("semicolon not found", procName, 1);
 }
 
 
 /*
- * \brief  getOffsetForCharacter()
+ *  getOffsetForCharacter()
  *
- * \param[in]    sa         output from cpp, by line
- * \param[in]    start      starting index in sa to search;
- *                          never a comment line
- * \param[in]    tchar      we are searching for the first instance of this
- * \param[out]   psoffset   offset in strings from start index
- * \param[out]   pboffset   offset in bytes within string in which
- *                          the character is first found
- * \param[out]   ptoffset   offset in total bytes from beginning of string
- *                          indexed by 'start' to the location where
- *                          the character is first found
- * \return  0 if OK, 1 on error
+ *      Input:  sa (output from cpp, by line)
+ *              start (starting index in sa to search; never a comment line)
+ *              tchar (we are searching for the first instance of this)
+ *              &soffset (<return> offset in strings from start index)
+ *              &boffset (<return> offset in bytes within string in which
+ *                        the character is first found)
+ *              &toffset (<return> offset in total bytes from beginning of
+ *                        string indexed by 'start' to the location where
+ *                        the character is first found)
+ *      Return: 0 if OK, 1 on error
  *
- * <pre>
- * Notes:
+ *  Notes:
  *      (1) We are searching for the first instance of 'tchar', starting
  *          at the beginning of the string indexed by start.
  *      (2) If the character is not found, soffset is returned as -1,
@@ -798,7 +786,6 @@ l_int32  i, j, n, jstart, nchars, found;
  *          caller must check the value of soffset.
  *      (3) This is only used in contexts where it is not necessary to
  *          consider if the character is inside a string.
- * </pre>
  */
 static l_int32
 getOffsetForCharacter(SARRAY   *sa,
@@ -811,14 +798,16 @@ getOffsetForCharacter(SARRAY   *sa,
 char    *str;
 l_int32  i, j, n, nchars, totchars, found;
 
+    PROCNAME("getOffsetForCharacter");
+
     if (!sa)
-        return ERROR_INT("sa not defined", __func__, 1);
+        return ERROR_INT("sa not defined", procName, 1);
     if (!psoffset)
-        return ERROR_INT("&soffset not defined", __func__, 1);
+        return ERROR_INT("&soffset not defined", procName, 1);
     if (!pboffset)
-        return ERROR_INT("&boffset not defined", __func__, 1);
+        return ERROR_INT("&boffset not defined", procName, 1);
     if (!ptoffset)
-        return ERROR_INT("&toffset not defined", __func__, 1);
+        return ERROR_INT("&toffset not defined", procName, 1);
 
     *psoffset = -1;  /* init to not found */
     *pboffset = 100000000;
@@ -829,7 +818,7 @@ l_int32  i, j, n, nchars, totchars, found;
     totchars = 0;
     for (i = start; i < n; i++) {
         if ((str = sarrayGetString(sa, i, L_NOCOPY)) == NULL)
-            return ERROR_INT("str not returned; shouldn't happen", __func__, 1);
+            return ERROR_INT("str not returned; shouldn't happen", procName, 1);
         nchars = strlen(str);
         for (j = 0; j < nchars; j++) {
             if (str[j] == tchar) {
@@ -853,24 +842,22 @@ l_int32  i, j, n, nchars, totchars, found;
 
 
 /*
- * \brief  getOffsetForMatchingRP()
+ *  getOffsetForMatchingRP()
  *
- * \param[in]    sa          output from cpp, by line
- * \param[in]    start       starting index in sa to search;
- *                           never a comment line
- * \param[in]    soffsetlp   string offset to first LP
- * \param[in]    boffsetlp   byte offset within string to first LP
- * \param[in]    toffsetlp   total byte offset to first LP
- * \param[out]   psoffset    offset in strings from start index
- * \param[out]   pboffset    offset in bytes within string in which
- *                           the matching RP is found
- * \param[out]   ptoffset    offset in total bytes from beginning of string
- *                           indexed by 'start' to the location where
- *                           the matching RP is found
- * \return  0 if OK, 1 on error
+ *      Input:  sa (output from cpp, by line)
+ *              start (starting index in sa to search; never a comment line)
+ *              soffsetlp (string offset to first LP)
+ *              boffsetlp (byte offset within string to first LP)
+ *              toffsetlp (total byte offset to first LP)
+ *              &soffset (<return> offset in strings from start index)
+ *              &boffset (<return> offset in bytes within string in which
+ *                        the matching RP is found)
+ *              &toffset (<return> offset in total bytes from beginning of
+ *                        string indexed by 'start' to the location where
+ *                        the matching RP is found);
+ *      Return: 0 if OK, 1 on error
  *
- * <pre>
- * Notes:
+ *  Notes:
  *      (1) We are searching for the matching right parenthesis (RP) that
  *          corresponds to the first LP found beginning at the string
  *          indexed by start.
@@ -886,7 +873,6 @@ l_int32  i, j, n, nchars, totchars, found;
  *          are strict, and require that for functions passed in as args,
  *          the function name arg be placed in parenthesis, as well
  *          as its arg list, thus incurring two extra levels of parentheses.
- * </pre>
  */
 static l_int32
 getOffsetForMatchingRP(SARRAY   *sa,
@@ -901,14 +887,16 @@ getOffsetForMatchingRP(SARRAY   *sa,
 char    *str;
 l_int32  i, j, n, nchars, totchars, leftmatch, firstline, jstart, found;
 
+    PROCNAME("getOffsetForMatchingRP");
+
     if (!sa)
-        return ERROR_INT("sa not defined", __func__, 1);
+        return ERROR_INT("sa not defined", procName, 1);
     if (!psoffset)
-        return ERROR_INT("&soffset not defined", __func__, 1);
+        return ERROR_INT("&soffset not defined", procName, 1);
     if (!pboffset)
-        return ERROR_INT("&boffset not defined", __func__, 1);
+        return ERROR_INT("&boffset not defined", procName, 1);
     if (!ptoffset)
-        return ERROR_INT("&toffset not defined", __func__, 1);
+        return ERROR_INT("&toffset not defined", procName, 1);
 
     *psoffset = -1;  /* init to not found */
     *pboffset = 100000000;
@@ -921,7 +909,7 @@ l_int32  i, j, n, nchars, totchars, leftmatch, firstline, jstart, found;
     firstline = start + soffsetlp;
     for (i = firstline; i < n; i++) {
         if ((str = sarrayGetString(sa, i, L_NOCOPY)) == NULL)
-            return ERROR_INT("str not returned; shouldn't happen", __func__, 1);
+            return ERROR_INT("str not returned; shouldn't happen", procName, 1);
         nchars = strlen(str);
         jstart = 0;
         if (i == firstline)

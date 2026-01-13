@@ -31,10 +31,6 @@
  *   corresponding reductions)
  */
 
-#ifdef HAVE_CONFIG_H
-#include <config_auto.h>
-#endif  /* HAVE_CONFIG_H */
-
 #include "allheaders.h"
 
 #define  BINARY_IMAGE             "test1.png"
@@ -154,7 +150,7 @@ L_REGPARAMS  *rp;
     pixDestroy(&pixs);
 
     if (rp->display) {
-        lept_stderr("Writing to: /tmp/lept/expand/test.pdf\n");
+        fprintf(stderr, "Writing to: /tmp/lept/expand/test.pdf\n");
         pixaConvertToPdf(pixa, 0, 1.0, 0, 0, "Replicative expansion",
                          "/tmp/lept/expand/test.pdf");
     }

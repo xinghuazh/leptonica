@@ -28,10 +28,6 @@
  * bilinear_reg.c
  */
 
-#ifdef HAVE_CONFIG_H
-#include <config_auto.h>
-#endif  /* HAVE_CONFIG_H */
-
 #include "allheaders.h"
 
 static void MakePtas(l_int32 i, PTA **pptas, PTA **pptad);
@@ -80,7 +76,7 @@ L_REGPARAMS  *rp;
 
 #if ALL
         /* Test non-invertability of sampling */
-    lept_stderr("Test invertability of sampling\n");
+    fprintf(stderr, "Test invertability of sampling\n");
     pixa = pixaCreate(0);
     for (i = 1; i < 3; i++) {
         pixb = pixAddBorder(pixg, ADDED_BORDER_PIXELS, 255);
@@ -110,7 +106,7 @@ L_REGPARAMS  *rp;
 
 #if ALL
         /* Test invertability of grayscale interpolation */
-    lept_stderr("Test invertability of grayscale interpolation\n");
+    fprintf(stderr, "Test invertability of grayscale interpolation\n");
     pixa = pixaCreate(0);
     for (i = 1; i < 3; i++) {
         pixb = pixAddBorder(pixg, ADDED_BORDER_PIXELS, 255);
@@ -140,7 +136,7 @@ L_REGPARAMS  *rp;
 
 #if ALL
         /* Test invertability of color interpolation */
-    lept_stderr("Test invertability of color interpolation\n");
+    fprintf(stderr, "Test invertability of color interpolation\n");
     pixa = pixaCreate(0);
     pixc = pixRead("test24.jpg");
     pixcs = pixScale(pixc, 0.3, 0.3);
@@ -174,7 +170,7 @@ L_REGPARAMS  *rp;
 
 #if ALL
         /* Comparison between sampling and interpolated */
-    lept_stderr("Compare sampling with interpolated\n");
+    fprintf(stderr, "Compare sampling with interpolated\n");
     MakePtas(2, &ptas, &ptad);
     pixa = pixaCreate(0);
 
@@ -206,7 +202,7 @@ L_REGPARAMS  *rp;
 
 #if ALL
         /* Large distortion with inversion */
-    lept_stderr("Large bilinear distortion with inversion\n");
+    fprintf(stderr, "Large bilinear distortion with inversion\n");
     MakePtas(0, &ptas, &ptad);
     pixa = pixaCreate(0);
     pixs = pixRead("marge.jpg");

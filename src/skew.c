@@ -29,7 +29,6 @@
  * <pre>
  *
  *      Top-level deskew interfaces
- *          PIX       *pixDeskewBoth()
  *          PIX       *pixDeskew()
  *          PIX       *pixFindSkewAndDeskew()
  *          PIX       *pixDeskewGeneral()
@@ -95,45 +94,39 @@
  * </pre>
  */
 
-#ifdef HAVE_CONFIG_H
-#include <config_auto.h>
-#endif  /* HAVE_CONFIG_H */
-
 #include <math.h>
 #include "allheaders.h"
 
     /* Default sweep angle parameters for pixFindSkew() */
-static const l_float32  DefaultSweepRange = 7.0;   /* degrees */
-static const l_float32  DefaultSweepDelta = 1.0;   /* degrees */
+static const l_float32  DEFAULT_SWEEP_RANGE = 7.;    /* degrees */
+static const l_float32  DEFAULT_SWEEP_DELTA = 1.;    /* degrees */
 
     /* Default final angle difference parameter for binary
      * search in pixFindSkew().  The expected accuracy is
      * not better than the inverse image width in pixels,
      * say, 1/2000 radians, or about 0.03 degrees. */
-static const l_float32  DefaultMinbsDelta = 0.01f;  /* degrees */
+static const l_float32  DEFAULT_MINBS_DELTA = 0.01;  /* degrees */
 
     /* Default scale factors for pixFindSkew() */
-static const l_int32  DefaultSweepReduction = 4;  /* sweep part; 4 is good */
-static const l_int32  DefaultBsReduction = 2;  /* binary search part */
+static const l_int32  DEFAULT_SWEEP_REDUCTION = 4;  /* sweep part; 4 is good */
+static const l_int32  DEFAULT_BS_REDUCTION = 2;  /* binary search part */
 
     /* Minimum angle for deskewing in pixDeskew() */
-static const l_float32  MinDeskewAngle = 0.1f;  /* degree */
+static const l_float32  MIN_DESKEW_ANGLE = 0.1;  /* degree */
 
     /* Minimum allowed confidence (ratio) for deskewing in pixDeskew() */
-static const l_float32  MinAllowedConfidence = 3.0;
+static const l_float32  MIN_ALLOWED_CONFIDENCE = 3.0;
 
     /* Minimum allowed maxscore to give nonzero confidence */
-static const l_int32  MinValidMaxscore = 10000;
+static const l_int32  MIN_VALID_MAXSCORE = 10000;
 
     /* Constant setting threshold for minimum allowed minscore
      * to give nonzero confidence; multiply this constant by
      *  (height * width^2) */
-static const l_float32  MinscoreThreshFactor = 0.000002f;
+static const l_float32  MINSCORE_THRESHOLD_CONSTANT = 0.000002;
 
-    /* Default binarization threshold value.
-     * This is set deliberately above 130 to capture light foreground
-     * with poor printing or images that are out of focus.  */
-static const l_int32  DefaultBinaryThreshold = 160;
+    /* Default binarization threshold value */
+static const l_int32  DEFAULT_BINARY_THRESHOLD = 130;
 
 #ifndef  NO_CONSOLE_IO
 #define  DEBUG_PRINT_SCORES     0
@@ -152,9 +145,9 @@ static const l_int32  DefaultBinaryThreshold = 160;
 /*!
  * \brief   pixDeskewBoth()
  *
- * \param[in]    pixs         any depth
- * \param[in]    redsearch    for binary search: reduction factor = 1, 2 or 4;
- *                            use 0 for default
+ * \param[in]    pixs any depth
+ * \param[in]    redsearch for binary search: reduction factor = 1, 2 or 4;
+ *                         use 0 for default
  * \return  pixd deskewed pix, or NULL on error
  *
  * <pre>
@@ -162,6 +155,7 @@ static const l_int32  DefaultBinaryThreshold = 160;
  *      (1) This binarizes if necessary and does both horizontal
  *          and vertical deskewing, using the default parameters in
  *          the underlying pixDeskew().  See usage there.
+ *      (2) This may return a clone.
  * </pre>
  */
 PIX *
@@ -170,12 +164,14 @@ pixDeskewBoth(PIX     *pixs,
 {
 PIX  *pix1, *pix2, *pix3, *pix4;
 
+    PROCNAME("pixDeskewBoth");
+
     if (!pixs)
-        return (PIX *)ERROR_PTR("pixs not defined", __func__, NULL);
+        return (PIX *)ERROR_PTR("pixs not defined", procName, NULL);
     if (redsearch == 0)
-        redsearch = DefaultBsReduction;
+        redsearch = DEFAULT_BS_REDUCTION;
     else if (redsearch != 1 && redsearch != 2 && redsearch != 4)
-        return (PIX *)ERROR_PTR("redsearch not in {1,2,4}", __func__, NULL);
+        return (PIX *)ERROR_PTR("redsearch not in {1,2,4}", procName, NULL);
 
     pix1 = pixDeskew(pixs, redsearch);
     pix2 = pixRotate90(pix1, 1);
@@ -191,9 +187,9 @@ PIX  *pix1, *pix2, *pix3, *pix4;
 /*!
  * \brief   pixDeskew()
  *
- * \param[in]    pixs        any depth
- * \param[in]    redsearch   for binary search: reduction factor = 1, 2 or 4;
- *                           use 0 for default
+ * \param[in]    pixs any depth
+ * \param[in]    redsearch for binary search: reduction factor = 1, 2 or 4;
+ *                         use 0 for default
  * \return  pixd deskewed pix, or NULL on error
  *
  * <pre>
@@ -209,12 +205,14 @@ PIX *
 pixDeskew(PIX     *pixs,
           l_int32  redsearch)
 {
+    PROCNAME("pixDeskew");
+
     if (!pixs)
-        return (PIX *)ERROR_PTR("pixs not defined", __func__, NULL);
+        return (PIX *)ERROR_PTR("pixs not defined", procName, NULL);
     if (redsearch == 0)
-        redsearch = DefaultBsReduction;
+        redsearch = DEFAULT_BS_REDUCTION;
     else if (redsearch != 1 && redsearch != 2 && redsearch != 4)
-        return (PIX *)ERROR_PTR("redsearch not in {1,2,4}", __func__, NULL);
+        return (PIX *)ERROR_PTR("redsearch not in {1,2,4}", procName, NULL);
 
     return pixDeskewGeneral(pixs, 0, 0.0, 0.0, redsearch, 0, NULL, NULL);
 }
@@ -223,13 +221,13 @@ pixDeskew(PIX     *pixs,
 /*!
  * \brief   pixFindSkewAndDeskew()
  *
- * \param[in]    pixs        any depth
- * \param[in]    redsearch   for binary search: reduction factor = 1, 2 or 4;
- *                           use 0 for default
- * \param[out]   pangle      [optional] angle required to deskew,
- *                           in degrees; use NULL to skip
- * \param[out]   pconf       [optional] conf value is ratio
- *                           of max/min scores; use NULL to skip
+ * \param[in]    pixs any depth
+ * \param[in]    redsearch for binary search: reduction factor = 1, 2 or 4;
+ *                         use 0 for default
+ * \param[out]   pangle   [optional] angle required to deskew,
+ *                        in degrees; use NULL to skip
+ * \param[out]   pconf    [optional] conf value is ratio
+ *                        of max/min scores; use NULL to skip
  * \return  pixd deskewed pix, or NULL on error
  *
  * <pre>
@@ -245,12 +243,14 @@ pixFindSkewAndDeskew(PIX        *pixs,
                      l_float32  *pangle,
                      l_float32  *pconf)
 {
+    PROCNAME("pixFindSkewAndDeskew");
+
     if (!pixs)
-        return (PIX *)ERROR_PTR("pixs not defined", __func__, NULL);
+        return (PIX *)ERROR_PTR("pixs not defined", procName, NULL);
     if (redsearch == 0)
-        redsearch = DefaultBsReduction;
+        redsearch = DEFAULT_BS_REDUCTION;
     else if (redsearch != 1 && redsearch != 2 && redsearch != 4)
-        return (PIX *)ERROR_PTR("redsearch not in {1,2,4}", __func__, NULL);
+        return (PIX *)ERROR_PTR("redsearch not in {1,2,4}", procName, NULL);
 
     return pixDeskewGeneral(pixs, 0, 0.0, 0.0, redsearch, 0, pangle, pconf);
 }
@@ -259,19 +259,19 @@ pixFindSkewAndDeskew(PIX        *pixs,
 /*!
  * \brief   pixDeskewGeneral()
  *
- * \param[in]    pixs         any depth
- * \param[in]    redsweep     for linear search: reduction factor = 1, 2 or 4;
- *                            use 0 for default
- * \param[in]    sweeprange   in degrees in each direction from 0;
- *                            use 0.0 for default
- * \param[in]    sweepdelta   in degrees; use 0.0 for default
- * \param[in]    redsearch    for binary search: reduction factor = 1, 2 or 4;
- *                            use 0 for default;
- * \param[in]    thresh       for binarizing the image; use 0 for default
- * \param[out]   pangle       [optional] angle required to deskew,
- *                            in degrees; use NULL to skip
- * \param[out]   pconf        [optional] conf value is ratio
- *                            of max/min scores; use NULL to skip
+ * \param[in]    pixs  any depth
+ * \param[in]    redsweep  for linear search: reduction factor = 1, 2 or 4;
+ *                         use 0 for default
+ * \param[in]    sweeprange in degrees in each direction from 0;
+ *                          use 0.0 for default
+ * \param[in]    sweepdelta in degrees; use 0.0 for default
+ * \param[in]    redsearch  for binary search: reduction factor = 1, 2 or 4;
+ *                          use 0 for default;
+ * \param[in]    thresh for binarizing the image; use 0 for default
+ * \param[out]   pangle   [optional] angle required to deskew,
+ *                        in degrees; use NULL to skip
+ * \param[out]   pconf    [optional] conf value is ratio
+ *                        of max/min scores; use NULL to skip
  * \return  pixd deskewed pix, or NULL on error
  *
  * <pre>
@@ -295,26 +295,28 @@ l_int32    ret, depth;
 l_float32  angle, conf, deg2rad;
 PIX       *pixb, *pixd;
 
+    PROCNAME("pixDeskewGeneral");
+
     if (pangle) *pangle = 0.0;
     if (pconf) *pconf = 0.0;
     if (!pixs)
-        return (PIX *)ERROR_PTR("pixs not defined", __func__, NULL);
+        return (PIX *)ERROR_PTR("pixs not defined", procName, NULL);
     if (redsweep == 0)
-        redsweep = DefaultSweepReduction;
+        redsweep = DEFAULT_SWEEP_REDUCTION;
     else if (redsweep != 1 && redsweep != 2 && redsweep != 4)
-        return (PIX *)ERROR_PTR("redsweep not in {1,2,4}", __func__, NULL);
+        return (PIX *)ERROR_PTR("redsweep not in {1,2,4}", procName, NULL);
     if (sweeprange == 0.0)
-        sweeprange = DefaultSweepRange;
+        sweeprange = DEFAULT_SWEEP_RANGE;
     if (sweepdelta == 0.0)
-        sweepdelta = DefaultSweepDelta;
+        sweepdelta = DEFAULT_SWEEP_DELTA;
     if (redsearch == 0)
-        redsearch = DefaultBsReduction;
+        redsearch = DEFAULT_BS_REDUCTION;
     else if (redsearch != 1 && redsearch != 2 && redsearch != 4)
-        return (PIX *)ERROR_PTR("redsearch not in {1,2,4}", __func__, NULL);
+        return (PIX *)ERROR_PTR("redsearch not in {1,2,4}", procName, NULL);
     if (thresh == 0)
-        thresh = DefaultBinaryThreshold;
+        thresh = DEFAULT_BINARY_THRESHOLD;
 
-    deg2rad = 3.1415926535f / 180.f;
+    deg2rad = 3.1415926535 / 180.;
 
         /* Binarize if necessary */
     depth = pixGetDepth(pixs);
@@ -326,14 +328,14 @@ PIX       *pixb, *pixd;
         /* Use the 1 bpp image to find the skew */
     ret = pixFindSkewSweepAndSearch(pixb, &angle, &conf, redsweep, redsearch,
                                     sweeprange, sweepdelta,
-                                    DefaultMinbsDelta);
+                                    DEFAULT_MINBS_DELTA);
     pixDestroy(&pixb);
     if (pangle) *pangle = angle;
     if (pconf) *pconf = conf;
     if (ret)
         return pixClone(pixs);
 
-    if (L_ABS(angle) < MinDeskewAngle || conf < MinAllowedConfidence)
+    if (L_ABS(angle) < MIN_DESKEW_ANGLE || conf < MIN_ALLOWED_CONFIDENCE)
         return pixClone(pixs);
 
     if ((pixd = pixRotate(pixs, deg2rad * angle, L_ROTATE_AREA_MAP,
@@ -350,10 +352,10 @@ PIX       *pixb, *pixd;
 /*!
  * \brief   pixFindSkew()
  *
- * \param[in]    pixs     1 bpp
+ * \param[in]    pixs  1 bpp
  * \param[out]   pangle   angle required to deskew, in degrees
  * \param[out]   pconf    confidence value is ratio max/min scores
- * \return  0 if OK, 1 on error or if angle measurement not valid
+ * \return  0 if OK, 1 on error or if angle measurment not valid
  *
  * <pre>
  * Notes:
@@ -364,26 +366,28 @@ PIX       *pixb, *pixd;
  *          Clockwise rotations are positive angles.
  * </pre>
  */
-l_ok
+l_int32
 pixFindSkew(PIX        *pixs,
             l_float32  *pangle,
             l_float32  *pconf)
 {
+    PROCNAME("pixFindSkew");
+
     if (pangle) *pangle = 0.0;
     if (pconf) *pconf = 0.0;
     if (!pangle || !pconf)
-        return ERROR_INT("&angle and/or &conf not defined", __func__, 1);
+        return ERROR_INT("&angle and/or &conf not defined", procName, 1);
     if (!pixs)
-        return ERROR_INT("pixs not defined", __func__, 1);
+        return ERROR_INT("pixs not defined", procName, 1);
     if (pixGetDepth(pixs) != 1)
-        return ERROR_INT("pixs not 1 bpp", __func__, 1);
+        return ERROR_INT("pixs not 1 bpp", procName, 1);
 
     return pixFindSkewSweepAndSearch(pixs, pangle, pconf,
-                                     DefaultSweepReduction,
-                                     DefaultBsReduction,
-                                     DefaultSweepRange,
-                                     DefaultSweepDelta,
-                                     DefaultMinbsDelta);
+                                     DEFAULT_SWEEP_REDUCTION,
+                                     DEFAULT_BS_REDUCTION,
+                                     DEFAULT_SWEEP_RANGE,
+                                     DEFAULT_SWEEP_DELTA,
+                                     DEFAULT_MINBS_DELTA);
 }
 
 
@@ -393,12 +397,12 @@ pixFindSkew(PIX        *pixs,
 /*!
  * \brief   pixFindSkewSweep()
  *
- * \param[in]    pixs         1 bpp
- * \param[out]   pangle       angle required to deskew, in degrees
- * \param[in]    reduction    factor = 1, 2, 4 or 8
+ * \param[in]    pixs  1 bpp
+ * \param[out]   pangle   angle required to deskew, in degrees
+ * \param[in]    reduction  factor = 1, 2, 4 or 8
  * \param[in]    sweeprange   half the full range; assumed about 0; in degrees
  * \param[in]    sweepdelta   angle increment of sweep; in degrees
- * \return  0 if OK, 1 on error or if angle measurement not valid
+ * \return  0 if OK, 1 on error or if angle measurment not valid
  *
  * <pre>
  * Notes:
@@ -406,7 +410,7 @@ pixFindSkew(PIX        *pixs,
  *      (2) Caller must check the return value for validity of the result.
  * </pre>
  */
-l_ok
+l_int32
 pixFindSkewSweep(PIX        *pixs,
                  l_float32  *pangle,
                  l_int32     reduction,
@@ -419,17 +423,19 @@ l_float32  sum, maxscore, maxangle;
 NUMA      *natheta, *nascore;
 PIX       *pix, *pixt;
 
+    PROCNAME("pixFindSkewSweep");
+
     if (!pangle)
-        return ERROR_INT("&angle not defined", __func__, 1);
+        return ERROR_INT("&angle not defined", procName, 1);
     *pangle = 0.0;
     if (!pixs)
-        return ERROR_INT("pixs not defined", __func__, 1);
+        return ERROR_INT("pixs not defined", procName, 1);
     if (pixGetDepth(pixs) != 1)
-        return ERROR_INT("pixs not 1 bpp", __func__, 1);
+        return ERROR_INT("pixs not 1 bpp", procName, 1);
     if (reduction != 1 && reduction != 2 && reduction != 4 && reduction != 8)
-        return ERROR_INT("reduction must be in {1,2,4,8}", __func__, 1);
+        return ERROR_INT("reduction must be in {1,2,4,8}", procName, 1);
 
-    deg2rad = 3.1415926535f / 180.f;
+    deg2rad = 3.1415926535 / 180.;
     ret = 0;
 
         /* Generate reduced image, if requested */
@@ -454,11 +460,11 @@ PIX       *pix, *pixt;
     pixt = pixCreateTemplate(pix);
 
     if (!pix || !pixt) {
-        ret = ERROR_INT("pix and pixt not both made", __func__, 1);
+        ret = ERROR_INT("pix and pixt not both made", procName, 1);
         goto cleanup;
     }
     if (!natheta || !nascore) {
-        ret = ERROR_INT("natheta and nascore not both made", __func__, 1);
+        ret = ERROR_INT("natheta and nascore not both made", procName, 1);
         goto cleanup;
     }
 
@@ -472,7 +478,7 @@ PIX       *pix, *pixt;
         pixFindDifferentialSquareSum(pixt, &sum);
 
 #if  DEBUG_PRINT_SCORES
-        L_INFO("sum(%7.2f) = %7.0f\n", __func__, theta, sum);
+        L_INFO("sum(%7.2f) = %7.0f\n", procName, theta, sum);
 #endif  /* DEBUG_PRINT_SCORES */
 
             /* Save the result in the output arrays */
@@ -487,7 +493,7 @@ PIX       *pix, *pixt;
     *pangle = maxangle;
 
 #if  DEBUG_PRINT_SWEEP
-    L_INFO(" From sweep: angle = %7.3f, score = %7.3f\n", __func__,
+    L_INFO(" From sweep: angle = %7.3f, score = %7.3f\n", procName,
            maxangle, maxscore);
 #endif  /* DEBUG_PRINT_SWEEP */
 
@@ -523,16 +529,16 @@ cleanup:
 /*!
  * \brief   pixFindSkewSweepAndSearch()
  *
- * \param[in]    pixs         1 bpp
- * \param[out]   pangle       angle required to deskew; in degrees
- * \param[out]   pconf        confidence given by ratio of max/min score
- * \param[in]    redsweep     sweep reduction factor = 1, 2, 4 or 8
- * \param[in]    redsearch    binary search reduction factor = 1, 2, 4 or 8;
- *                            and must not exceed redsweep
+ * \param[in]    pixs  1 bpp
+ * \param[out]   pangle   angle required to deskew; in degrees
+ * \param[out]   pconf    confidence given by ratio of max/min score
+ * \param[in]    redsweep  sweep reduction factor = 1, 2, 4 or 8
+ * \param[in]    redsearch  binary search reduction factor = 1, 2, 4 or 8;
+ *                          and must not exceed redsweep
  * \param[in]    sweeprange   half the full range, assumed about 0; in degrees
  * \param[in]    sweepdelta   angle increment of sweep; in degrees
  * \param[in]    minbsdelta   min binary search increment angle; in degrees
- * \return  0 if OK, 1 on error or if angle measurement not valid
+ * \return  0 if OK, 1 on error or if angle measurment not valid
  *
  * <pre>
  * Notes:
@@ -548,7 +554,7 @@ cleanup:
  *      (4) See also notes in pixFindSkewSweepAndSearchScore()
  * </pre>
  */
-l_ok
+l_int32
 pixFindSkewSweepAndSearch(PIX        *pixs,
                           l_float32  *pangle,
                           l_float32  *pconf,
@@ -567,19 +573,19 @@ pixFindSkewSweepAndSearch(PIX        *pixs,
 /*!
  * \brief   pixFindSkewSweepAndSearchScore()
  *
- * \param[in]    pixs         1 bpp
- * \param[out]   pangle       angle required to deskew; in degrees
- * \param[out]   pconf        confidence given by ratio of max/min score
- * \param[out]   pendscore    [optional] max score; use NULL to ignore
- * \param[in]    redsweep     sweep reduction factor = 1, 2, 4 or 8
- * \param[in]    redsearch    binary search reduction factor = 1, 2, 4 or 8;
- *                            and must not exceed redsweep
+ * \param[in]    pixs  1 bpp
+ * \param[out]   pangle   angle required to deskew; in degrees
+ * \param[out]   pconf    confidence given by ratio of max/min score
+ * \param[out]   pendscore [optional] max score; use NULL to ignore
+ * \param[in]    redsweep  sweep reduction factor = 1, 2, 4 or 8
+ * \param[in]    redsearch  binary search reduction factor = 1, 2, 4 or 8;
+ *                          and must not exceed redsweep
  * \param[in]    sweepcenter  angle about which sweep is performed; in degrees
  * \param[in]    sweeprange   half the full range, taken about sweepcenter;
  *                            in degrees
  * \param[in]    sweepdelta   angle increment of sweep; in degrees
  * \param[in]    minbsdelta   min binary search increment angle; in degrees
- * \return  0 if OK, 1 on error or if angle measurement not valid
+ * \return  0 if OK, 1 on error or if angle measurment not valid
  *
  * <pre>
  * Notes:
@@ -587,8 +593,8 @@ pixFindSkewSweepAndSearch(PIX        *pixs,
  *          of equal angles, and then doing a binary search until convergence.
  *      (2) There are two built-in constants that determine if the
  *          returned confidence is nonzero:
- *            ~ MinValidMaxscore (minimum allowed maxscore)
- *            ~ MinscoreThreshFactor (determines minimum allowed
+ *            ~ MIN_VALID_MAXSCORE (minimum allowed maxscore)
+ *            ~ MINSCORE_THRESHOLD_CONSTANT (determines minimum allowed
  *                 minscore, by multiplying by (height * width^2)
  *          If either of these conditions is not satisfied, the returned
  *          confidence value will be zero.  The maxscore is optionally
@@ -602,7 +608,7 @@ pixFindSkewSweepAndSearch(PIX        *pixs,
  *      (4) By default, the shear is about the UL corner.
  * </pre>
  */
-l_ok
+l_int32
 pixFindSkewSweepAndSearchScore(PIX        *pixs,
                                l_float32  *pangle,
                                l_float32  *pconf,
@@ -625,20 +631,20 @@ pixFindSkewSweepAndSearchScore(PIX        *pixs,
 /*!
  * \brief   pixFindSkewSweepAndSearchScorePivot()
  *
- * \param[in]    pixs         1 bpp
- * \param[out]   pangle       angle required to deskew; in degrees
- * \param[out]   pconf        confidence given by ratio of max/min score
- * \param[out]   pendscore    [optional] max score; use NULL to ignore
- * \param[in]    redsweep     sweep reduction factor = 1, 2, 4 or 8
- * \param[in]    redsearch    binary search reduction factor = 1, 2, 4 or 8;
- *                            and must not exceed redsweep
+ * \param[in]    pixs  1 bpp
+ * \param[out]   pangle   angle required to deskew; in degrees
+ * \param[out]   pconf    confidence given by ratio of max/min score
+ * \param[out]   pendscore [optional] max score; use NULL to ignore
+ * \param[in]    redsweep  sweep reduction factor = 1, 2, 4 or 8
+ * \param[in]    redsearch  binary search reduction factor = 1, 2, 4 or 8;
+ *                          and must not exceed redsweep
  * \param[in]    sweepcenter  angle about which sweep is performed; in degrees
  * \param[in]    sweeprange   half the full range, taken about sweepcenter;
  *                            in degrees
  * \param[in]    sweepdelta   angle increment of sweep; in degrees
  * \param[in]    minbsdelta   min binary search increment angle; in degrees
- * \param[in]    pivot        L_SHEAR_ABOUT_CORNER, L_SHEAR_ABOUT_CENTER
- * \return  0 if OK, 1 on error or if angle measurement not valid
+ * \param[in]    pivot  L_SHEAR_ABOUT_CORNER, L_SHEAR_ABOUT_CENTER
+ * \return  0 if OK, 1 on error or if angle measurment not valid
  *
  * <pre>
  * Notes:
@@ -651,7 +657,7 @@ pixFindSkewSweepAndSearchScore(PIX        *pixs,
  *          loses too much of the image.
  * </pre>
  */
-l_ok
+l_int32
 pixFindSkewSweepAndSearchScorePivot(PIX        *pixs,
                                     l_float32  *pangle,
                                     l_float32  *pconf,
@@ -676,23 +682,25 @@ l_float32  rangeleft;
 NUMA      *natheta, *nascore;
 PIX       *pixsw, *pixsch, *pixt1, *pixt2;
 
+    PROCNAME("pixFindSkewSweepAndSearchScorePivot");
+
     if (pendscore) *pendscore = 0.0;
     if (pangle) *pangle = 0.0;
     if (pconf) *pconf = 0.0;
     if (!pangle || !pconf)
-        return ERROR_INT("&angle and/or &conf not defined", __func__, 1);
+        return ERROR_INT("&angle and/or &conf not defined", procName, 1);
     if (!pixs || pixGetDepth(pixs) != 1)
-        return ERROR_INT("pixs not defined or not 1 bpp", __func__, 1);
+        return ERROR_INT("pixs not defined or not 1 bpp", procName, 1);
     if (redsweep != 1 && redsweep != 2 && redsweep != 4 && redsweep != 8)
-        return ERROR_INT("redsweep must be in {1,2,4,8}", __func__, 1);
+        return ERROR_INT("redsweep must be in {1,2,4,8}", procName, 1);
     if (redsearch != 1 && redsearch != 2 && redsearch != 4 && redsearch != 8)
-        return ERROR_INT("redsearch must be in {1,2,4,8}", __func__, 1);
+        return ERROR_INT("redsearch must be in {1,2,4,8}", procName, 1);
     if (redsearch > redsweep)
-        return ERROR_INT("redsearch must not exceed redsweep", __func__, 1);
+        return ERROR_INT("redsearch must not exceed redsweep", procName, 1);
     if (pivot != L_SHEAR_ABOUT_CORNER && pivot != L_SHEAR_ABOUT_CENTER)
-        return ERROR_INT("invalid pivot", __func__, 1);
+        return ERROR_INT("invalid pivot", procName, 1);
 
-    deg2rad = 3.1415926535f / 180.f;
+    deg2rad = 3.1415926535 / 180.;
     ret = 0;
 
         /* Generate reduced image for binary search, if requested */
@@ -735,15 +743,15 @@ PIX       *pixsw, *pixsch, *pixt1, *pixt2;
     nascore = numaCreate(nangles);
 
     if (!pixsch || !pixsw) {
-        ret = ERROR_INT("pixsch and pixsw not both made", __func__, 1);
+        ret = ERROR_INT("pixsch and pixsw not both made", procName, 1);
         goto cleanup;
     }
     if (!pixt1 || !pixt2) {
-        ret = ERROR_INT("pixt1 and pixt2 not both made", __func__, 1);
+        ret = ERROR_INT("pixt1 and pixt2 not both made", procName, 1);
         goto cleanup;
     }
     if (!natheta || !nascore) {
-        ret = ERROR_INT("natheta and nascore not both made", __func__, 1);
+        ret = ERROR_INT("natheta and nascore not both made", procName, 1);
         goto cleanup;
     }
 
@@ -762,7 +770,7 @@ PIX       *pixsw, *pixsch, *pixt1, *pixt2;
         pixFindDifferentialSquareSum(pixt1, &sum);
 
 #if  DEBUG_PRINT_SCORES
-        L_INFO("sum(%7.2f) = %7.0f\n", __func__, theta, sum);
+        L_INFO("sum(%7.2f) = %7.0f\n", procName, theta, sum);
 #endif  /* DEBUG_PRINT_SCORES */
 
             /* Save the result in the output arrays */
@@ -775,7 +783,7 @@ PIX       *pixsw, *pixsch, *pixt1, *pixt2;
     numaGetFValue(natheta, maxindex, &maxangle);
 
 #if  DEBUG_PRINT_SWEEP
-    L_INFO(" From sweep: angle = %7.3f, score = %7.3f\n", __func__,
+    L_INFO(" From sweep: angle = %7.3f, score = %7.3f\n", procName,
            maxangle, maxscore);
 #endif  /* DEBUG_PRINT_SWEEP */
 
@@ -796,7 +804,7 @@ PIX       *pixsw, *pixsch, *pixt1, *pixt2;
         /* Check if the max is at the end of the sweep. */
     n = numaGetCount(natheta);
     if (maxindex == 0 || maxindex == n - 1) {
-        L_WARNING("max found at sweep edge\n", __func__);
+        L_WARNING("max found at sweep edge\n", procName);
         goto cleanup;
     }
 
@@ -835,7 +843,7 @@ PIX       *pixsw, *pixsch, *pixt1, *pixt2;
     numaAddNumber(natheta, centerangle + sweepdelta);
 
         /* Start the search */
-    delta = 0.5f * sweepdelta;
+    delta = 0.5 * sweepdelta;
     while (delta >= minbsdelta)
     {
             /* Get the left intermediate score */
@@ -883,12 +891,12 @@ PIX       *pixsw, *pixsch, *pixt1, *pixt2;
 
             /* Get new center angle and delta for next iteration */
         centerangle = centerangle + delta * (maxindex - 2);
-        delta = 0.5f * delta;
+        delta = 0.5 * delta;
     }
     *pangle = centerangle;
 
 #if  DEBUG_PRINT_SCORES
-    L_INFO(" Binary search score = %7.3f\n", __func__, bsearchscore[2]);
+    L_INFO(" Binary search score = %7.3f\n", procName, bsearchscore[2]);
 #endif  /* DEBUG_PRINT_SCORES */
 
     if (pendscore)  /* save if requested */
@@ -908,12 +916,12 @@ PIX       *pixsw, *pixsch, *pixt1, *pixt2;
     numaGetMin(nascore, &minscore, &minloc);
     width = pixGetWidth(pixsch);
     height = pixGetHeight(pixsch);
-    minthresh = MinscoreThreshFactor * width * width * height;
+    minthresh = MINSCORE_THRESHOLD_CONSTANT * width * width * height;
 
 #if  DEBUG_THRESHOLD
-    L_INFO(" minthresh = %10.2f, minscore = %10.2f\n", __func__,
+    L_INFO(" minthresh = %10.2f, minscore = %10.2f\n", procName,
            minthresh, minscore);
-    L_INFO(" maxscore = %10.2f\n", __func__, maxscore);
+    L_INFO(" maxscore = %10.2f\n", procName, maxscore);
 #endif  /* DEBUG_THRESHOLD */
 
     if (minscore > minthresh)
@@ -925,13 +933,13 @@ PIX       *pixsw, *pixsch, *pixt1, *pixt2;
          * range or if maxscore is small */
     if ((centerangle > rangeleft + 2 * sweeprange - sweepdelta) ||
         (centerangle < rangeleft + sweepdelta) ||
-        (maxscore < MinValidMaxscore))
+        (maxscore < MIN_VALID_MAXSCORE))
         *pconf = 0.0;
 
 #if  DEBUG_PRINT_BINARY
-    lept_stderr("Binary search: angle = %7.3f, score ratio = %6.2f\n",
+    fprintf(stderr, "Binary search: angle = %7.3f, score ratio = %6.2f\n",
             *pangle, *pconf);
-    lept_stderr("               max score = %8.0f\n", maxscore);
+    fprintf(stderr, "               max score = %8.0f\n", maxscore);
 #endif  /* DEBUG_PRINT_BINARY */
 
 #if  DEBUG_PLOT_SCORES
@@ -964,25 +972,24 @@ cleanup:
  *    Search over arbitrary range of angles in orthogonal directions   *
  *---------------------------------------------------------------------*/
 /*
- * \brief   pixFindSkewOrthogonalRange()
+ *   pixFindSkewOrthogonalRange()
  *
- * \param[in]    pixs         1 bpp
- * \param[out]   pangle       angle required to deskew; in degrees cw
- * \param[out]   pconf        confidence given by ratio of max/min score
- * \param[in]    redsweep     sweep reduction factor = 1, 2, 4 or 8
- * \param[in]    redsearch    binary search reduction factor = 1, 2, 4 or 8;
- *                            and must not exceed redsweep
- * \param[in]    sweeprange   half the full range in each orthogonal
- *                            direction, taken about 0, in degrees
- * \param[in]    sweepdelta   angle increment of sweep; in degrees
- * \param[in]    minbsdelta   min binary search increment angle; in degrees
- * \param[in]    confprior    amount by which confidence of 90 degree rotated
- *                            result is reduced when comparing with unrotated
- *                            confidence value
- * \return   0 if OK, 1 on error or if angle measurement not valid
+ *      Input:  pixs  (1 bpp)
+ *              &angle  (<return> angle required to deskew; in degrees cw)
+ *              &conf   (<return> confidence given by ratio of max/min score)
+ *              redsweep  (sweep reduction factor = 1, 2, 4 or 8)
+ *              redsearch  (binary search reduction factor = 1, 2, 4 or 8;
+ *                          and must not exceed redsweep)
+ *              sweeprange  (half the full range in each orthogonal
+ *                           direction, taken about 0, in degrees)
+ *              sweepdelta   (angle increment of sweep; in degrees)
+ *              minbsdelta   (min binary search increment angle; in degrees)
+ *              confprior  (amount by which confidence of 90 degree rotated
+ *                          result is reduced when comparing with unrotated
+ *                          confidence value)
+ *      Return: 0 if OK, 1 on error or if angle measurment not valid
  *
- * <pre>
- * Notes:
+ *  Notes:
  *      (1) This searches for the skew angle, first in the range
  *          [-sweeprange, sweeprange], and then in
  *          [90 - sweeprange, 90 + sweeprange], with angles measured
@@ -1020,7 +1027,6 @@ cleanup:
  *          the landscape signal is accidentally larger than the
  *          portrait signal.  To do this use a positive value of
  *          %confprior; say 1.5.
- * </pre>
  */
 l_int32
 pixFindSkewOrthogonalRange(PIX        *pixs,
@@ -1036,12 +1042,14 @@ pixFindSkewOrthogonalRange(PIX        *pixs,
 l_float32  angle1, conf1, score1, angle2, conf2, score2;
 PIX       *pixr;
 
+    PROCNAME("pixFindSkewOrthogonalRange");
+
     if (pangle) *pangle = 0.0;
     if (pconf) *pconf = 0.0;
     if (!pangle || !pconf)
-        return ERROR_INT("&angle and/or &conf not defined", __func__, 1);
+        return ERROR_INT("&angle and/or &conf not defined", procName, 1);
     if (!pixs || pixGetDepth(pixs) != 1)
-        return ERROR_INT("pixs not defined or not 1 bpp", __func__, 1);
+        return ERROR_INT("pixs not defined or not 1 bpp", procName, 1);
 
     pixFindSkewSweepAndSearchScorePivot(pixs, &angle1, &conf1, &score1,
                                         redsweep, redsearch, 0.0,
@@ -1058,16 +1066,16 @@ PIX       *pixr;
         *pangle = angle1;
         *pconf = conf1;
     } else {
-        *pangle = -90.0f + angle2;
+        *pangle = -90.0 + angle2;
         *pconf = conf2;
     }
 
 #if  DEBUG_PRINT_ORTH
-    lept_stderr(" About 0:  angle1 = %7.3f, conf1 = %7.3f, score1 = %f\n",
+    fprintf(stderr, " About 0:  angle1 = %7.3f, conf1 = %7.3f, score1 = %f\n",
             angle1, conf1, score1);
-    lept_stderr(" About 90: angle2 = %7.3f, conf2 = %7.3f, score2 = %f\n",
+    fprintf(stderr, " About 90: angle2 = %7.3f, conf2 = %7.3f, score2 = %f\n",
             angle2, conf2, score2);
-    lept_stderr(" Final:    angle = %7.3f, conf = %7.3f\n", *pangle, *pconf);
+    fprintf(stderr, " Final:    angle = %7.3f, conf = %7.3f\n", *pangle, *pconf);
 #endif  /* DEBUG_PRINT_ORTH */
 
     return 0;
@@ -1082,7 +1090,7 @@ PIX       *pixr;
  * \brief   pixFindDifferentialSquareSum()
  *
  * \param[in]    pixs
- * \param[out]   psum    result
+ * \param[out]   psum  result
  * \return  0 if OK, 1 on error
  *
  * <pre>
@@ -1093,7 +1101,7 @@ PIX       *pixr;
  *           ~ not more than 5% of the image width
  * </pre>
  */
-l_ok
+l_int32
 pixFindDifferentialSquareSum(PIX        *pixs,
                              l_float32  *psum)
 {
@@ -1102,16 +1110,18 @@ l_int32    w, h, skiph, skip, nskip;
 l_float32  val1, val2, diff, sum;
 NUMA      *na;
 
+    PROCNAME("pixFindDifferentialSquareSum");
+
     if (!psum)
-        return ERROR_INT("&sum not defined", __func__, 1);
+        return ERROR_INT("&sum not defined", procName, 1);
     *psum = 0.0;
     if (!pixs)
-        return ERROR_INT("pixs not defined", __func__, 1);
+        return ERROR_INT("pixs not defined", procName, 1);
 
         /* Generate a number array consisting of the sum
          * of pixels in each row of pixs */
     if ((na = pixCountPixelsByRow(pixs, NULL)) == NULL)
-        return ERROR_INT("na not made", __func__, 1);
+        return ERROR_INT("na not made", procName, 1);
 
         /* Compute the number of rows at top and bottom to omit.
          * We omit these to avoid getting a spurious signal from
@@ -1145,11 +1155,11 @@ NUMA      *na;
  * \brief   pixFindNormalizedSquareSum()
  *
  * \param[in]    pixs
- * \param[out]   phratio   [optional] ratio of normalized horiz square sum
- *                         to result if the pixel distribution were uniform
- * \param[out]   pvratio   [optional] ratio of normalized vert square sum
- *                         to result if the pixel distribution were uniform
- * \param[out]   pfract    [optional] ratio of fg pixels to total pixels
+ * \param[out]   phratio [optional] ratio of normalized horiz square sum
+ *                       to result if the pixel distribution were uniform
+ * \param[out]   pvratio [optional] ratio of normalized vert square sum
+ *                       to result if the pixel distribution were uniform
+ * \param[out]   pfract  [optional] ratio of fg pixels to total pixels
  * \return  0 if OK, 1 on error or if there are no fg pixels
  *
  * <pre>
@@ -1164,7 +1174,7 @@ NUMA      *na;
  *      (2) If there are no fg pixels, hratio and vratio are returned as 0.0.
  * </pre>
  */
-l_ok
+l_int32
 pixFindNormalizedSquareSum(PIX        *pixs,
                            l_float32  *phratio,
                            l_float32  *pvratio,
@@ -1175,13 +1185,15 @@ l_float32  sum, sumsq, uniform, val;
 NUMA      *na;
 PIX       *pixt;
 
+    PROCNAME("pixFindNormalizedSquareSum");
+
     if (phratio) *phratio = 0.0;
     if (pvratio) *pvratio = 0.0;
     if (pfract) *pfract = 0.0;
     if (!phratio && !pvratio)
-        return ERROR_INT("nothing to do", __func__, 1);
+        return ERROR_INT("nothing to do", procName, 1);
     if (!pixs || pixGetDepth(pixs) != 1)
-        return ERROR_INT("pixs not defined or not 1 bpp", __func__, 1);
+        return ERROR_INT("pixs not defined or not 1 bpp", procName, 1);
     pixGetDimensions(pixs, &w, &h, NULL);
 
     empty = 0;

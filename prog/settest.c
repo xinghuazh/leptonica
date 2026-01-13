@@ -36,10 +36,6 @@
  *  For a more complete set of tests, see the operations tested in maptest.c.
  */
 
-#ifdef HAVE_CONFIG_H
-#include <config_auto.h>
-#endif  /* HAVE_CONFIG_H */
-
 #include "allheaders.h"
 
 static L_ASET *BuildSet(PIX *pix, l_int32 factor, l_int32 print);
@@ -52,7 +48,6 @@ l_int32 main(int    argc,
 L_ASET  *s;
 PIX     *pix;
 
-    setLeptDebugOK(1);
     pix = pixRead("weasel8.240c.png");
 
         /* Build the set from all the pixels. */
@@ -69,7 +64,7 @@ PIX     *pix;
     pix = pixRead("marge.jpg");
     startTimer();
     s = BuildSet(pix, 1, FALSE);
-    lept_stderr("Time (250K pixels): %7.3f sec\n", stopTimer());
+    fprintf(stderr, "Time (250K pixels): %7.3f sec\n", stopTimer());
     TestSetIterator(s, FALSE);
     l_asetDestroy(&s);
     pixDestroy(&pix);
@@ -89,7 +84,7 @@ PIXCMAP   *cmap;
 RB_TYPE    key;
 RB_TYPE   *pval;
 
-    lept_stderr("\n --------------- Begin building set --------------\n");
+    fprintf(stderr, "\n --------------- Begin building set --------------\n");
     s = l_asetCreate(L_UINT_TYPE);
     data = pixGetData(pix);
     wpl = pixGetWpl(pix);
@@ -107,14 +102,14 @@ RB_TYPE   *pval;
             }
             pval = l_asetFind(s, key);
             if (pval && print)
-                lept_stderr("key = %llx\n", key.utype);
+                fprintf(stderr, "key = %llx\n", key.utype);
             l_asetInsert(s, key);
         }
     }
-    lept_stderr("Size: %d\n", l_asetSize(s));
+    fprintf(stderr, "Size: %d\n", l_asetSize(s));
     if (print)
         l_rbtreePrint(stderr, s);
-    lept_stderr(" ----------- End Building set -----------------\n");
+    fprintf(stderr, " ----------- End Building set -----------------\n");
 
     return s;
 }
@@ -123,24 +118,24 @@ static void
 TestSetIterator(L_ASET  *s,
                 l_int32  print)
 {
-l_int32       count;
+l_int32       count, npix, val;
 L_ASET_NODE  *n;
 
     n = l_asetGetFirst(s);
     count = 0;
-    lept_stderr("\n --------------- Begin iter listing --------------\n");
+    fprintf(stderr, "\n --------------- Begin iter listing --------------\n");
     while (n) {
         count++;
         if (print)
 #if 0
-            lept_stderr("key = %x\n", n->key.utype);
+            fprintf(stderr, "key = %x\n", n->key.utype);
 #else
-            lept_stderr("key = %llx\n", n->key.utype);
+            fprintf(stderr, "key = %llx\n", n->key.utype);
 #endif
         n = l_asetGetNext(n);
     }
-    lept_stderr("Count from iterator: %d\n", count);
-    lept_stderr(" --------------- End iter listing --------------\n");
+    fprintf(stderr, "Count from iterator: %d\n", count);
+    fprintf(stderr, " --------------- End iter listing --------------\n");
     return;
 }
 

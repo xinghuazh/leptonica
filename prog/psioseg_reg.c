@@ -44,10 +44,6 @@
  *        this program uses ps2pdf to generate the pdf output.
  */
 
-#ifdef HAVE_CONFIG_H
-#include <config_auto.h>
-#endif  /* HAVE_CONFIG_H */
-
 #include "allheaders.h"
 
 int main(int    argc,
@@ -61,28 +57,8 @@ PIX          *pixs, *pixc, *pixht, *pixtxt, *pixmfull;
 PIX          *pix4c, *pix8c, *pix8g, *pix32, *pixcs, *pixcs2;
 L_REGPARAMS  *rp;
 
-#if !defined(HAVE_LIBPNG)
-    L_ERROR("This test requires libpng to run.\n", "psioseg_reg");
-    exit(77);
-#endif
-#if !defined(HAVE_LIBJPEG)
-    L_ERROR("This test requires libjpeg to run.\n", "psioseg_reg");
-    exit(77);
-#endif
-#if !defined(HAVE_LIBTIFF)
-    L_ERROR("This test requires libtiff to run.\n", "psioseg_reg");
-    exit(77);
-#endif
-
     if (regTestSetup(argc, argv, &rp))
         return 1;
-
-#if !USE_PSIO
-    lept_stderr("psio writing is not enabled\n"
-                "See environ.h: #define USE_PSIO 1\n\n");
-    regTestCleanup(rp);
-    return 0;
-#endif  /* abort */
 
         /* Source for generating images */
     pixs = pixRead("pageseg2.tif");   /* 1 bpp */
@@ -162,7 +138,7 @@ L_REGPARAMS  *rp;
     psname = genPathname("/tmp/lept/regout", "psioseg.5.ps");
     pdfname = genPathname("/tmp/lept/regout", "psioseg.5.pdf");
     snprintf(buf, sizeof(buf), "ps2pdf %s %s", psname, pdfname);
-    ret = callSystemDebug(buf);  /* ps2pdf */
+    ret = system(buf);  /* ps2pdf */
     lept_free(psname);
     lept_free(pdfname);
     if (!ret)

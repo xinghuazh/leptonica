@@ -35,7 +35,6 @@
  *           BOX             *boxTransformOrdered()
  *           BOXA            *boxaRotateOrth()
  *           BOX             *boxRotateOrth()
- *           BOXA            *boxaShiftWithPta()
  *
  *      Boxa sort
  *           BOXA            *boxaSort()
@@ -52,7 +51,6 @@
  *      Boxa array extraction
  *           l_int32          boxaExtractAsNuma()
  *           l_int32          boxaExtractAsPta()
- *           PTA             *boxaExtractCorners()
  *
  *      Other Boxaa functions
  *           l_int32          boxaaGetExtent()
@@ -64,18 +62,14 @@
  * </pre>
  */
 
-#ifdef HAVE_CONFIG_H
-#include <config_auto.h>
-#endif  /* HAVE_CONFIG_H */
-
 #include <math.h>
 #include "allheaders.h"
-#include "pix_internal.h"
 
     /* For more than this number of c.c. in a binarized image of
      * semi-perimeter (w + h) about 5000 or less, the O(n) binsort
      * is faster than the O(nlogn) shellsort.  */
-static const l_int32   MinCompsForBinSort = 200;
+static const l_int32   MIN_COMPS_FOR_BIN_SORT = 200;
+
 
 /*---------------------------------------------------------------------*
  *      Boxa/Box transform (shift, scale) and orthogonal rotation      *
@@ -84,19 +78,13 @@ static const l_int32   MinCompsForBinSort = 200;
  * \brief   boxaTransform()
  *
  * \param[in]    boxas
- * \param[in]    shiftx
- * \param[in]    shifty
- * \param[in]    scalex
- * \param[in]    scaley
+ * \param[in]    shiftx, shifty
+ * \param[in]    scalex, scaley
  * \return  boxad, or NULL on error
  *
  * <pre>
  * Notes:
  *      (1) This is a very simple function that first shifts, then scales.
- *      (2) The UL corner coordinates of all boxes in the output %boxad
- *      (3) For the boxes in the output %boxad, the UL corner coordinates
- *          must be non-negative, and the width and height of valid
- *          boxes must be at least 1.
  * </pre>
  */
 BOXA *
@@ -110,15 +98,17 @@ l_int32  i, n;
 BOX     *boxs, *boxd;
 BOXA    *boxad;
 
+    PROCNAME("boxaTransform");
+
     if (!boxas)
-        return (BOXA *)ERROR_PTR("boxas not defined", __func__, NULL);
+        return (BOXA *)ERROR_PTR("boxas not defined", procName, NULL);
     n = boxaGetCount(boxas);
     if ((boxad = boxaCreate(n)) == NULL)
-        return (BOXA *)ERROR_PTR("boxad not made", __func__, NULL);
+        return (BOXA *)ERROR_PTR("boxad not made", procName, NULL);
     for (i = 0; i < n; i++) {
         if ((boxs = boxaGetBox(boxas, i, L_CLONE)) == NULL) {
             boxaDestroy(&boxad);
-            return (BOXA *)ERROR_PTR("boxs not found", __func__, NULL);
+            return (BOXA *)ERROR_PTR("boxs not found", procName, NULL);
         }
         boxd = boxTransform(boxs, shiftx, shifty, scalex, scaley);
         boxDestroy(&boxs);
@@ -133,18 +123,14 @@ BOXA    *boxad;
  * \brief   boxTransform()
  *
  * \param[in]    box
- * \param[in]    shiftx
- * \param[in]    shifty
- * \param[in]    scalex
- * \param[in]    scaley
+ * \param[in]    shiftx, shifty
+ * \param[in]    scalex, scaley
  * \return  boxd, or NULL on error
  *
  * <pre>
  * Notes:
  *      (1) This is a very simple function that first shifts, then scales.
  *      (2) If the box is invalid, a new invalid box is returned.
- *      (3) The UL corner coordinates must be non-negative, and the
- *          width and height of valid boxes must be at least 1.
  * </pre>
  */
 BOX *
@@ -154,13 +140,15 @@ boxTransform(BOX       *box,
              l_float32  scalex,
              l_float32  scaley)
 {
+    PROCNAME("boxTransform");
+
     if (!box)
-        return (BOX *)ERROR_PTR("box not defined", __func__, NULL);
+        return (BOX *)ERROR_PTR("box not defined", procName, NULL);
     if (box->w <= 0 || box->h <= 0)
         return boxCreate(0, 0, 0, 0);
     else
-        return boxCreate((l_int32)(L_MAX(0, scalex * (box->x + shiftx) + 0.5)),
-                         (l_int32)(L_MAX(0, scaley * (box->y + shifty) + 0.5)),
+        return boxCreate((l_int32)(scalex * (box->x + shiftx) + 0.5),
+                         (l_int32)(scaley * (box->y + shifty) + 0.5),
                          (l_int32)(L_MAX(1.0, scalex * box->w + 0.5)),
                          (l_int32)(L_MAX(1.0, scaley * box->h + 0.5)));
 }
@@ -170,16 +158,17 @@ boxTransform(BOX       *box,
  * \brief   boxaTransformOrdered()
  *
  * \param[in]    boxas
- * \param[in]    shiftx
- * \param[in]    shifty
- * \param[in]    scalex
- * \param[in]    scaley
- * \param[in]    xcen, ycen    center of rotation
- * \param[in]    angle         in radians; clockwise is positive
- * \param[in]    order         one of 6 combinations: L_TR_SC_RO, ...
+ * \param[in]    shiftx, shifty
+ * \param[in]    scalex, scaley
+ * \param[in]    xcen, ycen center of rotation
+ * \param[in]    angle in radians; clockwise is positive
+ * \param[in]    order one of 6 combinations: L_TR_SC_RO, ...
  * \return  boxd, or NULL on error
  *
  * <pre>
+ * Notes:
+ *      (1) This allows a sequence of linear transforms on each box.
+ *          the transforms are from the affine set, composed of
  *          shift, scaling and rotation, and the order of the
  *          transforms is specified.
  *      (2) Although these operations appear to be on an infinite
@@ -214,15 +203,17 @@ l_int32  i, n;
 BOX     *boxs, *boxd;
 BOXA    *boxad;
 
+    PROCNAME("boxaTransformOrdered");
+
     if (!boxas)
-        return (BOXA *)ERROR_PTR("boxas not defined", __func__, NULL);
+        return (BOXA *)ERROR_PTR("boxas not defined", procName, NULL);
     n = boxaGetCount(boxas);
     if ((boxad = boxaCreate(n)) == NULL)
-        return (BOXA *)ERROR_PTR("boxad not made", __func__, NULL);
+        return (BOXA *)ERROR_PTR("boxad not made", procName, NULL);
     for (i = 0; i < n; i++) {
         if ((boxs = boxaGetBox(boxas, i, L_CLONE)) == NULL) {
             boxaDestroy(&boxad);
-            return (BOXA *)ERROR_PTR("boxs not found", __func__, NULL);
+            return (BOXA *)ERROR_PTR("boxs not found", procName, NULL);
         }
         boxd = boxTransformOrdered(boxs, shiftx, shifty, scalex, scaley,
                                    xcen, ycen, angle, order);
@@ -238,13 +229,11 @@ BOXA    *boxad;
  * \brief   boxTransformOrdered()
  *
  * \param[in]    boxs
- * \param[in]    shiftx
- * \param[in]    shifty
- * \param[in]    scalex
- * \param[in]    scaley
- * \param[in]    xcen, ycen   center of rotation
- * \param[in]    angle        in radians; clockwise is positive
- * \param[in]    order        one of 6 combinations: L_TR_SC_RO, ...
+ * \param[in]    shiftx, shifty
+ * \param[in]    scalex, scaley
+ * \param[in]    xcen, ycen center of rotation
+ * \param[in]    angle in radians; clockwise is positive
+ * \param[in]    order one of 6 combinations: L_TR_SC_RO, ...
  * \return  boxd, or NULL on error
  *
  * <pre>
@@ -303,11 +292,13 @@ l_int32    xcent, ycent;  /* transformed center of rotation due to scaling */
 l_float32  sina, cosa, xdif, ydif, rx, ry, rw, rh;
 BOX       *boxd;
 
+    PROCNAME("boxTransformOrdered");
+
     if (!boxs)
-        return (BOX *)ERROR_PTR("boxs not defined", __func__, NULL);
+        return (BOX *)ERROR_PTR("boxs not defined", procName, NULL);
     if (order != L_TR_SC_RO && order != L_SC_RO_TR && order != L_RO_TR_SC &&
         order != L_TR_RO_SC && order != L_RO_SC_TR && order != L_SC_TR_RO)
-        return (BOX *)ERROR_PTR("order invalid", __func__, NULL);
+        return (BOX *)ERROR_PTR("order invalid", procName, NULL);
 
     boxGetGeometry(boxs, &bx, &by, &bw, &bh);
     if (bw <= 0 || bh <= 0)  /* invalid */
@@ -449,9 +440,9 @@ BOX       *boxd;
  * \brief   boxaRotateOrth()
  *
  * \param[in]    boxas
- * \param[in]    w, h       of image in which the boxa is embedded
- * \param[in]    rotation   0 = noop, 1 = 90 deg, 2 = 180 deg, 3 = 270 deg;
- *                          all rotations are clockwise
+ * \param[in]    w, h of image in which the boxa is embedded
+ * \param[in]    rotation 0 = noop, 1 = 90 deg, 2 = 180 deg, 3 = 270 deg;
+ *                        all rotations are clockwise
  * \return  boxad, or NULL on error
  *
  * <pre>
@@ -469,20 +460,22 @@ l_int32  i, n;
 BOX     *boxs, *boxd;
 BOXA    *boxad;
 
+    PROCNAME("boxaRotateOrth");
+
     if (!boxas)
-        return (BOXA *)ERROR_PTR("boxas not defined", __func__, NULL);
+        return (BOXA *)ERROR_PTR("boxas not defined", procName, NULL);
     if (rotation < 0 || rotation > 3)
-        return (BOXA *)ERROR_PTR("rotation not in {0,1,2,3}", __func__, NULL);
+        return (BOXA *)ERROR_PTR("rotation not in {0,1,2,3}", procName, NULL);
     if (rotation == 0)
         return boxaCopy(boxas, L_COPY);
 
     n = boxaGetCount(boxas);
     if ((boxad = boxaCreate(n)) == NULL)
-        return (BOXA *)ERROR_PTR("boxad not made", __func__, NULL);
+        return (BOXA *)ERROR_PTR("boxad not made", procName, NULL);
     for (i = 0; i < n; i++) {
         if ((boxs = boxaGetBox(boxas, i, L_CLONE)) == NULL) {
             boxaDestroy(&boxad);
-            return (BOXA *)ERROR_PTR("boxs not found", __func__, NULL);
+            return (BOXA *)ERROR_PTR("boxs not found", procName, NULL);
         }
         boxd = boxRotateOrth(boxs, w, h, rotation);
         boxDestroy(&boxs);
@@ -497,9 +490,9 @@ BOXA    *boxad;
  * \brief   boxRotateOrth()
  *
  * \param[in]    box
- * \param[in]    w, h       of image in which the box is embedded
- * \param[in]    rotation   0 = noop, 1 = 90 deg, 2 = 180 deg, 3 = 270 deg;
- *                          all rotations are clockwise
+ * \param[in]    w, h of image in which the box is embedded
+ * \param[in]    rotation 0 = noop, 1 = 90 deg, 2 = 180 deg, 3 = 270 deg;
+ *                        all rotations are clockwise
  * \return  boxd, or NULL on error
  *
  * <pre>
@@ -517,10 +510,12 @@ boxRotateOrth(BOX     *box,
 {
 l_int32  bx, by, bw, bh, xdist, ydist;
 
+    PROCNAME("boxRotateOrth");
+
     if (!box)
-        return (BOX *)ERROR_PTR("box not defined", __func__, NULL);
+        return (BOX *)ERROR_PTR("box not defined", procName, NULL);
     if (rotation < 0 || rotation > 3)
-        return (BOX *)ERROR_PTR("rotation not in {0,1,2,3}", __func__, NULL);
+        return (BOX *)ERROR_PTR("rotation not in {0,1,2,3}", procName, NULL);
     if (rotation == 0)
         return boxCopy(box);
 
@@ -538,65 +533,6 @@ l_int32  bx, by, bw, bh, xdist, ydist;
 }
 
 
-/*!
- * \brief   boxaShiftWithPta()
- *
- * \param[in]    boxas
- * \param[in]    pta       aligned with the boxes; determines shift amount
- * \param[in]    dir       +1 to shift by the values in pta; -1 to shift
- *                         by the negative of the values in the pta.
- * \return  boxad, or NULL on error
- *
- * <pre>
- * Notes:
- *      (1) In use, %pta may come from the UL corners of of a boxa, each
- *          of whose boxes contains the corresponding box of %boxas
- *          within it.  The output %boxad is then a boxa in the (global)
- *          coordinates of the containing boxa.  So the input %pta
- *          could come from boxaExtractCorners().
- *      (2) The operations with %dir == 1 and %dir == -1 are inverses if
- *          called in order (1, -1).  Starting with an input boxa and
- *          calling twice with these values of %dir results in a boxa
- *          identical to the input.  However, because box parameters can
- *          never be negative, calling in the order (-1, 1) may result
- *          in clipping at the left side and the top.
- * </pre>
- */
-BOXA *
-boxaShiftWithPta(BOXA    *boxas,
-                 PTA     *pta,
-                 l_int32  dir)
-{
-l_int32  i, n, x, y, full;
-BOX     *box1, *box2;
-BOXA    *boxad;
-
-    if (!boxas)
-        return (BOXA *)ERROR_PTR("boxas not defined", __func__, NULL);
-    boxaIsFull(boxas, &full);
-    if (!full)
-        return (BOXA *)ERROR_PTR("boxas not full", __func__, NULL);
-    if (!pta)
-        return (BOXA *)ERROR_PTR("pta not defined", __func__, NULL);
-    if (dir != 1 && dir != -1)
-        return (BOXA *)ERROR_PTR("invalid dir", __func__, NULL);
-    n = boxaGetCount(boxas);
-    if (n != ptaGetCount(pta))
-        return (BOXA *)ERROR_PTR("boxas and pta not same size", __func__, NULL);
-
-    if ((boxad = boxaCreate(n)) == NULL)
-        return (BOXA *)ERROR_PTR("boxad not made", __func__, NULL);
-    for (i = 0; i < n; i++) {
-        box1 = boxaGetBox(boxas, i, L_COPY);
-        ptaGetIPt(pta, i, &x, &y);
-        box2 = boxTransform(box1, dir * x, dir * y, 1.0, 1.0);
-        boxaAddBox(boxad, box2, L_INSERT);
-        boxDestroy(&box1);
-    }
-    return boxad;
-}
-
-
 /*---------------------------------------------------------------------*
  *                              Boxa sort                              *
  *---------------------------------------------------------------------*/
@@ -604,15 +540,15 @@ BOXA    *boxad;
  * \brief   boxaSort()
  *
  * \param[in]    boxas
- * \param[in]    sorttype   L_SORT_BY_X, L_SORT_BY_Y,
- *                          L_SORT_BY_RIGHT, L_SORT_BY_BOT,
- *                          L_SORT_BY_WIDTH, L_SORT_BY_HEIGHT,
- *                          L_SORT_BY_MIN_DIMENSION, L_SORT_BY_MAX_DIMENSION,
- *                          L_SORT_BY_PERIMETER, L_SORT_BY_AREA,
- *                          L_SORT_BY_ASPECT_RATIO
+ * \param[in]    sorttype L_SORT_BY_X, L_SORT_BY_Y,
+ *                        L_SORT_BY_RIGHT, L_SORT_BY_BOT,
+ *                        L_SORT_BY_WIDTH, L_SORT_BY_HEIGHT,
+ *                        L_SORT_BY_MIN_DIMENSION, L_SORT_BY_MAX_DIMENSION,
+ *                        L_SORT_BY_PERIMETER, L_SORT_BY_AREA,
+ *                        L_SORT_BY_ASPECT_RATIO
  * \param[in]    sortorder  L_SORT_INCREASING, L_SORT_DECREASING
- * \param[out]   pnaindex   [optional] index of sorted order into
- *                          original array
+ * \param[out]   pnaindex [optional] index of sorted order into
+ *                        original array
  * \return  boxad sorted version of boxas, or NULL on error
  *
  * <pre>
@@ -630,11 +566,13 @@ l_int32    i, n, x, y, w, h, size;
 BOXA      *boxad;
 NUMA      *na, *naindex;
 
+    PROCNAME("boxaSort");
+
     if (pnaindex) *pnaindex = NULL;
     if (!boxas)
-        return (BOXA *)ERROR_PTR("boxas not defined", __func__, NULL);
+        return (BOXA *)ERROR_PTR("boxas not defined", procName, NULL);
     if ((n = boxaGetCount(boxas)) == 0) {
-        L_WARNING("boxas is empty\n", __func__);
+        L_WARNING("boxas is empty\n", procName);
         return boxaCopy(boxas, L_COPY);
     }
     if (sorttype != L_SORT_BY_X && sorttype != L_SORT_BY_Y &&
@@ -645,12 +583,12 @@ NUMA      *na, *naindex;
         sorttype != L_SORT_BY_PERIMETER &&
         sorttype != L_SORT_BY_AREA &&
         sorttype != L_SORT_BY_ASPECT_RATIO)
-        return (BOXA *)ERROR_PTR("invalid sort type", __func__, NULL);
+        return (BOXA *)ERROR_PTR("invalid sort type", procName, NULL);
     if (sortorder != L_SORT_INCREASING && sortorder != L_SORT_DECREASING)
-        return (BOXA *)ERROR_PTR("invalid sort order", __func__, NULL);
+        return (BOXA *)ERROR_PTR("invalid sort order", procName, NULL);
 
         /* Use O(n) binsort if possible */
-    if (n > MinCompsForBinSort &&
+    if (n > MIN_COMPS_FOR_BIN_SORT &&
         ((sorttype == L_SORT_BY_X) || (sorttype == L_SORT_BY_Y) ||
          (sorttype == L_SORT_BY_WIDTH) || (sorttype == L_SORT_BY_HEIGHT) ||
          (sorttype == L_SORT_BY_PERIMETER)))
@@ -658,7 +596,7 @@ NUMA      *na, *naindex;
 
         /* Build up numa of specific data */
     if ((na = numaCreate(n)) == NULL)
-        return (BOXA *)ERROR_PTR("na not made", __func__, NULL);
+        return (BOXA *)ERROR_PTR("na not made", procName, NULL);
     for (i = 0; i < n; i++) {
         boxaGetBoxGeometry(boxas, i, &x, &y, &w, &h);
         switch (sorttype)
@@ -701,7 +639,7 @@ NUMA      *na, *naindex;
             numaAddNumber(na, (l_float32)w / (l_float32)h);
             break;
         default:
-            L_WARNING("invalid sort type\n", __func__);
+            L_WARNING("invalid sort type\n", procName);
         }
     }
 
@@ -709,7 +647,7 @@ NUMA      *na, *naindex;
     naindex = numaGetSortIndex(na, sortorder);
     numaDestroy(&na);
     if (!naindex)
-        return (BOXA *)ERROR_PTR("naindex not made", __func__, NULL);
+        return (BOXA *)ERROR_PTR("naindex not made", procName, NULL);
 
         /* Build up sorted boxa using sort index */
     boxad = boxaSortByIndex(boxas, naindex);
@@ -726,11 +664,11 @@ NUMA      *na, *naindex;
  * \brief   boxaBinSort()
  *
  * \param[in]    boxas
- * \param[in]    sorttype    L_SORT_BY_X, L_SORT_BY_Y, L_SORT_BY_WIDTH,
- *                           L_SORT_BY_HEIGHT, L_SORT_BY_PERIMETER
- * \param[in]    sortorder   L_SORT_INCREASING, L_SORT_DECREASING
- * \param[out]   pnaindex    [optional] index of sorted order into
- *                           original array
+ * \param[in]    sorttype L_SORT_BY_X, L_SORT_BY_Y, L_SORT_BY_WIDTH,
+ *                        L_SORT_BY_HEIGHT, L_SORT_BY_PERIMETER
+ * \param[in]    sortorder  L_SORT_INCREASING, L_SORT_DECREASING
+ * \param[out]   pnaindex [optional] index of sorted order into
+ *                        original array
  * \return  boxad sorted version of boxas, or NULL on error
  *
  * <pre>
@@ -752,23 +690,25 @@ l_int32  i, n, x, y, w, h;
 BOXA    *boxad;
 NUMA    *na, *naindex;
 
+    PROCNAME("boxaBinSort");
+
     if (pnaindex) *pnaindex = NULL;
     if (!boxas)
-        return (BOXA *)ERROR_PTR("boxas not defined", __func__, NULL);
+        return (BOXA *)ERROR_PTR("boxas not defined", procName, NULL);
     if ((n = boxaGetCount(boxas)) == 0) {
-        L_WARNING("boxas is empty\n", __func__);
+        L_WARNING("boxas is empty\n", procName);
         return boxaCopy(boxas, L_COPY);
     }
     if (sorttype != L_SORT_BY_X && sorttype != L_SORT_BY_Y &&
         sorttype != L_SORT_BY_WIDTH && sorttype != L_SORT_BY_HEIGHT &&
         sorttype != L_SORT_BY_PERIMETER)
-        return (BOXA *)ERROR_PTR("invalid sort type", __func__, NULL);
+        return (BOXA *)ERROR_PTR("invalid sort type", procName, NULL);
     if (sortorder != L_SORT_INCREASING && sortorder != L_SORT_DECREASING)
-        return (BOXA *)ERROR_PTR("invalid sort order", __func__, NULL);
+        return (BOXA *)ERROR_PTR("invalid sort order", procName, NULL);
 
         /* Generate Numa of appropriate box dimensions */
     if ((na = numaCreate(n)) == NULL)
-        return (BOXA *)ERROR_PTR("na not made", __func__, NULL);
+        return (BOXA *)ERROR_PTR("na not made", procName, NULL);
     for (i = 0; i < n; i++) {
         boxaGetBoxGeometry(boxas, i, &x, &y, &w, &h);
         switch (sorttype)
@@ -789,7 +729,7 @@ NUMA    *na, *naindex;
             numaAddNumber(na, w + h);
             break;
         default:
-            L_WARNING("invalid sort type\n", __func__);
+            L_WARNING("invalid sort type\n", procName);
         }
     }
 
@@ -797,7 +737,7 @@ NUMA    *na, *naindex;
     naindex = numaGetBinSortIndex(na, sortorder);
     numaDestroy(&na);
     if (!naindex)
-        return (BOXA *)ERROR_PTR("naindex not made", __func__, NULL);
+        return (BOXA *)ERROR_PTR("naindex not made", procName, NULL);
 
         /* Build up sorted boxa using the sort index */
     boxad = boxaSortByIndex(boxas, naindex);
@@ -814,7 +754,7 @@ NUMA    *na, *naindex;
  * \brief   boxaSortByIndex()
  *
  * \param[in]    boxas
- * \param[in]    naindex    na that maps from the new boxa to the input boxa
+ * \param[in]    naindex na that maps from the new boxa to the input boxa
  * \return  boxad sorted, or NULL on error
  */
 BOXA *
@@ -825,14 +765,16 @@ l_int32  i, n, index;
 BOX     *box;
 BOXA    *boxad;
 
+    PROCNAME("boxaSortByIndex");
+
     if (!boxas)
-        return (BOXA *)ERROR_PTR("boxas not defined", __func__, NULL);
+        return (BOXA *)ERROR_PTR("boxas not defined", procName, NULL);
     if ((n = boxaGetCount(boxas)) == 0) {
-        L_WARNING("boxas is empty\n", __func__);
+        L_WARNING("boxas is empty\n", procName);
         return boxaCopy(boxas, L_COPY);
     }
     if (!naindex)
-        return (BOXA *)ERROR_PTR("naindex not defined", __func__, NULL);
+        return (BOXA *)ERROR_PTR("naindex not defined", procName, NULL);
 
     boxad = boxaCreate(n);
     for (i = 0; i < n; i++) {
@@ -849,14 +791,14 @@ BOXA    *boxad;
  * \brief   boxaSort2d()
  *
  * \param[in]    boxas
- * \param[out]   pnaad    [optional] numaa with sorted indices
- *                        whose values are the indices of the input array
- * \param[in]    delta1   min separation that permits aggregation of a box
- *                        onto a boxa of horizontally-aligned boxes; pass 1
- * \param[in]    delta2   min separation that permits aggregation of a box
- *                        onto a boxa of horizontally-aligned boxes; pass 2
- * \param[in]    minh1    components less than this height either join an
- *                        existing boxa or are set aside for pass 2
+ * \param[out]   pnaad [optional] numaa with sorted indices
+ *                    whose values are the indices of the input array
+ * \param[in]    delta1 min overlap that permits aggregation of a box
+ *                      onto a boxa of horizontally-aligned boxes; pass 1
+ * \param[in]    delta2 min overlap that permits aggregation of a box
+ *                      onto a boxa of horizontally-aligned boxes; pass 2
+ * \param[in]    minh1 components less than this height either join an
+ *                     existing boxa or are set aside for pass 2
  * \return  baa 2d sorted version of boxa, or NULL on error
  *
  * <pre>
@@ -874,12 +816,11 @@ BOXA    *boxad;
  *          is overlapping are joined.  After that, the boxes in each
  *          boxa are sorted horizontally, and finally the boxa are
  *          sorted vertically.
- *      (3) If %delta1 > 0, the first pass allows aggregation when
- *          boxes in the same boxa do not overlap vertically.  In fact,
- *          %delta1 is the max distance by which they can miss and still
- *          be aggregated.  If %delta1 < 0, the box must have vertical
- *          overlap of at least abs(%delta1) with the boxa before it
- *          can be merged.  Similar for delta2 on the second pass.
+ *      (3) If delta1 < 0, the first pass allows aggregation when
+ *          boxes in the same boxa do not overlap vertically.
+ *          The distance by which they can miss and still be aggregated
+ *          is the absolute value |delta1|.   Similar for delta2 on
+ *          the second pass.
  *      (4) On the first pass, any component of height less than minh1
  *          cannot start a new boxa; it's put aside for later insertion.
  *      (5) On the second pass, any small component that doesn't align
@@ -906,16 +847,18 @@ BOXAA   *baa, *baa1, *baad;
 NUMA    *naindex, *nae, *nan, *nah, *nav, *na1, *na2, *nad, *namap;
 NUMAA   *naa, *naa1, *naad;
 
+    PROCNAME("boxaSort2d");
+
     if (pnaad) *pnaad = NULL;
     if (!boxas)
-        return (BOXAA *)ERROR_PTR("boxas not defined", __func__, NULL);
+        return (BOXAA *)ERROR_PTR("boxas not defined", procName, NULL);
     if (boxaGetCount(boxas) == 0)
-        return (BOXAA *)ERROR_PTR("boxas is empty", __func__, NULL);
+        return (BOXAA *)ERROR_PTR("boxas is empty", procName, NULL);
 
         /* Sort from left to right */
     if ((boxa = boxaSort(boxas, L_SORT_BY_X, L_SORT_INCREASING, &naindex))
                     == NULL)
-        return (BOXAA *)ERROR_PTR("boxa not made", __func__, NULL);
+        return (BOXAA *)ERROR_PTR("boxa not made", procName, NULL);
 
         /* First pass: assign taller boxes to boxa by row */
     nt = boxaGetCount(boxa);
@@ -1053,7 +996,7 @@ NUMAA   *naa, *naa1, *naad;
     }
 
 
-/*    lept_stderr("box count = %d, numaa count = %d\n", nt,
+/*    fprintf(stderr, "box count = %d, numaa count = %d\n", nt,
             numaaGetNumberCount(naad)); */
 
     boxaaDestroy(&baa);
@@ -1074,7 +1017,7 @@ NUMAA   *naa, *naa1, *naad;
  * \brief   boxaSort2dByIndex()
  *
  * \param[in]    boxas
- * \param[in]    naa     numaa that maps from the new baa to the input boxa
+ * \param[in]    naa numaa that maps from the new baa to the input boxa
  * \return  baa sorted boxaa, or NULL on error
  */
 BOXAA *
@@ -1087,17 +1030,19 @@ BOXA    *boxa;
 BOXAA   *baa;
 NUMA    *na;
 
+    PROCNAME("boxaSort2dByIndex");
+
     if (!boxas)
-        return (BOXAA *)ERROR_PTR("boxas not defined", __func__, NULL);
+        return (BOXAA *)ERROR_PTR("boxas not defined", procName, NULL);
     if ((boxtot = boxaGetCount(boxas)) == 0)
-        return (BOXAA *)ERROR_PTR("boxas is empty", __func__, NULL);
+        return (BOXAA *)ERROR_PTR("boxas is empty", procName, NULL);
     if (!naa)
-        return (BOXAA *)ERROR_PTR("naindex not defined", __func__, NULL);
+        return (BOXAA *)ERROR_PTR("naindex not defined", procName, NULL);
 
         /* Check counts */
     ntot = numaaGetNumberCount(naa);
     if (ntot != boxtot)
-        return (BOXAA *)ERROR_PTR("element count mismatch", __func__, NULL);
+        return (BOXAA *)ERROR_PTR("element count mismatch", procName, NULL);
 
     n = numaaGetCount(naa);
     baa = boxaaCreate(n);
@@ -1125,13 +1070,13 @@ NUMA    *na;
  * \brief   boxaExtractAsNuma()
  *
  * \param[in]    boxa
- * \param[out]   pnal          [optional] array of left locations
- * \param[out]   pnat          [optional] array of top locations
- * \param[out]   pnar          [optional] array of right locations
- * \param[out]   pnab          [optional] array of bottom locations
- * \param[out]   pnaw          [optional] array of widths
- * \param[out]   pnah          [optional] array of heights
- * \param[in]    keepinvalid   1 to keep invalid boxes; 0 to remove them
+ * \param[out]   pnal [optional] array of left locations
+ * \param[out]   pnat [optional] array of top locations
+ * \param[out]   pnar [optional] array of right locations
+ * \param[out]   pnab [optional] array of bottom locations
+ * \param[out]   pnaw [optional] array of widths
+ * \param[out]   pnah [optional] array of heights
+ * \param[in]    keepinvalid 1 to keep invalid boxes; 0 to remove them
  * \return  0 if OK, 1 on error
  *
  * <pre>
@@ -1144,7 +1089,7 @@ NUMA    *na;
  *          doing the extraction. This is easily done with boxaFillSequence().
  * </pre>
  */
-l_ok
+l_int32
 boxaExtractAsNuma(BOXA    *boxa,
                   NUMA   **pnal,
                   NUMA   **pnat,
@@ -1156,8 +1101,10 @@ boxaExtractAsNuma(BOXA    *boxa,
 {
 l_int32  i, n, left, top, right, bot, w, h;
 
+    PROCNAME("boxaExtractAsNuma");
+
     if (!pnal && !pnat && !pnar && !pnab && !pnaw && !pnah)
-        return ERROR_INT("no output requested", __func__, 1);
+        return ERROR_INT("no output requested", procName, 1);
     if (pnal) *pnal = NULL;
     if (pnat) *pnat = NULL;
     if (pnar) *pnar = NULL;
@@ -1165,9 +1112,9 @@ l_int32  i, n, left, top, right, bot, w, h;
     if (pnaw) *pnaw = NULL;
     if (pnah) *pnah = NULL;
     if (!boxa)
-        return ERROR_INT("boxa not defined", __func__, 1);
+        return ERROR_INT("boxa not defined", procName, 1);
     if (!keepinvalid && boxaGetValidCount(boxa) == 0)
-        return ERROR_INT("no valid boxes", __func__, 1);
+        return ERROR_INT("no valid boxes", procName, 1);
 
     n = boxaGetCount(boxa);
     if (pnal) *pnal = numaCreate(n);
@@ -1198,13 +1145,13 @@ l_int32  i, n, left, top, right, bot, w, h;
  * \brief   boxaExtractAsPta()
  *
  * \param[in]    boxa
- * \param[out]   pptal         [optional] array of left locations vs. index
- * \param[out]   pptat         [optional] array of top locations vs. index
- * \param[out]   pptar         [optional] array of right locations vs. index
- * \param[out]   pptab         [optional] array of bottom locations vs. index
- * \param[out]   pptaw         [optional] array of widths vs. index
- * \param[out]   pptah         [optional] array of heights vs. index
- * \param[in]    keepinvalid   1 to keep invalid boxes; 0 to remove them
+ * \param[out]   pptal [optional] array of left locations vs. index
+ * \param[out]   pptat [optional] array of top locations vs. index
+ * \param[out]   pptar [optional] array of right locations vs. index
+ * \param[out]   pptab [optional] array of bottom locations vs. index
+ * \param[out]   pptaw [optional] array of widths vs. index
+ * \param[out]   pptah [optional] array of heights vs. index
+ * \param[in]    keepinvalid 1 to keep invalid boxes; 0 to remove them
  * \return  0 if OK, 1 on error
  *
  * <pre>
@@ -1217,13 +1164,9 @@ l_int32  i, n, left, top, right, bot, w, h;
  *          boxaExtractAsNuma(), is not necessary.
  *      (2) If invalid boxes are retained, each one will result in
  *          entries (typically 0) in all selected output pta.
- *      (3) Other boxa --> pta functions are:
- *          * boxaExtractCorners(): extracts any of the four corners as a pta.
- *          * boxaConvertToPta(): extracts sufficient number of corners
- *            to allow reconstruction of the original boxa from the pta.
  * </pre>
  */
-l_ok
+l_int32
 boxaExtractAsPta(BOXA    *boxa,
                  PTA    **pptal,
                  PTA    **pptat,
@@ -1235,8 +1178,10 @@ boxaExtractAsPta(BOXA    *boxa,
 {
 l_int32  i, n, left, top, right, bot, w, h;
 
+    PROCNAME("boxaExtractAsPta");
+
     if (!pptal && !pptar && !pptat && !pptab && !pptaw && !pptah)
-        return ERROR_INT("no output requested", __func__, 1);
+        return ERROR_INT("no output requested", procName, 1);
     if (pptal) *pptal = NULL;
     if (pptat) *pptat = NULL;
     if (pptar) *pptar = NULL;
@@ -1244,9 +1189,9 @@ l_int32  i, n, left, top, right, bot, w, h;
     if (pptaw) *pptaw = NULL;
     if (pptah) *pptah = NULL;
     if (!boxa)
-        return ERROR_INT("boxa not defined", __func__, 1);
+        return ERROR_INT("boxa not defined", procName, 1);
     if (!keepinvalid && boxaGetValidCount(boxa) == 0)
-        return ERROR_INT("no valid boxes", __func__, 1);
+        return ERROR_INT("no valid boxes", procName, 1);
 
     n = boxaGetCount(boxa);
     if (pptal) *pptal = ptaCreate(n);
@@ -1273,67 +1218,6 @@ l_int32  i, n, left, top, right, bot, w, h;
 }
 
 
-/*!
- * \brief   boxaExtractCorners()
- *
- * \param[in]    boxa
- * \param[in]    loc       L_UPPER_LEFT, L_UPPER_RIGHT, L_LOWER_LEFT,
- *                         L_LOWER_RIGHT, L_BOX_CENTER
- * \return  pta of requested coordinates, or NULL on error
- *
- * <pre>
- * Notes:
- *      (1) Extracts (0,0) for invalid boxes.
- *      (2) Other boxa --> pta functions are:
- *          * boxaExtractAsPta(): allows extraction of any dimension
- *            and/or side location, with each in a separate pta.
- *          * boxaConvertToPta(): extracts sufficient number of corners
- *            to allow reconstruction of the original boxa from the pta.
- * </pre>
- */
-PTA *
-boxaExtractCorners(BOXA    *boxa,
-                   l_int32  loc)
-{
-l_int32  i, n, left, top, right, bot, w, h;
-PTA     *pta;
-
-    if (!boxa)
-        return (PTA *)ERROR_PTR("boxa not defined", __func__, NULL);
-    if (loc != L_UPPER_LEFT && loc != L_UPPER_RIGHT && loc != L_LOWER_LEFT &&
-        loc != L_LOWER_RIGHT && loc != L_BOX_CENTER)
-        return (PTA *)ERROR_PTR("invalid location", __func__, NULL);
-
-    n = boxaGetCount(boxa);
-    if ((pta = ptaCreate(n)) == NULL)
-        return (PTA *)ERROR_PTR("pta not made", __func__, NULL);
-
-    for (i = 0; i < n; i++) {
-        boxaGetBoxGeometry(boxa, i, &left, &top, &w, &h);
-        right = left + w - 1;
-        bot = top + h - 1;
-        if (w == 0 || h == 0) {  /* invalid */
-            left = 0;
-            top = 0;
-            right = 0;
-            bot = 0;
-        }
-        if (loc == L_UPPER_LEFT)
-            ptaAddPt(pta, left, top);
-        else if (loc == L_UPPER_RIGHT)
-            ptaAddPt(pta, right, top);
-        else if (loc == L_LOWER_LEFT)
-            ptaAddPt(pta, left, bot);
-        else if (loc == L_LOWER_RIGHT)
-            ptaAddPt(pta, right, bot);
-        else if (loc == L_BOX_CENTER)
-            ptaAddPt(pta, (left + right) / 2, (top + bot) / 2);
-    }
-
-    return pta;
-}
-
-
 /*---------------------------------------------------------------------*
  *                            Boxa statistics                          *
  *---------------------------------------------------------------------*/
@@ -1341,61 +1225,54 @@ PTA     *pta;
  * \brief   boxaGetRankVals()
  *
  * \param[in]    boxa
- * \param[in]    fract   use 0.0 for smallest, 1.0 for largest width and height
- * \param[out]   px      [optional] rank value of x (left side)
- * \param[out]   py      [optional] rank value of y (top side)
- * \param[out]   pr      [optional] rank value of right side
- * \param[out]   pb      [optional] rank value of bottom side
- * \param[out]   pw      [optional] rank value of width
- * \param[out]   ph      [optional] rank value of height
+ * \param[in]    fract use 0.0 for smallest, 1.0 for largest width and height
+ * \param[out]   px  [optional] rank value of x
+ * \param[out]   py  [optional] rank value of y
+ * \param[out]   pw  [optional] rank value of width
+ * \param[out]   ph  [optional] rank value of height
  * \return  0 if OK, 1 on error or if the boxa is empty or has no valid boxes
  *
  * <pre>
  * Notes:
  *      (1) This function does not assume that all boxes in the boxa are valid
- *      (2) The six box parameters are sorted independently.
+ *      (2) The four box parameters are sorted independently.
  *          For rank order, the width and height are sorted in increasing
  *          order.  But what does it mean to sort x and y in "rank order"?
  *          If the boxes are of comparable size and somewhat
  *          aligned (e.g., from multiple images), it makes some sense
  *          to give a "rank order" for x and y by sorting them in
- *          decreasing order.  (By the same argument, we choose to sort
- *          the r and b sides in increasing order.)  In general, the
- *          interpretation of a rank order on x and y (or on r and b)
- *          is highly application dependent.  In summary:
+ *          decreasing order.  But in general, the interpretation of a rank
+ *          order on x and y is highly application dependent.  In summary:
  *             ~ x and y are sorted in decreasing order
- *             ~ r and b are sorted in increasing order
  *             ~ w and h are sorted in increasing order
  * </pre>
  */
-l_ok
+l_int32
 boxaGetRankVals(BOXA      *boxa,
                 l_float32  fract,
                 l_int32   *px,
                 l_int32   *py,
-                l_int32   *pr,
-                l_int32   *pb,
                 l_int32   *pw,
                 l_int32   *ph)
 {
-l_float32  xval, yval, rval, bval, wval, hval;
-NUMA      *nax, *nay, *nar, *nab, *naw, *nah;
+l_float32  xval, yval, wval, hval;
+NUMA      *nax, *nay, *naw, *nah;
+
+    PROCNAME("boxaGetRankVals");
 
     if (px) *px = 0;
     if (py) *py = 0;
-    if (pr) *pr = 0;
-    if (pb) *pb = 0;
     if (pw) *pw = 0;
     if (ph) *ph = 0;
     if (!boxa)
-        return ERROR_INT("boxa not defined", __func__, 1);
+        return ERROR_INT("boxa not defined", procName, 1);
     if (fract < 0.0 || fract > 1.0)
-        return ERROR_INT("fract not in [0.0 ... 1.0]", __func__, 1);
+        return ERROR_INT("fract not in [0.0 ... 1.0]", procName, 1);
     if (boxaGetValidCount(boxa) == 0)
-        return ERROR_INT("no valid boxes in boxa", __func__, 1);
+        return ERROR_INT("no valid boxes in boxa", procName, 1);
 
         /* Use only the valid boxes */
-    boxaExtractAsNuma(boxa, &nax, &nay, &nar, &nab, &naw, &nah, 0);
+    boxaExtractAsNuma(boxa, &nax, &nay, NULL, NULL, &naw, &nah, 0);
 
     if (px) {
         numaGetRankValue(nax, 1.0 - fract, NULL, 1, &xval);
@@ -1404,14 +1281,6 @@ NUMA      *nax, *nay, *nar, *nab, *naw, *nah;
     if (py) {
         numaGetRankValue(nay, 1.0 - fract, NULL, 1, &yval);
         *py = (l_int32)yval;
-    }
-    if (pr) {
-        numaGetRankValue(nar, fract, NULL, 1, &rval);
-        *pr = (l_int32)rval;
-    }
-    if (pb) {
-        numaGetRankValue(nab, fract, NULL, 1, &bval);
-        *pb = (l_int32)bval;
     }
     if (pw) {
         numaGetRankValue(naw, fract, NULL, 1, &wval);
@@ -1423,8 +1292,6 @@ NUMA      *nax, *nay, *nar, *nab, *naw, *nah;
     }
     numaDestroy(&nax);
     numaDestroy(&nay);
-    numaDestroy(&nar);
-    numaDestroy(&nab);
     numaDestroy(&naw);
     numaDestroy(&nah);
     return 0;
@@ -1435,12 +1302,10 @@ NUMA      *nax, *nay, *nar, *nab, *naw, *nah;
  * \brief   boxaGetMedianVals()
  *
  * \param[in]    boxa
- * \param[out]   px     [optional] median value of x (left side)
- * \param[out]   py     [optional] median value of y (top side)
- * \param[out]   pr     [optional] median value of right side
- * \param[out]   pb     [optional] median value of bottom side
- * \param[out]   pw     [optional] median value of width
- * \param[out]   ph     [optional] median value of height
+ * \param[out]   px  [optional] median value of x
+ * \param[out]   py  [optional] median value of y
+ * \param[out]   pw  [optional] median value of width
+ * \param[out]   ph  [optional] median value of height
  * \return  0 if OK, 1 on error or if the boxa is empty or has no valid boxes
  *
  * <pre>
@@ -1448,21 +1313,21 @@ NUMA      *nax, *nay, *nar, *nab, *naw, *nah;
  *      (1) See boxaGetRankVals()
  * </pre>
  */
-l_ok
+l_int32
 boxaGetMedianVals(BOXA     *boxa,
                   l_int32  *px,
                   l_int32  *py,
-                  l_int32  *pr,
-                  l_int32  *pb,
                   l_int32  *pw,
                   l_int32  *ph)
 {
-    if (!boxa)
-        return ERROR_INT("boxa not defined", __func__, 1);
-    if (boxaGetValidCount(boxa) == 0)
-        return ERROR_INT("no valid boxes in boxa", __func__, 1);
+    PROCNAME("boxaGetMedianVals");
 
-    return boxaGetRankVals(boxa, 0.5, px, py, pr, pb, pw, ph);
+    if (!boxa)
+        return ERROR_INT("boxa not defined", procName, 1);
+    if (boxaGetValidCount(boxa) == 0)
+        return ERROR_INT("no valid boxes in boxa", procName, 1);
+
+    return boxaGetRankVals(boxa, 0.5, px, py, pw, ph);
 }
 
 
@@ -1470,11 +1335,11 @@ boxaGetMedianVals(BOXA     *boxa,
  * \brief   boxaGetAverageSize()
  *
  * \param[in]    boxa
- * \param[out]   pw     [optional] average width
- * \param[out]   ph     [optional] average height
+ * \param[out]   pw  [optional] average width
+ * \param[out]   ph  [optional] average height
  * \return  0 if OK, 1 on error or if the boxa is empty
  */
-l_ok
+l_int32
 boxaGetAverageSize(BOXA       *boxa,
                    l_float32  *pw,
                    l_float32  *ph)
@@ -1482,12 +1347,14 @@ boxaGetAverageSize(BOXA       *boxa,
 l_int32    i, n, bw, bh;
 l_float32  sumw, sumh;
 
+    PROCNAME("boxaGetAverageSize");
+
     if (pw) *pw = 0.0;
     if (ph) *ph = 0.0;
     if (!boxa)
-        return ERROR_INT("boxa not defined", __func__, 1);
+        return ERROR_INT("boxa not defined", procName, 1);
     if ((n = boxaGetCount(boxa)) == 0)
-        return ERROR_INT("boxa is empty", __func__, 1);
+        return ERROR_INT("boxa is empty", procName, 1);
 
     sumw = sumh = 0.0;
     for (i = 0; i < n; i++) {
@@ -1509,12 +1376,12 @@ l_float32  sumw, sumh;
  * \brief   boxaaGetExtent()
  *
  * \param[in]    baa
- * \param[out]   pw      [optional] width
- * \param[out]   ph      [optional] height
- * \param[out]   pbox    [optional]  minimum box containing all boxa
- *                       in boxaa
- * \param[out]   pboxa   [optional]  boxa containing all boxes in each
- *                       boxa in the boxaa
+ * \param[out]   pw  [optional] width
+ * \param[out]   ph  [optional] height
+ * \param[out]   pbox [optional]  minimum box containing all boxa
+ *                    in boxaa
+ * \param[out]   pboxa [optional]  boxa containing all boxes in each
+ *                     boxa in the boxaa
  * \return  0 if OK, 1 on error
  *
  * <pre>
@@ -1527,7 +1394,7 @@ l_float32  sumw, sumh;
  *          to its extent has all fields set to 0 (an invalid box).
  * </pre>
  */
-l_ok
+l_int32
 boxaaGetExtent(BOXAA    *baa,
                l_int32  *pw,
                l_int32  *ph,
@@ -1538,18 +1405,20 @@ l_int32  i, n, x, y, w, h, xmax, ymax, xmin, ymin, found;
 BOX     *box1;
 BOXA    *boxa, *boxa1;
 
+    PROCNAME("boxaaGetExtent");
+
     if (!pw && !ph && !pbox && !pboxa)
-        return ERROR_INT("no ptrs defined", __func__, 1);
+        return ERROR_INT("no ptrs defined", procName, 1);
     if (pw) *pw = 0;
     if (ph) *ph = 0;
     if (pbox) *pbox = NULL;
     if (pboxa) *pboxa = NULL;
     if (!baa)
-        return ERROR_INT("baa not defined", __func__, 1);
+        return ERROR_INT("baa not defined", procName, 1);
 
     n = boxaaGetCount(baa);
     if (n == 0)
-        return ERROR_INT("no boxa in baa", __func__, 1);
+        return ERROR_INT("no boxa in baa", procName, 1);
 
     boxa = boxaCreate(n);
     xmax = ymax = 0;
@@ -1588,8 +1457,8 @@ BOXA    *boxa, *boxa1;
  * \brief   boxaaFlattenToBoxa()
  *
  * \param[in]    baa
- * \param[out]   pnaindex   [optional] the boxa index in the baa
- * \param[in]    copyflag   L_COPY or L_CLONE
+ * \param[out]   pnaindex  [optional] the boxa index in the baa
+ * \param[in]    copyflag  L_COPY or L_CLONE
  * \return  boxa, or NULL on error
  *
  * <pre>
@@ -1613,13 +1482,15 @@ boxaaFlattenToBoxa(BOXAA   *baa,
 l_int32  i, j, m, n;
 BOXA    *boxa, *boxat;
 BOX     *box;
-NUMA    *naindex = NULL;
+NUMA    *naindex;
+
+    PROCNAME("boxaaFlattenToBoxa");
 
     if (pnaindex) *pnaindex = NULL;
     if (!baa)
-        return (BOXA *)ERROR_PTR("baa not defined", __func__, NULL);
+        return (BOXA *)ERROR_PTR("baa not defined", procName, NULL);
     if (copyflag != L_COPY && copyflag != L_CLONE)
-        return (BOXA *)ERROR_PTR("invalid copyflag", __func__, NULL);
+        return (BOXA *)ERROR_PTR("invalid copyflag", procName, NULL);
     if (pnaindex) {
         naindex = numaCreate(0);
         *pnaindex = naindex;
@@ -1654,9 +1525,9 @@ NUMA    *naindex = NULL;
  * \brief   boxaaFlattenAligned()
  *
  * \param[in]    baa
- * \param[in]    num         number extracted from each
- * \param[in]    fillerbox   [optional] that fills if necessary
- * \param[in]    copyflag    L_COPY or L_CLONE
+ * \param[in]    num number extracted from each
+ * \param[in]    fillerbox [optional] that fills if necessary
+ * \param[in]    copyflag  L_COPY or L_CLONE
  * \return  boxa, or NULL on error
  *
  * <pre>
@@ -1679,10 +1550,12 @@ l_int32  i, j, m, n, mval, nshort;
 BOXA    *boxat, *boxad;
 BOX     *box;
 
+    PROCNAME("boxaaFlattenAligned");
+
     if (!baa)
-        return (BOXA *)ERROR_PTR("baa not defined", __func__, NULL);
+        return (BOXA *)ERROR_PTR("baa not defined", procName, NULL);
     if (copyflag != L_COPY && copyflag != L_CLONE)
-        return (BOXA *)ERROR_PTR("invalid copyflag", __func__, NULL);
+        return (BOXA *)ERROR_PTR("invalid copyflag", procName, NULL);
 
     n = boxaaGetCount(baa);
     boxad = boxaCreate(n);
@@ -1714,8 +1587,8 @@ BOX     *box;
  * \brief   boxaEncapsulateAligned()
  *
  * \param[in]    boxa
- * \param[in]    num        number put into each boxa in the baa
- * \param[in]    copyflag   L_COPY or L_CLONE
+ * \param[in]    num number put into each boxa in the baa
+ * \param[in]    copyflag  L_COPY or L_CLONE
  * \return  baa, or NULL on error
  *
  * <pre>
@@ -1735,15 +1608,17 @@ BOX     *box;
 BOXA    *boxat;
 BOXAA   *baa;
 
+    PROCNAME("boxaEncapsulateAligned");
+
     if (!boxa)
-        return (BOXAA *)ERROR_PTR("boxa not defined", __func__, NULL);
+        return (BOXAA *)ERROR_PTR("boxa not defined", procName, NULL);
     if (copyflag != L_COPY && copyflag != L_CLONE)
-        return (BOXAA *)ERROR_PTR("invalid copyflag", __func__, NULL);
+        return (BOXAA *)ERROR_PTR("invalid copyflag", procName, NULL);
 
     n = boxaGetCount(boxa);
     nbaa = n / num;
     if (num * nbaa != n)
-        L_ERROR("inconsistent alignment: num doesn't divide n\n", __func__);
+        L_ERROR("inconsistent alignment: num doesn't divide n\n", procName);
     baa = boxaaCreate(nbaa);
     for (i = 0, index = 0; i < nbaa; i++) {
         boxat = boxaCreate(num);
@@ -1785,22 +1660,24 @@ BOX      *box;
 BOXA     *boxa;
 BOXAA    *baad;
 
+    PROCNAME("boxaaTranspose");
+
     if (!baas)
-        return (BOXAA *)ERROR_PTR("baas not defined", __func__, NULL);
+        return (BOXAA *)ERROR_PTR("baas not defined", procName, NULL);
     if ((ny = boxaaGetCount(baas)) == 0)
-        return (BOXAA *)ERROR_PTR("baas empty", __func__, NULL);
+        return (BOXAA *)ERROR_PTR("baas empty", procName, NULL);
 
         /* Make sure that each boxa in baas has the same number of boxes */
     for (i = 0; i < ny; i++) {
         if ((boxa = boxaaGetBoxa(baas, i, L_CLONE)) == NULL)
-            return (BOXAA *)ERROR_PTR("baas is missing a boxa", __func__, NULL);
+            return (BOXAA *)ERROR_PTR("baas is missing a boxa", procName, NULL);
         nb = boxaGetCount(boxa);
         boxaDestroy(&boxa);
         if (i == 0)
             nbox = nb;
         else if (nb != nbox)
             return (BOXAA *)ERROR_PTR("boxa are not all the same size",
-                                      __func__, NULL);
+                                      procName, NULL);
     }
 
         /* baad[i][j] = baas[j][i] */
@@ -1821,11 +1698,11 @@ BOXAA    *baad;
  * \brief   boxaaAlignBox()
  *
  * \param[in]    baa
- * \param[in]    box      to be aligned with bext boxa in the baa, if possible
- * \param[in]    delta    amount by which consecutive components can miss
- *                        in overlap and still be included in the array
- * \param[out]   pindex   index of boxa with best overlap, or if none match,
- *                        this is the index of the next boxa to be generated
+ * \param[in]    box to be aligned with the bext boxa in the baa, if possible
+ * \param[in]    delta amount by which consecutive components can miss
+ *                     in overlap and still be included in the array
+ * \param[out]   pindex index of boxa with best overlap, or if none match,
+ *                      this is the index of the next boxa to be generated
  * \return  0 if OK, 1 on error
  *
  * <pre>
@@ -1834,7 +1711,7 @@ BOXAA    *baad;
  *          extent has the closest overlap with the input box.
  * </pre>
  */
-l_ok
+l_int32
 boxaaAlignBox(BOXAA    *baa,
               BOX      *box,
               l_int32   delta,
@@ -1844,13 +1721,15 @@ l_int32  i, n, m, y, yt, h, ht, ovlp, maxovlp, maxindex;
 BOX     *boxt;
 BOXA    *boxa;
 
+    PROCNAME("boxaaAlignBox");
+
     if (pindex) *pindex = 0;
     if (!baa)
-        return ERROR_INT("baa not defined", __func__, 1);
+        return ERROR_INT("baa not defined", procName, 1);
     if (!box)
-        return ERROR_INT("box not defined", __func__, 1);
+        return ERROR_INT("box not defined", procName, 1);
     if (!pindex)
-        return ERROR_INT("&index not defined", __func__, 1);
+        return ERROR_INT("&index not defined", procName, 1);
 
     n = boxaaGetCount(baa);
     boxGetGeometry(box, NULL, &y, NULL, &h);
@@ -1859,7 +1738,7 @@ BOXA    *boxa;
         boxa = boxaaGetBoxa(baa, i, L_CLONE);
         if ((m = boxaGetCount(boxa)) == 0) {
             boxaDestroy(&boxa);
-            L_WARNING("no boxes in boxa\n", __func__);
+            L_WARNING("no boxes in boxa\n", procName);
             continue;
         }
         boxaGetExtent(boxa, NULL, NULL, &boxt);

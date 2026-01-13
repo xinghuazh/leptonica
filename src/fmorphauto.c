@@ -51,10 +51,9 @@
  *           (c) reading in a SELA from file, using selaRead() or
  *               various other formats.
  *
- *    (2) You call fmorphautogen() on this SELA.  This in turn calls
- *        fmorphautogen1() and fmorphautogen2(), which use the text
- *        files morphtemplate1.txt and morphtemplate2.txt, respectively,
- *        for building up the source code.  See the file
+ *    (2) You call fmorphautogen1() and fmorphautogen2() on this SELA.
+ *        These use the text files morphtemplate1.txt and
+ *        morphtemplate2.txt for building up the source code.  See the file
  *        prog/fmorphautogen.c for an example of how this is done.
  *        The output is written to files named fmorphgen.*.c
  *        and fmorphgenlow.*.c, where "*" is an integer that you
@@ -67,11 +66,11 @@
  *
  *    (3) You copy the generated source files back to your src
  *        directory for compilation.  Put their names in the
- *        Makefile, regenerate the allheaders.h prototype file,
- *        and recompile the library.  Look at the Makefile to see how
- *        morphgen.1.c and fmorphgenlow.1.c are included.  These files
- *        provide the single high-level interface for erosion, dilation,
- *        opening and closing, and the lower-level functions to
+ *        Makefile, regenerate the prototypes, and recompile
+ *        the library.  Look at the Makefile to see how I've
+ *        included morphgen.1.c and fmorphgenlow.1.c.  These files
+ *        provide the high-level interfaces for erosion, dilation,
+ *        opening and closing, and the low-level interfaces to
  *        do the actual work, for all 58 SELs in the SEL array.
  *
  *    (4) In an application, you now use this interface.  Again
@@ -80,25 +79,20 @@
  *            PIX   *pixMorphDwa_1(PIX *pixd, PIX, *pixs,
  *                                 l_int32 operation, char *selname);
  *
+ *                 or
+ *
+ *            PIX   *pixFMorphopGen_1(PIX *pixd, PIX *pixs,
+ *                                    l_int32 operation, char *selname);
+ *
  *        where the operation is one of {L_MORPH_DILATE, L_MORPH_ERODE.
  *        L_MORPH_OPEN, L_MORPH_CLOSE}, and the selname is one
  *        of the set that were defined as the name field of sels.
  *        This set is listed at the beginning of the file fmorphgen.1.c.
- *
- *        N.B. Although pixFMorphopGen_1() is global, you must NOT
- *        use it, because it assumes that 32 or 64 border pixels
- *        have been added to each side, and it will crash without those
- *        added pixels.
- *
  *        For examples of use, see the file prog/binmorph_reg1.c, which
  *        verifies the consistency of the various implementations by
  *        comparing the dwa result with that of full-image rasterops.
  * </pre>
  */
-
-#ifdef HAVE_CONFIG_H
-#include <config_auto.h>
-#endif  /* HAVE_CONFIG_H */
 
 #include <string.h>
 #include "allheaders.h"
@@ -109,7 +103,7 @@
 
 #define   PROTOARGS   "(l_uint32 *, l_int32, l_int32, l_int32, l_uint32 *, l_int32);"
 
-#define L_BUF_SIZE 512
+static const l_int32  L_BUF_SIZE = 512;
 
 static char * makeBarrelshiftString(l_int32 delx, l_int32 dely);
 static SARRAY * sarrayMakeInnerLoopDWACode(SEL *sel, l_int32 index);
@@ -245,19 +239,21 @@ static char wplstrm[][10] = {"- wpls", "- wpls2", "- wpls3", "- wpls4",
  *      (2) See fmorphautogen1() and fmorphautogen2() for details.
  * </pre>
  */
-l_ok
+l_int32
 fmorphautogen(SELA        *sela,
               l_int32      fileindex,
               const char  *filename)
 {
 l_int32  ret1, ret2;
 
+    PROCNAME("fmorphautogen");
+
     if (!sela)
-        return ERROR_INT("sela not defined", __func__, 1);
+        return ERROR_INT("sela not defined", procName, 1);
     ret1 = fmorphautogen1(sela, fileindex, filename);
     ret2 = fmorphautogen2(sela, fileindex, filename);
     if (ret1 || ret2)
-        return ERROR_INT("code generation problem", __func__, 1);
+        return ERROR_INT("code generation problem", procName, 1);
     return 0;
 }
 
@@ -278,12 +274,12 @@ l_int32  ret1, ret2;
  *          opening or closing for any of the sels in the input sela.
  *      (2) The fileindex parameter is inserted into the output
  *          filename, as described below.
- *      (3) If filename == NULL, the output file is fmorphgen.[n].c,
- *          where [n] is equal to the %fileindex parameter.
- *      (4) If filename != NULL, the output file is [%filename].[n].c.
+ *      (3) If filename == NULL, the output file is fmorphgen.<n>.c,
+ *          where <n> is equal to the 'fileindex' parameter.
+ *      (4) If filename != NULL, the output file is <filename>.<n>.c.
  * </pre>
  */
-l_ok
+l_int32
 fmorphautogen1(SELA        *sela,
                l_int32      fileindex,
                const char  *filename)
@@ -299,20 +295,22 @@ l_int32  i, nsels, nbytes, actstart, end, newstart;
 size_t   size;
 SARRAY  *sa1, *sa2, *sa3;
 
+    PROCNAME("fmorphautogen1");
+
     if (!sela)
-        return ERROR_INT("sela not defined", __func__, 1);
+        return ERROR_INT("sela not defined", procName, 1);
     if (fileindex < 0)
         fileindex = 0;
     if ((nsels = selaGetCount(sela)) == 0)
-        return ERROR_INT("no sels in sela", __func__, 1);
+        return ERROR_INT("no sels in sela", procName, 1);
 
         /* Make array of textlines from morphtemplate1.txt */
     if ((filestr = (char *)l_binaryRead(TEMPLATE1, &size)) == NULL)
-        return ERROR_INT("filestr not made", __func__, 1);
+        return ERROR_INT("filestr not made", procName, 1);
     sa2 = sarrayCreateLinesFromString(filestr, 1);
     LEPT_FREE(filestr);
     if (!sa2)
-        return ERROR_INT("sa2 not made", __func__, 1);
+        return ERROR_INT("sa2 not made", procName, 1);
 
         /* Make array of sel names */
     sa1 = selaGetSelnames(sela);
@@ -333,9 +331,9 @@ SARRAY  *sa1, *sa2, *sa3;
     str_doc1 = stringNew(bigbuf);
     sprintf(bigbuf, " *             PIX     *pixFMorphopGen_%d()", fileindex);
     str_doc2 = stringNew(bigbuf);
-    sprintf(bigbuf, " * \\brief   pixMorphDwa_%d()", fileindex);
+    sprintf(bigbuf, " *  pixMorphDwa_%d()", fileindex);
     str_doc3 = stringNew(bigbuf);
-    sprintf(bigbuf, " * \\brief   pixFMorphopGen_%d()", fileindex);
+    sprintf(bigbuf, " *  pixFMorphopGen_%d()", fileindex);
     str_doc4 = stringNew(bigbuf);
     sprintf(bigbuf, "pixMorphDwa_%d(PIX     *pixd,", fileindex);
     str_def1 = stringNew(bigbuf);
@@ -484,9 +482,9 @@ SARRAY  *sa1, *sa2, *sa3;
  *          in the input sela.
  *      (2) The fileindex parameter is inserted into the output
  *          filename, as described below.
- *      (3) If filename == NULL, the output file is fmorphgenlow.[n].c,
- *          where [n] is equal to the 'fileindex' parameter.
- *      (4) If filename != NULL, the output file is [filename]low.[n].c.
+ *      (3) If filename == NULL, the output file is fmorphgenlow.<n>.c,
+ *          where <n> is equal to the 'fileindex' parameter.
+ *      (4) If filename != NULL, the output file is <filename>low.<n>.c.
  */
 l_int32
 fmorphautogen2(SELA        *sela,
@@ -504,25 +502,27 @@ size_t   size;
 SARRAY  *sa1, *sa2, *sa3, *sa4, *sa5, *sa6;
 SEL     *sel;
 
+    PROCNAME("fmorphautogen2");
+
     if (!sela)
-        return ERROR_INT("sela not defined", __func__, 1);
+        return ERROR_INT("sela not defined", procName, 1);
     if (fileindex < 0)
         fileindex = 0;
     if ((nsels = selaGetCount(sela)) == 0)
-        return ERROR_INT("no sels in sela", __func__, 1);
+        return ERROR_INT("no sels in sela", procName, 1);
 
         /* Make the array of textlines from morphtemplate2.txt */
     if ((filestr = (char *)l_binaryRead(TEMPLATE2, &size)) == NULL)
-        return ERROR_INT("filestr not made", __func__, 1);
+        return ERROR_INT("filestr not made", procName, 1);
     sa1 = sarrayCreateLinesFromString(filestr, 1);
     LEPT_FREE(filestr);
     if (!sa1)
-        return ERROR_INT("sa1 not made", __func__, 1);
+        return ERROR_INT("sa1 not made", procName, 1);
 
         /* Make the array of static function names */
     if ((sa2 = sarrayCreate(2 * nsels)) == NULL) {
         sarrayDestroy(&sa1);
-        return ERROR_INT("sa2 not made", __func__, 1);
+        return ERROR_INT("sa2 not made", procName, 1);
     }
     for (i = 0; i < nsels; i++) {
         sprintf(bigbuf, "fdilate_%d_%d", fileindex, i);
@@ -547,6 +547,10 @@ SEL     *sel;
     str_doc2 = stringNew(bigbuf);
     sprintf(bigbuf, " *             void       ferode_%d_*()", fileindex);
     str_doc3 = stringNew(bigbuf);
+    sprintf(bigbuf, " *  fmorphopgen_low_%d()", fileindex);
+    str_doc4 = stringNew(bigbuf);
+    sprintf(bigbuf, "fmorphopgen_low_%d(l_uint32  *datad,", fileindex);
+    str_def1 = stringNew(bigbuf);
 
         /* Output to this sa */
     sa4 = sarrayCreate(0);
@@ -571,16 +575,10 @@ SEL     *sel;
             sarrayDestroy(&sa2);
             sarrayDestroy(&sa3);
             sarrayDestroy(&sa4);
-            return ERROR_INT("linestr not retrieved", __func__, 1);
+            return ERROR_INT("linestr not retrieved", procName, 1);
         }
         sarrayAddString(sa4, linestr, L_INSERT);
     }
-
-        /* More strings with function names */
-    sprintf(bigbuf, " *  fmorphopgen_low_%d()", fileindex);
-    str_doc4 = stringNew(bigbuf);
-    sprintf(bigbuf, "fmorphopgen_low_%d(l_uint32  *datad,", fileindex);
-    str_def1 = stringNew(bigbuf);
 
         /* Insert function header */
     sarrayParseRange(sa1, newstart, &actstart, &end, &newstart, "--", 0);
@@ -630,7 +628,7 @@ SEL     *sel;
             sarrayDestroy(&sa2);
             sarrayDestroy(&sa3);
             sarrayDestroy(&sa4);
-            return ERROR_INT("sel not returned", __func__, 1);
+            return ERROR_INT("sel not returned", procName, 1);
         }
         sa5 = sarrayMakeWplsCode(sel);
         sarrayJoin(sa4, sa5);
@@ -679,8 +677,10 @@ l_int32  i, j, ymax, dely, allvshifts;
 l_int32  vshift[32];
 SARRAY  *sa;
 
+    PROCNAME("sarrayMakeWplsCode");
+
     if (!sel)
-        return (SARRAY *)ERROR_PTR("sel not defined", __func__, NULL);
+        return (SARRAY *)ERROR_PTR("sel not defined", procName, NULL);
 
     for (i = 0; i < 32; i++)
         vshift[i] = 0;
@@ -696,7 +696,7 @@ SARRAY  *sa;
         }
     }
     if (ymax > 31) {
-        L_WARNING("ymax > 31; truncating to 31\n", __func__);
+        L_WARNING("ymax > 31; truncating to 31\n", procName);
         ymax = 31;
     }
 
@@ -762,8 +762,10 @@ char     bigbuf[L_BUF_SIZE];
 l_int32  i, j, optype, count, nfound, delx, dely;
 SARRAY  *sa;
 
+    PROCNAME("sarrayMakeInnerLoopDWACode");
+
     if (!sel)
-        return (SARRAY *)ERROR_PTR("sel not defined", __func__, NULL);
+        return (SARRAY *)ERROR_PTR("sel not defined", procName, NULL);
 
     if (index % 2 == 0) {
         optype = L_MORPH_DILATE;
@@ -783,7 +785,7 @@ SARRAY  *sa;
 
     sa = sarrayCreate(0);
     if (count == 0) {
-        L_WARNING("no hits in Sel %d\n", __func__, index);
+        L_WARNING("no hits in Sel %d\n", procName, index);
         return sa;  /* no code inside! */
     }
 
@@ -795,12 +797,12 @@ SARRAY  *sa;
                 if (optype == L_MORPH_DILATE) {
                     dely = sel->cy - i;
                     delx = sel->cx - j;
-                } else {  /* optype == L_MORPH_ERODE */
+                } else if (optype == L_MORPH_ERODE) {
                     dely = i - sel->cy;
                     delx = j - sel->cx;
                 }
                 if ((string = makeBarrelshiftString(delx, dely)) == NULL) {
-                    L_WARNING("barrel shift string not made\n", __func__);
+                    L_WARNING("barrel shift string not made\n", procName);
                     continue;
                 }
                 if (count == 1)  /* just one item */
@@ -831,10 +833,12 @@ makeBarrelshiftString(l_int32  delx,    /* j - cx */
 l_int32  absx, absy;
 char     bigbuf[L_BUF_SIZE];
 
+    PROCNAME("makeBarrelshiftString");
+
     if (delx < -31 || delx > 31)
-        return (char *)ERROR_PTR("delx out of bounds", __func__, NULL);
+        return (char *)ERROR_PTR("delx out of bounds", procName, NULL);
     if (dely < -31 || dely > 31)
-        return (char *)ERROR_PTR("dely out of bounds", __func__, NULL);
+        return (char *)ERROR_PTR("dely out of bounds", procName, NULL);
     absx = L_ABS(delx);
     absy = L_ABS(dely);
 

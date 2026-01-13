@@ -38,11 +38,8 @@
  * </pre>
  */
 
-#ifdef HAVE_CONFIG_H
-#include <config_auto.h>
-#endif  /* HAVE_CONFIG_H */
-
 #include "allheaders.h"
+
 
 /*-----------------------------------------------------------------*
  *              Top-level color morphological operations           *
@@ -51,10 +48,10 @@
  * \brief   pixColorMorph()
  *
  * \param[in]    pixs
- * \param[in]    type    L_MORPH_DILATE, L_MORPH_ERODE, L_MORPH_OPEN,
- *                       or L_MORPH_CLOSE
- * \param[in]    hsize   width of Sel; must be odd; origin implicitly in center
- * \param[in]    vsize   ditto for height of Sel
+ * \param[in]    type  L_MORPH_DILATE, L_MORPH_ERODE, L_MORPH_OPEN,
+ *                     or L_MORPH_CLOSE
+ * \param[in]    hsize  of Sel; must be odd; origin implicitly in center
+ * \param[in]    vsize  ditto
  * \return  pixd
  *
  * <pre>
@@ -73,21 +70,23 @@ pixColorMorph(PIX     *pixs,
 {
 PIX  *pixr, *pixg, *pixb, *pixrm, *pixgm, *pixbm, *pixd;
 
+    PROCNAME("pixColorMorph");
+
     if (!pixs)
-        return (PIX *)ERROR_PTR("pixs not defined", __func__, NULL);
+        return (PIX *)ERROR_PTR("pixs not defined", procName, NULL);
     if (pixGetDepth(pixs) != 32)
-        return (PIX *)ERROR_PTR("pixs not 32 bpp", __func__, NULL);
+        return (PIX *)ERROR_PTR("pixs not 32 bpp", procName, NULL);
     if (type != L_MORPH_DILATE && type != L_MORPH_ERODE &&
         type != L_MORPH_OPEN && type != L_MORPH_CLOSE)
-        return (PIX *)ERROR_PTR("invalid morph type", __func__, NULL);
+        return (PIX *)ERROR_PTR("invalid morph type", procName, NULL);
     if (hsize < 1 || vsize < 1)
-        return (PIX *)ERROR_PTR("hsize or vsize < 1", __func__, NULL);
+        return (PIX *)ERROR_PTR("hsize or vsize < 1", procName, NULL);
     if ((hsize & 1) == 0 ) {
-        L_WARNING("horiz sel size must be odd; increasing by 1\n", __func__);
+        L_WARNING("horiz sel size must be odd; increasing by 1\n", procName);
         hsize++;
     }
     if ((vsize & 1) == 0 ) {
-        L_WARNING("vert sel size must be odd; increasing by 1\n", __func__);
+        L_WARNING("vert sel size must be odd; increasing by 1\n", procName);
         vsize++;
     }
 

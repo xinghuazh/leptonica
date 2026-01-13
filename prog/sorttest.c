@@ -31,28 +31,25 @@
  *   in increasing or decreasing order.
  */
 
-#ifdef HAVE_CONFIG_H
-#include <config_auto.h>
-#endif  /* HAVE_CONFIG_H */
-
 #include "allheaders.h"
-#include "pix_internal.h"
 
 int main(int    argc,
          char **argv)
 {
-char    *filein;
-l_int32  i, n, ns;
-BOXA    *boxa;
-PIX     *pixs, *pixt;
-PIXA    *pixa, *pixas, *pixas2;
+char        *filein;
+l_int32      i, n, ns;
+BOX         *box;
+BOXA        *boxa, *boxas;
+PIX         *pixs, *pixt;
+PIXA        *pixa, *pixas, *pixas2;
+static char  mainName[] = "sorttest";
 
     if (argc != 2)
-        return ERROR_INT(" Syntax:  sorttest filein", __func__, 1);
+        return ERROR_INT(" Syntax:  sorttest filein", mainName, 1);
 
     filein = argv[1];
     if ((pixs = pixRead(filein)) == NULL)
-        return ERROR_INT("pixs not made", __func__, 1);
+        return ERROR_INT("pixs not made", mainName, 1);
 
 #if 0
     boxa = pixConnComp(pixs, NULL, 8);
@@ -60,7 +57,7 @@ PIXA    *pixa, *pixas, *pixas2;
 
     boxas = boxaSort(boxa, L_SORT_BY_PERIMETER, L_SORT_DECREASING, NULL);
     ns = boxaGetCount(boxas);
-    lept_stderr("Number of cc: n = %d, ns = %d\n", n, ns);
+    fprintf(stderr, "Number of cc: n = %d, ns = %d\n", n, ns);
     boxaWrite("/tmp/junkboxa.ba", boxas);
 
     for (i = 0; i < n; i++) {
@@ -80,7 +77,7 @@ PIXA    *pixa, *pixas, *pixas2;
 
     pixas = pixaSort(pixa, L_SORT_BY_Y, L_SORT_INCREASING, NULL, L_CLONE);
     ns = pixaGetCount(pixas);
-    lept_stderr("Number of cc: n = %d, ns = %d\n", n, ns);
+    fprintf(stderr, "Number of cc: n = %d, ns = %d\n", n, ns);
     pixaWrite("/tmp/pixa.pa", pixas);
     pixas2 = pixaRead("/tmp/pixa.pa");
     pixaWrite("/tmp/pixa2.pa", pixas2);

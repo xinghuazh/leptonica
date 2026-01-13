@@ -24,6 +24,7 @@
  -  SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
  *====================================================================*/
 
+
 /*!
  * \file  pixacc.c
  * <pre>
@@ -61,12 +62,8 @@
  * </pre>
  */
 
-#ifdef HAVE_CONFIG_H
-#include <config_auto.h>
-#endif  /* HAVE_CONFIG_H */
-
 #include "allheaders.h"
-#include "pix_internal.h"
+
 
 /*---------------------------------------------------------------------*
  *                     Pixacc creation, destruction                    *
@@ -74,9 +71,9 @@
 /*!
  * \brief   pixaccCreate()
  *
- * \param[in]    w, h      of 32 bpp internal Pix
- * \param[in]    negflag   0 if only positive numbers are involved;
- *                         1 if there will be negative numbers
+ * \param[in]    w, h of 32 bpp internal Pix
+ * \param[in]    negflag 0 if only positive numbers are involved;
+ *                       1 if there will be negative numbers
  * \return  pixacc, or NULL on error
  *
  * <pre>
@@ -96,14 +93,15 @@ pixaccCreate(l_int32  w,
 {
 PIXACC  *pixacc;
 
-    pixacc = (PIXACC *)LEPT_CALLOC(1, sizeof(PIXACC));
+    PROCNAME("pixaccCreate");
+
+    if ((pixacc = (PIXACC *)LEPT_CALLOC(1, sizeof(PIXACC))) == NULL)
+        return (PIXACC *)ERROR_PTR("pixacc not made", procName, NULL);
     pixacc->w = w;
     pixacc->h = h;
 
-    if ((pixacc->pix = pixCreate(w, h, 32)) == NULL) {
-        pixaccDestroy(&pixacc);
-        return (PIXACC *)ERROR_PTR("pix not made", __func__, NULL);
-    }
+    if ((pixacc->pix = pixCreate(w, h, 32)) == NULL)
+        return (PIXACC *)ERROR_PTR("pix not made", procName, NULL);
 
     if (negflag) {
         pixacc->offset = 0x40000000;
@@ -118,8 +116,8 @@ PIXACC  *pixacc;
  * \brief   pixaccCreateFromPix()
  *
  * \param[in]    pix
- * \param[in]    negflag   0 if only positive numbers are involved;
- *                         1 if there will be negative numbers
+ * \param[in]    negflag 0 if only positive numbers are involved;
+ *                       1 if there will be negative numbers
  * \return  pixacc, or NULL on error
  *
  * <pre>
@@ -134,8 +132,10 @@ pixaccCreateFromPix(PIX     *pix,
 l_int32  w, h;
 PIXACC  *pixacc;
 
+    PROCNAME("pixaccCreateFromPix");
+
     if (!pix)
-        return (PIXACC *)ERROR_PTR("pix not defined", __func__, NULL);
+        return (PIXACC *)ERROR_PTR("pix not defined", procName, NULL);
 
     pixGetDimensions(pix, &w, &h, NULL);
     pixacc = pixaccCreate(w, h, negflag);
@@ -147,8 +147,7 @@ PIXACC  *pixacc;
 /*!
  * \brief   pixaccDestroy()
  *
- * \param[in,out]   ppixacc   will be set to null before returning
- * \return  void
+ * \param[in,out] ppixacc to be nulled
  *
  * <pre>
  * Notes:
@@ -160,8 +159,10 @@ pixaccDestroy(PIXACC  **ppixacc)
 {
 PIXACC  *pixacc;
 
+    PROCNAME("pixaccDestroy");
+
     if (ppixacc == NULL) {
-        L_WARNING("ptr address is NULL!", __func__);
+        L_WARNING("ptr address is NULL!", procName);
         return;
     }
 
@@ -171,6 +172,7 @@ PIXACC  *pixacc;
     pixDestroy(&pixacc->pix);
     LEPT_FREE(pixacc);
     *ppixacc = NULL;
+    return;
 }
 
 
@@ -181,15 +183,17 @@ PIXACC  *pixacc;
  * \brief   pixaccFinal()
  *
  * \param[in]    pixacc
- * \param[in]    outdepth    8, 16 or 32 bpp
- * \return  pixd 8, 16 or 32 bpp, or NULL on error
+ * \param[in]    outdepth 8, 16 or 32 bpp
+ * \return  pixd 8 , 16 or 32 bpp, or NULL on error
  */
 PIX *
 pixaccFinal(PIXACC  *pixacc,
             l_int32  outdepth)
 {
+    PROCNAME("pixaccFinal");
+
     if (!pixacc)
-        return (PIX *)ERROR_PTR("pixacc not defined", __func__, NULL);
+        return (PIX *)ERROR_PTR("pixacc not defined", procName, NULL);
 
     return pixFinalAccumulate(pixaccGetPix(pixacc), pixaccGetOffset(pixacc),
                               outdepth);
@@ -208,8 +212,10 @@ pixaccFinal(PIXACC  *pixacc,
 PIX *
 pixaccGetPix(PIXACC  *pixacc)
 {
+    PROCNAME("pixaccGetPix");
+
     if (!pixacc)
-        return (PIX *)ERROR_PTR("pixacc not defined", __func__, NULL);
+        return (PIX *)ERROR_PTR("pixacc not defined", procName, NULL);
     return pixacc->pix;
 }
 
@@ -223,8 +229,10 @@ pixaccGetPix(PIXACC  *pixacc)
 l_int32
 pixaccGetOffset(PIXACC  *pixacc)
 {
+    PROCNAME("pixaccGetOffset");
+
     if (!pixacc)
-        return ERROR_INT("pixacc not defined", __func__, -1);
+        return ERROR_INT("pixacc not defined", procName, -1);
     return pixacc->offset;
 }
 
@@ -236,17 +244,19 @@ pixaccGetOffset(PIXACC  *pixacc)
  * \brief   pixaccAdd()
  *
  * \param[in]    pixacc
- * \param[in]    pix     to be added
+ * \param[in]    pix to be added
  * \return  0 if OK, 1 on error
  */
-l_ok
+l_int32
 pixaccAdd(PIXACC  *pixacc,
           PIX     *pix)
 {
+    PROCNAME("pixaccAdd");
+
     if (!pixacc)
-        return ERROR_INT("pixacc not defined", __func__, 1);
+        return ERROR_INT("pixacc not defined", procName, 1);
     if (!pix)
-        return ERROR_INT("pix not defined", __func__, 1);
+        return ERROR_INT("pix not defined", procName, 1);
     pixAccumulate(pixaccGetPix(pixacc), pix, L_ARITH_ADD);
     return 0;
 }
@@ -256,17 +266,19 @@ pixaccAdd(PIXACC  *pixacc,
  * \brief   pixaccSubtract()
  *
  * \param[in]    pixacc
- * \param[in]    pix      to be subtracted
+ * \param[in]    pix to be subtracted
  * \return  0 if OK, 1 on error
  */
-l_ok
+l_int32
 pixaccSubtract(PIXACC  *pixacc,
                PIX     *pix)
 {
+    PROCNAME("pixaccSubtract");
+
     if (!pixacc)
-        return ERROR_INT("pixacc not defined", __func__, 1);
+        return ERROR_INT("pixacc not defined", procName, 1);
     if (!pix)
-        return ERROR_INT("pix not defined", __func__, 1);
+        return ERROR_INT("pix not defined", procName, 1);
     pixAccumulate(pixaccGetPix(pixacc), pix, L_ARITH_SUBTRACT);
     return 0;
 }
@@ -279,12 +291,14 @@ pixaccSubtract(PIXACC  *pixacc,
  * \param[in]    factor
  * \return  0 if OK, 1 on error
  */
-l_ok
+l_int32
 pixaccMultConst(PIXACC    *pixacc,
                 l_float32  factor)
 {
+    PROCNAME("pixaccMultConst");
+
     if (!pixacc)
-        return ERROR_INT("pixacc not defined", __func__, 1);
+        return ERROR_INT("pixacc not defined", procName, 1);
     pixMultConstAccumulate(pixaccGetPix(pixacc), factor,
                            pixaccGetOffset(pixacc));
     return 0;
@@ -305,7 +319,7 @@ pixaccMultConst(PIXACC    *pixacc,
  *          constant %factor.  It then adds that into %pixacc.
  * </pre>
  */
-l_ok
+l_int32
 pixaccMultConstAccumulate(PIXACC    *pixacc,
                           PIX       *pix,
                           l_float32  factor)
@@ -314,10 +328,12 @@ l_int32  w, h, d, negflag;
 PIX     *pixt;
 PIXACC  *pacct;
 
+    PROCNAME("pixaccMultConstAccumulate");
+
     if (!pixacc)
-        return ERROR_INT("pixacc not defined", __func__, 1);
+        return ERROR_INT("pixacc not defined", procName, 1);
     if (!pix)
-        return ERROR_INT("pix not defined", __func__, 1);
+        return ERROR_INT("pix not defined", procName, 1);
 
     if (factor == 0.0) return 0;
 

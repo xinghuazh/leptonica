@@ -44,10 +44,10 @@
 /*                      Auto-generated deserializers                   */
 /*---------------------------------------------------------------------*/
 /*!
---- * \brief  l_autodecode_*()
+--- *  l_autodecode_*()
  *
- * \param[in]    index           into array of functions
- * \return       data struct     e.g., pixa, in memory
+ *      Input:  index into array of functions
+ *      Return: data struct (e.g., pixa) in memory
  */
 void *
 --- l_autodecode_*(l_int32  index)

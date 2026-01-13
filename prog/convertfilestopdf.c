@@ -38,20 +38,11 @@
  *    is applied to the images before conversion to pdf.  Internally
  *    we multiply these, so that the generated pdf will render at the
  *    same resolution as if it hadn't been scaled.  By downscaling, you
- *    reduce the size of the images.
- *
- *    For jpeg and jp2k, downscaling reduces pdf size by the square of
- *    the scale factor.
- *    * The jpeg quality can be specified from 1 (very poor) to 100
- *      (best available, but still lossy); use 0 for the default (75).
- *    * The jp2k quality can be specified from 27 (very poor) to 45 (nearly
- *      lossless; use 0 for the default (34).  You can use 100 to
- *      require lossless, but this is very expensive and not recommended.
+ *    reduce the size of the images.  For jpeg, downscaling reduces
+ *    pdf size by the square of the scale factor.  The jpeg quality can
+ *    be specified from 1 (very poor) to 100 (best available, but
+ *    still lossy); use 0 for the default (75).
  */
-
-#ifdef HAVE_CONFIG_H
-#include <config_auto.h>
-#endif  /* HAVE_CONFIG_H */
 
 #include <string.h>
 #include "allheaders.h"
@@ -59,14 +50,15 @@
 int main(int    argc,
          char **argv)
 {
-char      *dirin, *substr, *title, *fileout;
-l_int32    ret, res, type, quality;
-l_float32  scalefactor;
+char        *dirin, *substr, *title, *fileout;
+l_int32      ret, res, type, quality;
+l_float32    scalefactor;
+static char  mainName[] = "convertfilestopdf";
 
     if (argc != 9) {
-        lept_stderr(
+        fprintf(stderr,
             " Syntax: convertfilestopdf dirin substr res"
-            " scalefactor encoding_type quality title fileout\n"
+            " scalefactor encoding_type title fileout\n"
             "         dirin:  input directory for image files\n"
             "         substr:  Use 'allfiles' to convert all files\n"
             "                  in the directory.\n"
@@ -74,17 +66,16 @@ l_float32  scalefactor;
             "               assumed to all be the same\n"
             "         scalefactor:  Use to scale all images\n"
             "         encoding_type:\n"
-            "              L_DEFAULT_ENCODE = 0  (based on the image)\n"
             "              L_JPEG_ENCODE = 1\n"
             "              L_G4_ENCODE = 2\n"
-            "              L_FLATE_ENCODE = 3\n"
-            "              L_JP2K_ENCODE = 4\n"
-            "         quality:  used for jpeg; 1-100, 0 for default (75);\n"
-            "                   used for jp2k: 27-45, 0 for default (34)\n"
+            "              L_FLATE_ENCODE = 3, or 0 for per-page default)\n"
+            "         quality:  used for jpeg; 0 for default (75);\n"
+            "                   otherwise select from 1 to 100\n"
             "         title:  Use 'none' to omit\n"
             "         fileout:  Output pdf file\n");
         return 1;
     }
+
     dirin = argv[1];
     substr = argv[2];
     res = atoi(argv[3]);
@@ -95,14 +86,13 @@ l_float32  scalefactor;
     fileout = argv[8];
     if (!strcmp(substr, "allfiles"))
         substr = NULL;
-    if (scalefactor <= 0.0 || scalefactor > 2.0) {
-        L_WARNING("invalid scalefactor: setting to 1.0\n", __func__);
+    if (scalefactor <= 0.0 || scalefactor > 1.0) {
+        L_WARNING("invalid scalefactor: setting to 1.0\n", mainName);
         scalefactor = 1.0;
     }
     if (!strcmp(title, "none"))
         title = NULL;
 
-    setLeptDebugOK(1);
     ret = convertFilesToPdf(dirin, substr, res, scalefactor, type,
                             quality, title, fileout);
     return ret;

@@ -33,29 +33,26 @@
  *    all invoked on the separable block morph ops.
  */
 
-#ifdef HAVE_CONFIG_H
-#include <config_auto.h>
-#endif  /* HAVE_CONFIG_H */
-
 #include "allheaders.h"
 
 static const l_int32  MAX_SEL_SIZE = 120;
 
-static void writeResult(const char *sequence, l_int32 same);
+static void writeResult(char *sequence, l_int32 same);
 
 
 int main(int    argc,
          char **argv)
 {
-char     buffer1[256], buffer2[256];
-l_int32  i, same, same2, factor1, factor2, diff, success;
-PIX     *pixs, *pixsd, *pixt1, *pixt2, *pixt3;
+char         buffer1[256];
+char         buffer2[256];
+l_int32      i, same, same2, factor1, factor2, diff, success;
+PIX         *pixs, *pixsd, *pixt1, *pixt2, *pixt3;
+static char  mainName[] = "binmorph2_reg";
 
     if (argc != 1)
-        return ERROR_INT(" Syntax:  binmorph2_reg", __func__, 1);
+        return ERROR_INT(" Syntax:  binmorph2_reg", mainName, 1);
 
-    setLeptDebugOK(1);
-    pixs = pixRead("feyn-fract.tif");
+    pixs = pixRead("rabi.png");
     pixsd = pixMorphCompSequence(pixs, "d5.5", 0);
     success = TRUE;
     for (i = 1; i < MAX_SEL_SIZE; i++) {
@@ -63,11 +60,11 @@ PIX     *pixs, *pixsd, *pixt1, *pixt2, *pixt3;
             /* Check if the size is exactly decomposable */
         selectComposableSizes(i, &factor1, &factor2);
         diff = factor1 * factor2 - i;
-        lept_stderr("%d: (%d, %d): %d\n", i, factor1, factor2, diff);
+        fprintf(stderr, "%d: (%d, %d): %d\n", i, factor1, factor2, diff);
 
             /* Carry out operations on identical sized Sels: dilation */
-        snprintf(buffer1, sizeof(buffer1), "d%d.%d", i + diff, i + diff);
-        snprintf(buffer2, sizeof(buffer2), "d%d.%d", i, i);
+        sprintf(buffer1, "d%d.%d", i + diff, i + diff);
+        sprintf(buffer2, "d%d.%d", i, i);
         pixt1 = pixMorphSequence(pixsd, buffer1, 0);
         pixt2 = pixMorphCompSequence(pixsd, buffer2, 0);
         pixEqual(pixt1, pixt2, &same);
@@ -89,8 +86,8 @@ PIX     *pixs, *pixsd, *pixt1, *pixt2, *pixt3;
         pixDestroy(&pixt3);
 
             /* ... erosion */
-        snprintf(buffer1, sizeof(buffer1), "e%d.%d", i + diff, i + diff);
-        snprintf(buffer2, sizeof(buffer2), "e%d.%d", i, i);
+        sprintf(buffer1, "e%d.%d", i + diff, i + diff);
+        sprintf(buffer2, "e%d.%d", i, i);
         pixt1 = pixMorphSequence(pixsd, buffer1, 0);
         pixt2 = pixMorphCompSequence(pixsd, buffer2, 0);
         pixEqual(pixt1, pixt2, &same);
@@ -112,8 +109,8 @@ PIX     *pixs, *pixsd, *pixt1, *pixt2, *pixt3;
         pixDestroy(&pixt3);
 
             /* ... opening */
-        snprintf(buffer1, sizeof(buffer1), "o%d.%d", i + diff, i + diff);
-        snprintf(buffer2, sizeof(buffer2), "o%d.%d", i, i);
+        sprintf(buffer1, "o%d.%d", i + diff, i + diff);
+        sprintf(buffer2, "o%d.%d", i, i);
         pixt1 = pixMorphSequence(pixsd, buffer1, 0);
         pixt2 = pixMorphCompSequence(pixsd, buffer2, 0);
         pixEqual(pixt1, pixt2, &same);
@@ -135,8 +132,8 @@ PIX     *pixs, *pixsd, *pixt1, *pixt2, *pixt3;
         pixDestroy(&pixt3);
 
             /* ... closing */
-        snprintf(buffer1, sizeof(buffer1), "c%d.%d", i + diff, i + diff);
-        snprintf(buffer2, sizeof(buffer2), "c%d.%d", i, i);
+        sprintf(buffer1, "c%d.%d", i + diff, i + diff);
+        sprintf(buffer2, "c%d.%d", i, i);
         pixt1 = pixMorphSequence(pixsd, buffer1, 0);
         pixt2 = pixMorphCompSequence(pixsd, buffer2, 0);
         pixEqual(pixt1, pixt2, &same);
@@ -162,20 +159,20 @@ PIX     *pixs, *pixsd, *pixt1, *pixt2, *pixt3;
     pixDestroy(&pixsd);
 
     if (success)
-        lept_stderr("\n---------- Success: no errors ----------\n");
+        fprintf(stderr, "\n---------- Success: no errors ----------\n");
     else
-        lept_stderr("\n---------- Failure: error(s) found -----------\n");
+        fprintf(stderr, "\n---------- Failure: error(s) found -----------\n");
     return 0;
 }
 
 
-static void writeResult(const char *sequence,
+static void writeResult(char *sequence,
                         l_int32 same)
 {
     if (same)
-        lept_stderr("Sequence %s: SUCCESS\n", sequence);
+        fprintf(stderr, "Sequence %s: SUCCESS\n", sequence);
     else
-        lept_stderr("Sequence %s: FAILURE\n", sequence);
+        fprintf(stderr, "Sequence %s: FAILURE\n", sequence);
 }
 
 
@@ -183,7 +180,7 @@ static void writeResult(const char *sequence,
     for (i = 1; i < 400; i++) {
         selectComposableSizes(i, &factor1, &factor2);
         diff = factor1 * factor2 - i;
-        lept_stderr("%d: (%d, %d): %d\n",
+        fprintf(stderr, "%d: (%d, %d): %d\n",
                   i, factor1, factor2, diff);
         selectComposableSels(i, L_HORIZ, &sel1, &sel2);
         selDestroy(&sel1);
@@ -194,7 +191,7 @@ static void writeResult(const char *sequence,
 #if 0
     selectComposableSels(68, L_HORIZ, &sel1, &sel2);  /* 17, 4 */
     str = selPrintToString(sel2);
-    lept_stderr(str);
+    fprintf(stderr, str);
     selDestroy(&sel1);
     selDestroy(&sel2);
     lept_free(str);
@@ -202,19 +199,19 @@ static void writeResult(const char *sequence,
     str = selPrintToString(sel2);
     selDestroy(&sel1);
     selDestroy(&sel2);
-    lept_stderr(str);
+    fprintf(stderr, str);
     lept_free(str);
     selectComposableSels(85, L_HORIZ, &sel1, &sel2);  /* 17, 5 */
     str = selPrintToString(sel2);
     selDestroy(&sel1);
     selDestroy(&sel2);
-    lept_stderr(str);
+    fprintf(stderr, str);
     lept_free(str);
     selectComposableSels(96, L_HORIZ, &sel1, &sel2);  /* 12, 8 */
     str = selPrintToString(sel2);
     selDestroy(&sel1);
     selDestroy(&sel2);
-    lept_stderr(str);
+    fprintf(stderr, str);
     lept_free(str);
 
     { SELA *sela;

@@ -37,10 +37,6 @@
  *          are identical (rotated) to those on un-rotated components.
  */
 
-#ifdef HAVE_CONFIG_H
-#include <config_auto.h>
-#endif  /* HAVE_CONFIG_H */
-
 #include "allheaders.h"
 
 int main(int    argc,
@@ -103,23 +99,25 @@ L_REGPARAMS  *rp;
         pix32 = pixCreate(w, h, 32);
         pixSetAll(pix32);
         pixPaintThroughMask(pix32, pixt, 0, 0, 0xc0c0c000);
-        pixaAddPix(pixad, pix32, L_INSERT);
+        pixSaveTiled(pix32, pixad, 1.0, 1, 30, 32);
         for (i = 0; i < 5; i++) {
             pixc = pixCopy(NULL, pix32);
             boxa = pixSplitComponentIntoBoxa(pixt, NULL, minsum[i], skipdist[i],
                                              delta[i], maxbg[i], 0, 1);
-/*            boxaWriteStderr(boxa); */
+/*            boxaWriteStream(stderr, boxa); */
             pixd = pixBlendBoxaRandom(pixc, boxa, 0.4);
             pixRenderBoxaArb(pixd, boxa, 2, 255, 0, 0);
-            pixaAddPix(pixad, pixd, L_INSERT);
+            pixSaveTiled(pixd, pixad, 1.0, 0, 30, 32);
+            pixDestroy(&pixd);
             pixDestroy(&pixc);
             boxaDestroy(&boxa);
         }
         pixDestroy(&pixt);
+        pixDestroy(&pix32);
     }
 
         /* Display results */
-    pixd = pixaDisplayTiledInColumns(pixad, 6, 1.0, 30, 0);
+    pixd = pixaDisplay(pixad, 0, 0);
     regTestWritePixAndCheck(rp, pixd, IFF_PNG);  /* 0 */
     pixDisplayWithTitle(pixd, 100, 100, NULL, rp->display);
     pixDestroy(&pixd);
@@ -132,22 +130,24 @@ L_REGPARAMS  *rp;
     pix32 = pixCreate(w, h, 32);
     pixSetAll(pix32);
     pixPaintThroughMask(pix32, pixs, 0, 0, 0xc0c0c000);
-    pixaAddPix(pixad, pix32, L_INSERT);
+    pixSaveTiled(pix32, pixad, 1.0, 1, 30, 32);
     for (i = 0; i < 5; i++) {
         pixc = pixCopy(NULL, pix32);
         boxa = pixSplitIntoBoxa(pixs, minsum[i], skipdist[i],
                                 delta[i], maxbg[i], 0, 1);
-/*        boxaWriteStderr(boxa); */
+/*        boxaWriteStream(stderr, boxa); */
         pixd = pixBlendBoxaRandom(pixc, boxa, 0.4);
         pixRenderBoxaArb(pixd, boxa, 2, 255, 0, 0);
-        pixaAddPix(pixad, pixd, L_INSERT);
+        pixSaveTiled(pixd, pixad, 1.0, 0, 30, 32);
+        pixDestroy(&pixd);
         pixDestroy(&pixc);
         boxaDestroy(&boxa);
     }
+    pixDestroy(&pix32);
     pixDestroy(&pixs);
 
         /* Display results */
-    pixd = pixaDisplayTiledInColumns(pixad, 6, 1.0, 30, 0);
+    pixd = pixaDisplay(pixad, 0, 0);
     regTestWritePixAndCheck(rp, pixd, IFF_PNG);  /* 1 */
     pixDisplayWithTitle(pixd, 600, 100, NULL, rp->display);
     pixDestroy(&pixd);

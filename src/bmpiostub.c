@@ -32,10 +32,6 @@
  * </pre>
  */
 
-#ifdef HAVE_CONFIG_H
-#include <config_auto.h>
-#endif  /* HAVE_CONFIG_H */
-
 #include "allheaders.h"
 
 /* --------------------------------------------*/
@@ -44,28 +40,28 @@
 
 PIX * pixReadStreamBmp(FILE *fp)
 {
-    return (PIX * )ERROR_PTR("function not present", __func__, NULL);
+    return (PIX * )ERROR_PTR("function not present", "pixReadStreamBmp", NULL);
 }
 
 /* ----------------------------------------------------------------------*/
 
-l_ok pixWriteStreamBmp(FILE *fp, PIX *pix)
+l_int32 pixWriteStreamBmp(FILE *fp, PIX *pix)
 {
-    return ERROR_INT("function not present", __func__, 1);
+    return ERROR_INT("function not present", "pixWriteStreamBmp", 1);
 }
 
 /* ----------------------------------------------------------------------*/
 
 PIX * pixReadMemBmp(const l_uint8 *cdata, size_t size)
 {
-    return (PIX *)ERROR_PTR("function not present", __func__, NULL);
+    return (PIX *)ERROR_PTR("function not present", "pixReadMemBmp", NULL);
 }
 
 /* ----------------------------------------------------------------------*/
 
-l_ok pixWriteMemBmp(l_uint8 **pdata, size_t *psize, PIX *pix)
+l_int32 pixWriteMemBmp(l_uint8 **pdata, size_t *psize, PIX *pix)
 {
-    return ERROR_INT("function not present", __func__, 1);
+    return ERROR_INT("function not present", "pixWriteMemBmp", 1);
 }
 
 /* --------------------------------------------*/

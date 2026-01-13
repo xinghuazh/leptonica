@@ -32,10 +32,6 @@
  *    text orientation.
  */
 
-#ifdef HAVE_CONFIG_H
-#include <config_auto.h>
-#endif  /* HAVE_CONFIG_H */
-
 #include "allheaders.h"
 
 static const char *textsel1 = "x  oo "
@@ -69,9 +65,6 @@ PIX   *pix1;
 SEL   *sel1, *sel2, *sel3, *sel4;
 SELA  *sela;
 
-    setLeptDebugOK(1);
-    lept_mkdir("lept/livre");
-
     sel1 = selCreateFromString(textsel1, 5, 6, NULL);
     sel2 = selCreateFromString(textsel2, 5, 6, NULL);
     sel3 = selCreateFromString(textsel3, 5, 6, NULL);
@@ -83,6 +76,7 @@ SELA  *sela;
     selaAddSel(sela, sel3, "textsel3", L_INSERT);
     selaAddSel(sela, sel4, "textsel4", L_INSERT);
 
+    lept_mkdir("lept/livre");
     pix1 = selaDisplayInPix(sela, 28, 3, 30, 4);
     pixWrite("/tmp/lept/livre/orient.png", pix1, IFF_PNG);
     pixDisplay(pix1, 1200, 1200);

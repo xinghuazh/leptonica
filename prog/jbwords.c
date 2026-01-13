@@ -41,10 +41,6 @@
  *
  */
 
-#ifdef HAVE_CONFIG_H
-#include <config_auto.h>
-#endif  /* HAVE_CONFIG_H */
-
 #include "allheaders.h"
 
     /* Eliminate very large "words" */
@@ -61,19 +57,21 @@ static const l_int32  MAX_WORD_HEIGHT = 200;
 int main(int    argc,
          char **argv)
 {
-char        filename[BUF_SIZE];
-char       *dirin, *rootname;
-l_int32     reduction, i, firstpage, npages;
-l_float32   thresh, weight;
-JBDATA     *data;
-JBCLASSER  *classer;
-NUMA       *natl;
-PIX        *pix;
-PIXA       *pixa, *pixadb;
+char         filename[BUF_SIZE];
+char        *dirin, *rootname;
+l_int32      reduction, i, firstpage, npages;
+l_float32    thresh, weight;
+JBDATA      *data;
+JBCLASSER   *classer;
+NUMA        *natl;
+PIX         *pix;
+PIXA        *pixa, *pixadb;
+static char  mainName[] = "jbwords";
 
     if (argc != 6 && argc != 8)
         return ERROR_INT(" Syntax: jbwords dirin reduction thresh "
-                         "weight rootname [firstpage, npages]", __func__, 1);
+                         "weight rootname [firstpage, npages]", mainName, 1);
+
     dirin = argv[1];
     reduction = atoi(argv[2]);
     thresh = atof(argv[3]);
@@ -86,7 +84,6 @@ PIXA       *pixa, *pixadb;
         firstpage = atoi(argv[6]);
         npages = atoi(argv[7]);
     }
-    setLeptDebugOK(1);
 
     classer = jbWordsInTextlines(dirin, reduction, MAX_WORD_WIDTH,
                                  MAX_WORD_HEIGHT, thresh, weight,
@@ -104,7 +101,7 @@ PIXA       *pixa, *pixadb;
     for (i = 0; i < npages; i++) {
         pix = pixaGetPix(pixa, i, L_CLONE);
         snprintf(filename, BUF_SIZE, "%s.%05d", rootname, i);
-        lept_stderr("filename: %s\n", filename);
+        fprintf(stderr, "filename: %s\n", filename);
         pixWrite(filename, pix, IFF_PNG);
         pixDestroy(&pix);
     }
@@ -119,7 +116,7 @@ PIXA       *pixa, *pixadb;
     for (i = 0; i < npages; i++) {
         pix = pixaGetPix(pixadb, i, L_CLONE);
         snprintf(filename, BUF_SIZE, "%s.db.%05d", rootname, i);
-        lept_stderr("filename: %s\n", filename);
+        fprintf(stderr, "filename: %s\n", filename);
         pixWrite(filename, pix, IFF_PNG);
         pixDestroy(&pix);
     }

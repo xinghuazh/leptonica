@@ -114,13 +114,10 @@
  * </pre>
  */
 
-#ifdef HAVE_CONFIG_H
-#include <config_auto.h>
-#endif  /* HAVE_CONFIG_H */
-
 #include <string.h>
 #include <math.h>
 #include "allheaders.h"
+
 
 /*------------------------------------------------------------------*
  *        Pta generation for arbitrary shapes built with lines      *
@@ -128,8 +125,8 @@
 /*!
  * \brief   generatePtaLine()
  *
- * \param[in]    x1, y1    end point 1
- * \param[in]    x2, y2    end point 2
+ * \param[in]    x1, y1  end point 1
+ * \param[in]    x2, y2  end point 2
  * \return  pta, or NULL on error
  *
  * <pre>
@@ -147,9 +144,10 @@ l_int32    npts, diff, getyofx, sign, i, x, y;
 l_float32  slope;
 PTA       *pta;
 
+    PROCNAME("generatePtaLine");
+
         /* Generate line parameters */
     if (x1 == x2 && y1 == y2) {  /* same point */
-        getyofx = TRUE;
         npts = 1;
     } else if (L_ABS(x2 - x1) >= L_ABS(y2 - y1)) {
         getyofx = TRUE;
@@ -166,7 +164,7 @@ PTA       *pta;
     }
 
     if ((pta = ptaCreate(npts)) == NULL)
-        return (PTA *)ERROR_PTR("pta not made", __func__, NULL);
+        return (PTA *)ERROR_PTR("pta not made", procName, NULL);
 
     if (npts == 1) {  /* degenerate case */
         ptaAddPt(pta, x1, y1);
@@ -195,8 +193,8 @@ PTA       *pta;
 /*!
  * \brief   generatePtaWideLine()
  *
- * \param[in]    x1, y1     end point 1
- * \param[in]    x2, y2     end point 2
+ * \param[in]    x1, y1  end point 1
+ * \param[in]    x2, y2  end point 2
  * \param[in]    width
  * \return  ptaj, or NULL on error
  */
@@ -210,13 +208,15 @@ generatePtaWideLine(l_int32  x1,
 l_int32  i, x1a, x2a, y1a, y2a;
 PTA     *pta, *ptaj;
 
+    PROCNAME("generatePtaWideLine");
+
     if (width < 1) {
-        L_WARNING("width < 1; setting to 1\n", __func__);
+        L_WARNING("width < 1; setting to 1\n", procName);
         width = 1;
     }
 
     if ((ptaj = generatePtaLine(x1, y1, x2, y2)) == NULL)
-        return (PTA *)ERROR_PTR("ptaj not made", __func__, NULL);
+        return (PTA *)ERROR_PTR("ptaj not made", procName, NULL);
     if (width == 1)
         return ptaj;
 
@@ -230,10 +230,10 @@ PTA     *pta, *ptaj;
                 y1a = y1 + (i + 1) / 2;
                 y2a = y2 + (i + 1) / 2;
             }
-            if ((pta = generatePtaLine(x1, y1a, x2, y2a)) != NULL) {
-                ptaJoin(ptaj, pta, 0, -1);
-                ptaDestroy(&pta);
-            }
+            if ((pta = generatePtaLine(x1, y1a, x2, y2a)) == NULL)
+                return (PTA *)ERROR_PTR("pta not made", procName, NULL);
+            ptaJoin(ptaj, pta, 0, -1);
+            ptaDestroy(&pta);
         }
     } else  {  /* "vertical" line  */
         for (i = 1; i < width; i++) {
@@ -244,10 +244,10 @@ PTA     *pta, *ptaj;
                 x1a = x1 + (i + 1) / 2;
                 x2a = x2 + (i + 1) / 2;
             }
-            if ((pta = generatePtaLine(x1a, y1, x2a, y2)) != NULL) {
-                ptaJoin(ptaj, pta, 0, -1);
-                ptaDestroy(&pta);
-            }
+            if ((pta = generatePtaLine(x1a, y1, x2a, y2)) == NULL)
+                return (PTA *)ERROR_PTR("pta not made", procName, NULL);
+            ptaJoin(ptaj, pta, 0, -1);
+            ptaDestroy(&pta);
         }
     }
 
@@ -259,7 +259,7 @@ PTA     *pta, *ptaj;
  * \brief   generatePtaBox()
  *
  * \param[in]    box
- * \param[in]    width    of line
+ * \param[in]    width of line
  * \return  ptad, or NULL on error
  *
  * <pre>
@@ -275,17 +275,19 @@ generatePtaBox(BOX     *box,
 l_int32  x, y, w, h;
 PTA     *ptad, *pta;
 
+    PROCNAME("generatePtaBox");
+
     if (!box)
-        return (PTA *)ERROR_PTR("box not defined", __func__, NULL);
+        return (PTA *)ERROR_PTR("box not defined", procName, NULL);
     if (width < 1) {
-        L_WARNING("width < 1; setting to 1\n", __func__);
+        L_WARNING("width < 1; setting to 1\n", procName);
         width = 1;
     }
 
         /* Generate line points and add them to the pta. */
     boxGetGeometry(box, &x, &y, &w, &h);
     if (w == 0 || h == 0)
-        return (PTA *)ERROR_PTR("box has w = 0 or h = 0", __func__, NULL);
+        return (PTA *)ERROR_PTR("box has w = 0 or h = 0", procName, NULL);
     ptad = ptaCreate(0);
     if ((width & 1) == 1) {   /* odd width */
         pta = generatePtaWideLine(x - width / 2, y,
@@ -332,15 +334,15 @@ PTA     *ptad, *pta;
  *
  * \param[in]    boxa
  * \param[in]    width
- * \param[in]    removedups    1 to remove, 0 to leave
+ * \param[in]    removedups  1 to remove, 0 to leave
  * \return  ptad, or NULL on error
  *
  * <pre>
  * Notes:
- *      (1) If %boxa has overlapping boxes, and if blending will
+ *      (1) If the boxa has overlapping boxes, and if blending will
  *          be used to give a transparent effect, transparency
  *          artifacts at line intersections can be removed using
- *          %removedups = 1.
+ *          removedups = 1.
  * </pre>
  */
 PTA  *
@@ -352,10 +354,12 @@ l_int32  i, n;
 BOX     *box;
 PTA     *ptad, *ptat, *pta;
 
+    PROCNAME("generatePtaBoxa");
+
     if (!boxa)
-        return (PTA *)ERROR_PTR("boxa not defined", __func__, NULL);
+        return (PTA *)ERROR_PTR("boxa not defined", procName, NULL);
     if (width < 1) {
-        L_WARNING("width < 1; setting to 1\n", __func__);
+        L_WARNING("width < 1; setting to 1\n", procName);
         width = 1;
     }
 
@@ -370,7 +374,7 @@ PTA     *ptad, *ptat, *pta;
     }
 
     if (removedups)
-        ptaRemoveDupsByAset(ptat, &ptad);
+        ptad = ptaRemoveDupsByAset(ptat);
     else
         ptad = ptaClone(ptat);
 
@@ -383,12 +387,10 @@ PTA     *ptad, *ptat, *pta;
  * \brief   generatePtaHashBox()
  *
  * \param[in]    box
- * \param[in]    spacing    spacing between lines; must be > 1
- * \param[in]    width      of line
- * \param[in]    orient     orientation of lines: L_HORIZONTAL_LINE,
- *                             L_POS_SLOPE_LINE, L_VERTICAL_LINE,
- *                             L_NEG_SLOPE_LINE
- * \param[in]    outline    0 to skip drawing box outline
+ * \param[in]    spacing spacing between lines; must be > 1
+ * \param[in]    width  of line
+ * \param[in]    orient  orientation of lines: L_HORIZONTAL_LINE, ...
+ * \param[in]    outline  0 to skip drawing box outline
  * \return  ptad, or NULL on error
  *
  * <pre>
@@ -408,18 +410,20 @@ generatePtaHashBox(BOX     *box,
 l_int32  bx, by, bh, bw, x, y, x1, y1, x2, y2, i, n, npts;
 PTA     *ptad, *pta;
 
+    PROCNAME("generatePtaHashBox");
+
     if (!box)
-        return (PTA *)ERROR_PTR("box not defined", __func__, NULL);
+        return (PTA *)ERROR_PTR("box not defined", procName, NULL);
     if (spacing <= 1)
-        return (PTA *)ERROR_PTR("spacing not > 1", __func__, NULL);
+        return (PTA *)ERROR_PTR("spacing not > 1", procName, NULL);
     if (orient != L_HORIZONTAL_LINE && orient != L_POS_SLOPE_LINE &&
         orient != L_VERTICAL_LINE && orient != L_NEG_SLOPE_LINE)
-        return (PTA *)ERROR_PTR("invalid line orientation", __func__, NULL);
+        return (PTA *)ERROR_PTR("invalid line orientation", procName, NULL);
     boxGetGeometry(box, &bx, &by, &bw, &bh);
     if (bw == 0 || bh == 0)
-        return (PTA *)ERROR_PTR("box has bw = 0 or bh = 0", __func__, NULL);
+        return (PTA *)ERROR_PTR("box has bw = 0 or bh = 0", procName, NULL);
     if (width < 1) {
-        L_WARNING("width < 1; setting to 1\n", __func__);
+        L_WARNING("width < 1; setting to 1\n", procName);
         width = 1;
     }
 
@@ -478,13 +482,10 @@ PTA     *ptad, *pta;
  * \brief   generatePtaHashBoxa()
  *
  * \param[in]    boxa
- * \param[in]    spacing     spacing between lines; must be > 1
- * \param[in]    width       of line
- * \param[in]    orient      orientation of lines: L_HORIZONTAL_LINE, ...
- * \param[in]    orient      orientation of lines: L_HORIZONTAL_LINE,
- *                              L_POS_SLOPE_LINE, L_VERTICAL_LINE,
- *                              L_NEG_SLOPE_LINE
- * \param[in]    outline     0 to skip drawing box outline
+ * \param[in]    spacing spacing between lines; must be > 1
+ * \param[in]    width  of line
+ * \param[in]    orient  orientation of lines: L_HORIZONTAL_LINE, ...
+ * \param[in]    outline  0 to skip drawing box outline
  * \param[in]    removedups  1 to remove, 0 to leave
  * \return  ptad, or NULL on error
  *
@@ -496,7 +497,7 @@ PTA     *ptad, *pta;
  *      (3) If the boxa has overlapping boxes, and if blending will
  *          be used to give a transparent effect, transparency
  *          artifacts at line intersections can be removed using
- *          %removedups = 1.
+ *          removedups = 1.
  * </pre>
  */
 PTA  *
@@ -511,17 +512,19 @@ l_int32  i, n;
 BOX     *box;
 PTA     *ptad, *ptat, *pta;
 
+    PROCNAME("generatePtaHashBoxa");
+
     if (!boxa)
-        return (PTA *)ERROR_PTR("boxa not defined", __func__, NULL);
+        return (PTA *)ERROR_PTR("boxa not defined", procName, NULL);
     if (spacing <= 1)
-        return (PTA *)ERROR_PTR("spacing not > 1", __func__, NULL);
+        return (PTA *)ERROR_PTR("spacing not > 1", procName, NULL);
     if (width < 1) {
-        L_WARNING("width < 1; setting to 1\n", __func__);
+        L_WARNING("width < 1; setting to 1\n", procName);
         width = 1;
     }
     if (orient != L_HORIZONTAL_LINE && orient != L_POS_SLOPE_LINE &&
         orient != L_VERTICAL_LINE && orient != L_NEG_SLOPE_LINE)
-        return (PTA *)ERROR_PTR("invalid line orientation", __func__, NULL);
+        return (PTA *)ERROR_PTR("invalid line orientation", procName, NULL);
 
     n = boxaGetCount(boxa);
     ptat = ptaCreate(0);
@@ -534,7 +537,7 @@ PTA     *ptad, *ptat, *pta;
     }
 
     if (removedups)
-        ptaRemoveDupsByAset(ptat, &ptad);
+        ptad = ptaRemoveDupsByAset(ptat);
     else
         ptad = ptaClone(ptat);
 
@@ -565,8 +568,10 @@ BOX     *box;
 PTA     *pta;
 PTAA    *ptaa;
 
+    PROCNAME("generatePtaaBoxa");
+
     if (!boxa)
-        return (PTAA *)ERROR_PTR("boxa not defined", __func__, NULL);
+        return (PTAA *)ERROR_PTR("boxa not defined", procName, NULL);
 
     n = boxaGetCount(boxa);
     ptaa = ptaaCreate(n);
@@ -590,12 +595,10 @@ PTAA    *ptaa;
  * \brief   generatePtaaHashBoxa()
  *
  * \param[in]    boxa
- * \param[in]    spacing     spacing between hash lines; must be > 1
- * \param[in]    width       hash line width
- * \param[in]    orient      orientation of lines: L_HORIZONTAL_LINE,
- *                              L_POS_SLOPE_LINE, L_VERTICAL_LINE,
- *                              L_NEG_SLOPE_LINE
- * \param[in]    outline     0 to skip drawing box outline
+ * \param[in]    spacing spacing between hash lines; must be > 1
+ * \param[in]    width  hash line width
+ * \param[in]    orient  orientation of lines: L_HORIZONTAL_LINE, ...
+ * \param[in]    outline  0 to skip drawing box outline
  * \return  ptaa, or NULL on error
  *
  * <pre>
@@ -620,17 +623,19 @@ BOX     *box;
 PTA     *pta;
 PTAA    *ptaa;
 
+    PROCNAME("generatePtaaHashBoxa");
+
     if (!boxa)
-        return (PTAA *)ERROR_PTR("boxa not defined", __func__, NULL);
+        return (PTAA *)ERROR_PTR("boxa not defined", procName, NULL);
     if (spacing <= 1)
-        return (PTAA *)ERROR_PTR("spacing not > 1", __func__, NULL);
+        return (PTAA *)ERROR_PTR("spacing not > 1", procName, NULL);
     if (width < 1) {
-        L_WARNING("width < 1; setting to 1\n", __func__);
+        L_WARNING("width < 1; setting to 1\n", procName);
         width = 1;
     }
     if (orient != L_HORIZONTAL_LINE && orient != L_POS_SLOPE_LINE &&
         orient != L_VERTICAL_LINE && orient != L_NEG_SLOPE_LINE)
-        return (PTAA *)ERROR_PTR("invalid line orientation", __func__, NULL);
+        return (PTAA *)ERROR_PTR("invalid line orientation", procName, NULL);
 
     n = boxaGetCount(boxa);
     ptaa = ptaaCreate(n);
@@ -648,10 +653,10 @@ PTAA    *ptaa;
 /*!
  * \brief   generatePtaPolyline()
  *
- * \param[in]    ptas         vertices of polyline
+ * \param[in]    ptas vertices of polyline
  * \param[in]    width
- * \param[in]    closeflag    1 to close the contour; 0 otherwise
- * \param[in]    removedups   1 to remove, 0 to leave
+ * \param[in]    closeflag 1 to close the contour; 0 otherwise
+ * \param[in]    removedups  1 to remove, 0 to leave
  * \return  ptad, or NULL on error
  */
 PTA *
@@ -663,10 +668,12 @@ generatePtaPolyline(PTA     *ptas,
 l_int32  i, n, x1, y1, x2, y2;
 PTA     *ptad, *ptat, *pta;
 
+    PROCNAME("generatePtaPolyline");
+
     if (!ptas)
-        return (PTA *)ERROR_PTR("ptas not defined", __func__, NULL);
+        return (PTA *)ERROR_PTR("ptas not defined", procName, NULL);
     if (width < 1) {
-        L_WARNING("width < 1; setting to 1\n", __func__);
+        L_WARNING("width < 1; setting to 1\n", procName);
         width = 1;
     }
 
@@ -693,7 +700,7 @@ PTA     *ptad, *ptat, *pta;
     }
 
     if (removedups)
-        ptaRemoveDupsByAset(ptat, &ptad);
+        ptad = ptaRemoveDupsByAset(ptat);
     else
         ptad = ptaClone(ptat);
 
@@ -705,9 +712,9 @@ PTA     *ptad, *ptat, *pta;
 /*!
  * \brief   generatePtaGrid()
  *
- * \param[in]    w, h       of region where grid will be displayed
- * \param[in]    nx, ny     number of rectangles in each direction in grid
- * \param[in]    width      of rendered lines
+ * \param[in]    w, h of region where grid will be displayed
+ * \param[in]    nx, ny  number of rectangles in each direction in grid
+ * \param[in]    width of rendered lines
  * \return  ptad, or NULL on error
  */
 PTA  *
@@ -722,12 +729,14 @@ BOX     *box;
 BOXA    *boxa;
 PTA     *pta;
 
+    PROCNAME("generatePtaGrid");
+
     if (nx < 1 || ny < 1)
-        return (PTA *)ERROR_PTR("nx and ny must be > 0", __func__, NULL);
+        return (PTA *)ERROR_PTR("nx and ny must be > 0", procName, NULL);
     if (w < 2 * nx || h < 2 * ny)
-        return (PTA *)ERROR_PTR("w and/or h too small", __func__, NULL);
+        return (PTA *)ERROR_PTR("w and/or h too small", procName, NULL);
     if (width < 1) {
-        L_WARNING("width < 1; setting to 1\n", __func__);
+        L_WARNING("width < 1; setting to 1\n", procName);
         width = 1;
     }
 
@@ -754,7 +763,7 @@ PTA     *pta;
 /*!
  * \brief   convertPtaLineTo4cc()
  *
- * \param[in]    ptas    8-connected line of points
+ * \param[in]    ptas 8-connected line of points
  * \return  ptad 4-connected line, or NULL on error
  *
  * <pre>
@@ -772,8 +781,10 @@ convertPtaLineTo4cc(PTA  *ptas)
 l_int32  i, n, x, y, xp, yp;
 PTA     *ptad;
 
+    PROCNAME("convertPtaLineTo4cc");
+
     if (!ptas)
-        return (PTA *)ERROR_PTR("ptas not defined", __func__, NULL);
+        return (PTA *)ERROR_PTR("ptas not defined", procName, NULL);
 
     n = ptaGetCount(ptas);
     ptad = ptaCreate(n);
@@ -802,7 +813,7 @@ PTA     *ptad;
  * Notes:
  *      (1) The circle is has diameter = 2 * radius + 1.
  *      (2) It is located with the center of the circle at the
- *          point (%radius, %radius).
+ *          point (radius, radius).
  *      (3) Consequently, it typically must be translated if
  *          it is to represent a set of pixels in an image.
  * </pre>
@@ -814,8 +825,10 @@ l_int32    x, y;
 l_float32  radthresh, sqdist;
 PTA       *pta;
 
+    PROCNAME("generatePtaFilledCircle");
+
     if (radius < 1)
-        return (PTA *)ERROR_PTR("radius must be >= 1", __func__, NULL);
+        return (PTA *)ERROR_PTR("radius must be >= 1", procName, NULL);
 
     pta = ptaCreate(0);
     radthresh = (radius + 0.5) * (radius + 0.5);
@@ -851,8 +864,9 @@ generatePtaFilledSquare(l_int32  side)
 l_int32  x, y;
 PTA     *pta;
 
+    PROCNAME("generatePtaFilledSquare");
     if (side < 1)
-        return (PTA *)ERROR_PTR("side must be > 0", __func__, NULL);
+        return (PTA *)ERROR_PTR("side must be > 0", procName, NULL);
 
     pta = ptaCreate(0);
     for (y = 0; y < side; y++)
@@ -866,14 +880,14 @@ PTA     *pta;
 /*!
  * \brief   generatePtaLineFromPt()
  *
- * \param[in]    x, y      point of origination
- * \param[in]    length    of line, including starting point
- * \param[in]    radang    angle in radians, CW from horizontal
+ * \param[in]    x, y  point of origination
+ * \param[in]    length of line, including starting point
+ * \param[in]    radang angle in radians, CW from horizontal
  * \return  pta, or NULL on error
  *
  * <pre>
  * Notes:
- *      (1) %length of the line is 1 greater than the distance
+ *      (1) The %length of the line is 1 greater than the distance
  *          used in locatePtRadially().  Example: a distance of 1
  *          gives rise to a length of 2.
  * </pre>
@@ -895,14 +909,14 @@ l_int32  x2, y2;  /* the point at the other end of the line */
 /*!
  * \brief   locatePtRadially()
  *
- * \param[in]    xr, yr    reference point
- * \param[in]    radang    angle in radians, CW from horizontal
- * \param[in]    dist      distance of point from reference point along
- *                         line given by the specified angle
- * \param[out]   px, py    location of point
+ * \param[in]    xr, yr  reference point
+ * \param[in]    radang angle in radians, CW from horizontal
+ * \param[in]    dist distance of point from reference point along line
+ *                    given by the specified angle
+ * \param[out]   px, py location of point
  * \return  0 if OK, 1 on error
  */
-l_ok
+l_int32
 locatePtRadially(l_int32     xr,
                  l_int32     yr,
                  l_float64   dist,
@@ -910,8 +924,10 @@ locatePtRadially(l_int32     xr,
                  l_float64  *px,
                  l_float64  *py)
 {
+    PROCNAME("locatePtRadially");
+
     if (!px || !py)
-        return ERROR_INT("&x and &y not both defined", __func__, 1);
+        return ERROR_INT("&x and &y not both defined", procName, 1);
 
     *px = xr + dist * cos(radang);
     *py = yr + dist * sin(radang);
@@ -925,11 +941,11 @@ locatePtRadially(l_int32     xr,
 /*!
  * \brief   pixRenderPlotFromNuma()
  *
- * \param[in,out]  ppix        any type; replaced if not 32 bpp rgb
- * \param[in]      na          to be plotted
- * \param[in]      plotloc     location of plot: L_PLOT_AT_TOP, etc
- * \param[in]      linewidth   width of "line" that is drawn; between 1 and 7
- * \param[in]      max         maximum excursion in pixels from baseline
+ * \param[in,out]  ppix any type; replaced if not 32 bpp rgb
+ * \param[in]      na to be plotted
+ * \param[in]      plotloc location of plot: L_PLOT_AT_TOP, etc
+ * \param[in]      linewidth width of "line" that is drawn; between 1 and 7
+ * \param[in]      max maximum excursion in pixels from baseline
  * \param[in]      color plot color: 0xrrggbb00
  * \return  0 if OK, 1 on error
  *
@@ -942,7 +958,7 @@ locatePtRadially(l_int32     xr,
  *      (3) See makePlotPtaFromNumaGen() for more details.
  * </pre>
  */
-l_ok
+l_int32
 pixRenderPlotFromNuma(PIX     **ppix,
                       NUMA     *na,
                       l_int32   plotloc,
@@ -954,17 +970,19 @@ l_int32  w, h, size, rval, gval, bval;
 PIX     *pix1;
 PTA     *pta;
 
+    PROCNAME("pixRenderPlotFromNuma");
+
     if (!ppix)
-        return ERROR_INT("&pix not defined", __func__, 1);
+        return ERROR_INT("&pix not defined", procName, 1);
     if (*ppix == NULL)
-        return ERROR_INT("pix not defined", __func__, 1);
+        return ERROR_INT("pix not defined", procName, 1);
 
     pixGetDimensions(*ppix, &w, &h, NULL);
     size = (plotloc == L_PLOT_AT_TOP || plotloc == L_PLOT_AT_MID_HORIZ ||
             plotloc == L_PLOT_AT_BOT) ? h : w;
     pta = makePlotPtaFromNuma(na, size, plotloc, linewidth, max);
     if (!pta)
-        return ERROR_INT("pta not made", __func__, 1);
+        return ERROR_INT("pta not made", procName, 1);
 
     if (pixGetDepth(*ppix) != 32) {
         pix1 = pixConvertTo32(*ppix);
@@ -982,11 +1000,10 @@ PTA     *pta;
  * \brief   makePlotPtaFromNuma()
  *
  * \param[in]    na
- * \param[in]    size        pix height for horizontal plot; pix width
- *                           for vertical plot
- * \param[in]    plotloc     location of plot: L_PLOT_AT_TOP, etc
- * \param[in]    linewidth   width of "line" that is drawn; between 1 and 7
- * \param[in]    max         maximum excursion in pixels from baseline
+ * \param[in]    size pix height for horizontal plot; width for vertical plot
+ * \param[in]    plotloc location of plot: L_PLOT_AT_TOP, etc
+ * \param[in]    linewidth width of "line" that is drawn; between 1 and 7
+ * \param[in]    max maximum excursion in pixels from baseline
  * \return  ptad, or NULL on error
  *
  * <pre>
@@ -1008,8 +1025,10 @@ makePlotPtaFromNuma(NUMA    *na,
 {
 l_int32  orient, refpos;
 
+    PROCNAME("makePlotPtaFromNuma");
+
     if (!na)
-        return (PTA *)ERROR_PTR("na not defined", __func__, NULL);
+        return (PTA *)ERROR_PTR("na not defined", procName, NULL);
     if (plotloc == L_PLOT_AT_TOP || plotloc == L_PLOT_AT_MID_HORIZ ||
         plotloc == L_PLOT_AT_BOT) {
         orient = L_HORIZONTAL_LINE;
@@ -1017,7 +1036,7 @@ l_int32  orient, refpos;
                plotloc == L_PLOT_AT_RIGHT) {
         orient = L_VERTICAL_LINE;
     } else {
-        return (PTA *)ERROR_PTR("invalid plotloc", __func__, NULL);
+        return (PTA *)ERROR_PTR("invalid plotloc", procName, NULL);
     }
 
     if (plotloc == L_PLOT_AT_LEFT || plotloc == L_PLOT_AT_TOP)
@@ -1034,15 +1053,14 @@ l_int32  orient, refpos;
 /*!
  * \brief   pixRenderPlotFromNumaGen()
  *
- * \param[in,out]  ppix         any type; replaced if not 32 bpp rgb
- * \param[in]      na           to be plotted
- * \param[in]      orient       L_HORIZONTAL_LINE, L_VERTICAL_LINE
- * \param[in]      linewidth    width of "line" that is drawn; between 1 and 7
- * \param[in]      refpos       reference position: y for horizontal;
- *                              x for vertical
- * \param[in]      max          maximum excursion in pixels from baseline
- * \param[in]      drawref      1 to draw the reference line and its normal
- * \param[in]      color        plot color: 0xrrggbb00
+ * \param[in,out]  ppix any type; replaced if not 32 bpp rgb
+ * \param[in]      na to be plotted
+ * \param[in]      orient L_HORIZONTAL_LINE, L_VERTICAL_LINE
+ * \param[in]      linewidth width of "line" that is drawn; between 1 and 7
+ * \param[in]      refpos reference position: y for horizontal and x for vertical
+ * \param[in]      max maximum excursion in pixels from baseline
+ * \param[in]      drawref 1 to draw the reference line and the normal to it
+ * \param[in]      color plot color: 0xrrggbb00
  * \return  0 if OK, 1 on error
  *
  * <pre>
@@ -1054,7 +1072,7 @@ l_int32  orient, refpos;
  *      (3) See makePlotPtaFromNumaGen() for other input parameters.
  * </pre>
  */
-l_ok
+l_int32
 pixRenderPlotFromNumaGen(PIX     **ppix,
                          NUMA     *na,
                          l_int32   orient,
@@ -1068,14 +1086,16 @@ l_int32  rval, gval, bval;
 PIX     *pix1;
 PTA     *pta;
 
+    PROCNAME("pixRenderPlotFromNumaGen");
+
     if (!ppix)
-        return ERROR_INT("&pix not defined", __func__, 1);
+        return ERROR_INT("&pix not defined", procName, 1);
     if (*ppix == NULL)
-        return ERROR_INT("pix not defined", __func__, 1);
+        return ERROR_INT("pix not defined", procName, 1);
 
     pta = makePlotPtaFromNumaGen(na, orient, linewidth, refpos, max, drawref);
     if (!pta)
-        return ERROR_INT("pta not made", __func__, 1);
+        return ERROR_INT("pta not made", procName, 1);
 
     if (pixGetDepth(*ppix) != 32) {
         pix1 = pixConvertTo32(*ppix);
@@ -1093,12 +1113,11 @@ PTA     *pta;
  * \brief   makePlotPtaFromNumaGen()
  *
  * \param[in]    na
- * \param[in]    orient       L_HORIZONTAL_LINE, L_VERTICAL_LINE
- * \param[in]    linewidth    width of "line" that is drawn; between 1 and 7
- * \param[in]    refpos       reference position: y for horizontal;
- *                            x for vertical
- * \param[in]    max          maximum excursion in pixels from baseline
- * \param[in]    drawref      1 to draw the reference line and its normal
+ * \param[in]    orient L_HORIZONTAL_LINE, L_VERTICAL_LINE
+ * \param[in]    linewidth width of "line" that is drawn; between 1 and 7
+ * \param[in]    refpos reference position: y for horizontal and x for vertical
+ * \param[in]    max maximum excursion in pixels from baseline
+ * \param[in]    drawref 1 to draw the reference line and the normal to it
  * \return  ptad, or NULL on error
  *
  * <pre>
@@ -1130,16 +1149,18 @@ l_int32    i, n, maxw, maxh;
 l_float32  minval, maxval, absval, val, scale, start, del;
 PTA       *pta1, *pta2, *ptad;
 
+    PROCNAME("makePlotPtaFromNumaGen");
+
     if (!na)
-        return (PTA *)ERROR_PTR("na not defined", __func__, NULL);
+        return (PTA *)ERROR_PTR("na not defined", procName, NULL);
     if (orient != L_HORIZONTAL_LINE && orient != L_VERTICAL_LINE)
-        return (PTA *)ERROR_PTR("invalid orient", __func__, NULL);
+        return (PTA *)ERROR_PTR("invalid orient", procName, NULL);
     if (linewidth < 1) {
-        L_WARNING("linewidth < 1; setting to 1\n", __func__);
+        L_WARNING("linewidth < 1; setting to 1\n", procName);
         linewidth = 1;
     }
     if (linewidth > 7) {
-        L_WARNING("linewidth > 7; setting to 7\n", __func__);
+        L_WARNING("linewidth > 7; setting to 7\n", procName);
         linewidth = 7;
     }
 
@@ -1152,7 +1173,6 @@ PTA       *pta1, *pta2, *ptad;
 
         /* Generate the plot points */
     pta1 = ptaCreate(n);
-    maxw = maxh = 0;       
     for (i = 0; i < n; i++) {
         numaGetFValue(na, i, &val);
         if (orient == L_HORIZONTAL_LINE) {
@@ -1212,9 +1232,9 @@ PTA       *pta1, *pta2, *ptad;
 /*!
  * \brief   pixRenderPta()
  *
- * \param[in]    pix   any depth, not cmapped
- * \param[in]    pta   arbitrary set of points
- * \param[in]    op    one of L_SET_PIXELS, L_CLEAR_PIXELS, L_FLIP_PIXELS
+ * \param[in]    pix  any depth, not cmapped
+ * \param[in]    pta  arbitrary set of points
+ * \param[in]    op   one of L_SET_PIXELS, L_CLEAR_PIXELS, L_FLIP_PIXELS
  * \return  0 if OK, 1 on error
  *
  * <pre>
@@ -1229,21 +1249,23 @@ PTA       *pta1, *pta2, *ptad;
  *          pixRenderBox() and pixRenderBoxa(), that call pixRenderPta().
  * </pre>
  */
-l_ok
+l_int32
 pixRenderPta(PIX     *pix,
              PTA     *pta,
              l_int32  op)
 {
 l_int32  i, n, x, y, w, h, d, maxval;
 
+    PROCNAME("pixRenderPta");
+
     if (!pix)
-        return ERROR_INT("pix not defined", __func__, 1);
+        return ERROR_INT("pix not defined", procName, 1);
     if (pixGetColormap(pix))
-        return ERROR_INT("pix is colormapped", __func__, 1);
+        return ERROR_INT("pix is colormapped", procName, 1);
     if (!pta)
-        return ERROR_INT("pta not defined", __func__, 1);
+        return ERROR_INT("pta not defined", procName, 1);
     if (op != L_SET_PIXELS && op != L_CLEAR_PIXELS && op != L_FLIP_PIXELS)
-        return ERROR_INT("invalid op", __func__, 1);
+        return ERROR_INT("invalid op", procName, 1);
 
     pixGetDimensions(pix, &w, &h, &d);
     maxval = 1;
@@ -1298,14 +1320,14 @@ l_int32  i, n, x, y, w, h, d, maxval;
 /*!
  * \brief   pixRenderPtaArb()
  *
- * \param[in]    pix      any depth, cmapped ok
- * \param[in]    pta      arbitrary set of points
+ * \param[in]    pix any depth, cmapped ok
+ * \param[in]    pta arbitrary set of points
  * \param[in]    rval, gval, bval
  * \return  0 if OK, 1 on error
  *
  * <pre>
  * Notes:
- *      (1) If %pix is colormapped, render this color (or the nearest
+ *      (1) If pix is colormapped, render this color (or the nearest
  *          color if the cmap is full) on each pixel.
  *      (2) The rgb components have the standard dynamic range [0 ... 255]
  *      (3) If pix is not colormapped, do the best job you can using
@@ -1313,10 +1335,10 @@ l_int32  i, n, x, y, w, h, d, maxval;
  *          ~ d = 1: set the pixels
  *          ~ d = 2, 4, 8: average the input rgb value
  *          ~ d = 32: use the input rgb value
- *      (4) This function clips the rendering to %pix.
+ *      (4) This function clips the rendering to the pix.
  * </pre>
  */
-l_ok
+l_int32
 pixRenderPtaArb(PIX     *pix,
                 PTA     *pta,
                 l_uint8  rval,
@@ -1328,13 +1350,15 @@ l_uint8   val;
 l_uint32  val32;
 PIXCMAP  *cmap;
 
+    PROCNAME("pixRenderPtaArb");
+
     if (!pix)
-        return ERROR_INT("pix not defined", __func__, 1);
+        return ERROR_INT("pix not defined", procName, 1);
     if (!pta)
-        return ERROR_INT("pta not defined", __func__, 1);
+        return ERROR_INT("pta not defined", procName, 1);
     d = pixGetDepth(pix);
     if (d != 1 && d != 2 && d != 4 && d != 8 && d != 32)
-        return ERROR_INT("depth not in {1,2,4,8,32}", __func__, 1);
+        return ERROR_INT("depth not in {1,2,4,8,32}", procName, 1);
 
     if (d == 1) {
         pixRenderPta(pix, pta, L_SET_PIXELS);
@@ -1378,18 +1402,17 @@ PIXCMAP  *cmap;
 /*!
  * \brief   pixRenderPtaBlend()
  *
- * \param[in]    pix      32 bpp rgb
- * \param[in]    pta      arbitrary set of points
+ * \param[in]    pix  32 bpp rgb
+ * \param[in]    pta  arbitrary set of points
  * \param[in]    rval, gval, bval
- * \param[in]    fract
  * \return  0 if OK, 1 on error
  *
  * <pre>
  * Notes:
- *      (1) This function clips the rendering to %pix.
+ *      (1) This function clips the rendering to the pix.
  * </pre>
  */
-l_ok
+l_int32
 pixRenderPtaBlend(PIX     *pix,
                   PTA     *pta,
                   l_uint8  rval,
@@ -1402,14 +1425,16 @@ l_uint8    nrval, ngval, nbval;
 l_uint32   val32;
 l_float32  frval, fgval, fbval;
 
+    PROCNAME("pixRenderPtaBlend");
+
     if (!pix)
-        return ERROR_INT("pix not defined", __func__, 1);
+        return ERROR_INT("pix not defined", procName, 1);
     if (!pta)
-        return ERROR_INT("pta not defined", __func__, 1);
+        return ERROR_INT("pta not defined", procName, 1);
     if (pixGetDepth(pix) != 32)
-        return ERROR_INT("depth not 32 bpp", __func__, 1);
+        return ERROR_INT("depth not 32 bpp", procName, 1);
     if (fract < 0.0 || fract > 1.0) {
-        L_WARNING("fract must be in [0.0, 1.0]; setting to 0.5\n", __func__);
+        L_WARNING("fract must be in [0.0, 1.0]; setting to 0.5\n", procName);
         fract = 0.5;
     }
 
@@ -1445,14 +1470,14 @@ l_float32  frval, fgval, fbval;
 /*!
  * \brief   pixRenderLine()
  *
- * \param[in]    pix      any depth, not cmapped
+ * \param[in]    pix  any depth, not cmapped
  * \param[in]    x1, y1
  * \param[in]    x2, y2
- * \param[in]    width    thickness of line
- * \param[in]    op       one of L_SET_PIXELS, L_CLEAR_PIXELS, L_FLIP_PIXELS
+ * \param[in]    width  thickness of line
+ * \param[in]    op  one of L_SET_PIXELS, L_CLEAR_PIXELS, L_FLIP_PIXELS
  * \return  0 if OK, 1 on error
  */
-l_ok
+l_int32
 pixRenderLine(PIX     *pix,
               l_int32  x1,
               l_int32  y1,
@@ -1463,17 +1488,19 @@ pixRenderLine(PIX     *pix,
 {
 PTA  *pta;
 
+    PROCNAME("pixRenderLine");
+
     if (!pix)
-        return ERROR_INT("pix not defined", __func__, 1);
+        return ERROR_INT("pix not defined", procName, 1);
     if (width < 1) {
-        L_WARNING("width must be > 0; setting to 1\n", __func__);
+        L_WARNING("width must be > 0; setting to 1\n", procName);
         width = 1;
     }
     if (op != L_SET_PIXELS && op != L_CLEAR_PIXELS && op != L_FLIP_PIXELS)
-        return ERROR_INT("invalid op", __func__, 1);
+        return ERROR_INT("invalid op", procName, 1);
 
     if ((pta = generatePtaWideLine(x1, y1, x2, y2, width)) == NULL)
-        return ERROR_INT("pta not made", __func__, 1);
+        return ERROR_INT("pta not made", procName, 1);
     pixRenderPta(pix, pta, op);
     ptaDestroy(&pta);
     return 0;
@@ -1483,14 +1510,14 @@ PTA  *pta;
 /*!
  * \brief   pixRenderLineArb()
  *
- * \param[in]    pix       any depth, cmapped ok
+ * \param[in]    pix   any depth, cmapped ok
  * \param[in]    x1, y1
  * \param[in]    x2, y2
- * \param[in]    width     thickness of line
+ * \param[in]    width  thickness of line
  * \param[in]    rval, gval, bval
  * \return  0 if OK, 1 on error
  */
-l_ok
+l_int32
 pixRenderLineArb(PIX     *pix,
                  l_int32  x1,
                  l_int32  y1,
@@ -1503,15 +1530,17 @@ pixRenderLineArb(PIX     *pix,
 {
 PTA  *pta;
 
+    PROCNAME("pixRenderLineArb");
+
     if (!pix)
-        return ERROR_INT("pix not defined", __func__, 1);
+        return ERROR_INT("pix not defined", procName, 1);
     if (width < 1) {
-        L_WARNING("width must be > 0; setting to 1\n", __func__);
+        L_WARNING("width must be > 0; setting to 1\n", procName);
         width = 1;
     }
 
     if ((pta = generatePtaWideLine(x1, y1, x2, y2, width)) == NULL)
-        return ERROR_INT("pta not made", __func__, 1);
+        return ERROR_INT("pta not made", procName, 1);
     pixRenderPtaArb(pix, pta, rval, gval, bval);
     ptaDestroy(&pta);
     return 0;
@@ -1521,15 +1550,15 @@ PTA  *pta;
 /*!
  * \brief   pixRenderLineBlend()
  *
- * \param[in]    pix      32 bpp rgb
+ * \param[in]    pix  32 bpp rgb
  * \param[in]    x1, y1
  * \param[in]    x2, y2
- * \param[in]    width    thickness of line
+ * \param[in]    width  thickness of line
  * \param[in]    rval, gval, bval
  * \param[in]    fract
  * \return  0 if OK, 1 on error
  */
-l_ok
+l_int32
 pixRenderLineBlend(PIX       *pix,
                    l_int32    x1,
                    l_int32    y1,
@@ -1543,15 +1572,17 @@ pixRenderLineBlend(PIX       *pix,
 {
 PTA  *pta;
 
+    PROCNAME("pixRenderLineBlend");
+
     if (!pix)
-        return ERROR_INT("pix not defined", __func__, 1);
+        return ERROR_INT("pix not defined", procName, 1);
     if (width < 1) {
-        L_WARNING("width must be > 0; setting to 1\n", __func__);
+        L_WARNING("width must be > 0; setting to 1\n", procName);
         width = 1;
     }
 
     if ((pta = generatePtaWideLine(x1, y1, x2, y2, width)) == NULL)
-        return ERROR_INT("pta not made", __func__, 1);
+        return ERROR_INT("pta not made", procName, 1);
     pixRenderPtaBlend(pix, pta, rval, gval, bval, fract);
     ptaDestroy(&pta);
     return 0;
@@ -1561,13 +1592,13 @@ PTA  *pta;
 /*!
  * \brief   pixRenderBox()
  *
- * \param[in]    pix     any depth, not cmapped
+ * \param[in]    pix  any depth, not cmapped
  * \param[in]    box
- * \param[in]    width   thickness of box lines
- * \param[in]    op      one of L_SET_PIXELS, L_CLEAR_PIXELS, L_FLIP_PIXELS
+ * \param[in]    width  thickness of box lines
+ * \param[in]    op  one of L_SET_PIXELS, L_CLEAR_PIXELS, L_FLIP_PIXELS
  * \return  0 if OK, 1 on error
  */
-l_ok
+l_int32
 pixRenderBox(PIX     *pix,
              BOX     *box,
              l_int32  width,
@@ -1575,19 +1606,21 @@ pixRenderBox(PIX     *pix,
 {
 PTA  *pta;
 
+    PROCNAME("pixRenderBox");
+
     if (!pix)
-        return ERROR_INT("pix not defined", __func__, 1);
+        return ERROR_INT("pix not defined", procName, 1);
     if (!box)
-        return ERROR_INT("box not defined", __func__, 1);
+        return ERROR_INT("box not defined", procName, 1);
     if (width < 1) {
-        L_WARNING("width < 1; setting to 1\n", __func__);
+        L_WARNING("width < 1; setting to 1\n", procName);
         width = 1;
     }
     if (op != L_SET_PIXELS && op != L_CLEAR_PIXELS && op != L_FLIP_PIXELS)
-        return ERROR_INT("invalid op", __func__, 1);
+        return ERROR_INT("invalid op", procName, 1);
 
     if ((pta = generatePtaBox(box, width)) == NULL)
-        return ERROR_INT("pta not made", __func__, 1);
+        return ERROR_INT("pta not made", procName, 1);
     pixRenderPta(pix, pta, op);
     ptaDestroy(&pta);
     return 0;
@@ -1597,13 +1630,13 @@ PTA  *pta;
 /*!
  * \brief   pixRenderBoxArb()
  *
- * \param[in]    pix       any depth, cmapped ok
+ * \param[in]    pix any depth, cmapped ok
  * \param[in]    box
- * \param[in]    width     thickness of box lines
+ * \param[in]    width  thickness of box lines
  * \param[in]    rval, gval, bval
  * \return  0 if OK, 1 on error
  */
-l_ok
+l_int32
 pixRenderBoxArb(PIX     *pix,
                 BOX     *box,
                 l_int32  width,
@@ -1613,17 +1646,19 @@ pixRenderBoxArb(PIX     *pix,
 {
 PTA  *pta;
 
+    PROCNAME("pixRenderBoxArb");
+
     if (!pix)
-        return ERROR_INT("pix not defined", __func__, 1);
+        return ERROR_INT("pix not defined", procName, 1);
     if (!box)
-        return ERROR_INT("box not defined", __func__, 1);
+        return ERROR_INT("box not defined", procName, 1);
     if (width < 1) {
-        L_WARNING("width < 1; setting to 1\n", __func__);
+        L_WARNING("width < 1; setting to 1\n", procName);
         width = 1;
     }
 
     if ((pta = generatePtaBox(box, width)) == NULL)
-        return ERROR_INT("pta not made", __func__, 1);
+        return ERROR_INT("pta not made", procName, 1);
     pixRenderPtaArb(pix, pta, rval, gval, bval);
     ptaDestroy(&pta);
     return 0;
@@ -1633,15 +1668,15 @@ PTA  *pta;
 /*!
  * \brief   pixRenderBoxBlend()
  *
- * \param[in]    pix       32 bpp rgb
+ * \param[in]    pix  32 bpp rgb
  * \param[in]    box
- * \param[in]    width     thickness of box lines
+ * \param[in]    width  thickness of box lines
  * \param[in]    rval, gval, bval
- * \param[in]    fract     in [0.0 - 1.0]: 1.0 is no transparency;
- *                         0.0 is complete transparency (no effect)
+ * \param[in]    fract in [0.0 - 1.0]; complete transparency (no effect
+ *                      if 0.0; no transparency if 1.0)
  * \return  0 if OK, 1 on error
  */
-l_ok
+l_int32
 pixRenderBoxBlend(PIX       *pix,
                   BOX       *box,
                   l_int32    width,
@@ -1652,17 +1687,19 @@ pixRenderBoxBlend(PIX       *pix,
 {
 PTA  *pta;
 
+    PROCNAME("pixRenderBoxBlend");
+
     if (!pix)
-        return ERROR_INT("pix not defined", __func__, 1);
+        return ERROR_INT("pix not defined", procName, 1);
     if (!box)
-        return ERROR_INT("box not defined", __func__, 1);
+        return ERROR_INT("box not defined", procName, 1);
     if (width < 1) {
-        L_WARNING("width < 1; setting to 1\n", __func__);
+        L_WARNING("width < 1; setting to 1\n", procName);
         width = 1;
     }
 
     if ((pta = generatePtaBox(box, width)) == NULL)
-        return ERROR_INT("pta not made", __func__, 1);
+        return ERROR_INT("pta not made", procName, 1);
     pixRenderPtaBlend(pix, pta, rval, gval, bval, fract);
     ptaDestroy(&pta);
     return 0;
@@ -1672,13 +1709,13 @@ PTA  *pta;
 /*!
  * \brief   pixRenderBoxa()
  *
- * \param[in]    pix      any depth, not cmapped
+ * \param[in]    pix  any depth, not cmapped
  * \param[in]    boxa
- * \param[in]    width    thickness of line
- * \param[in]    op       one of L_SET_PIXELS, L_CLEAR_PIXELS, L_FLIP_PIXELS
+ * \param[in]    width  thickness of line
+ * \param[in]    op  one of L_SET_PIXELS, L_CLEAR_PIXELS, L_FLIP_PIXELS
  * \return  0 if OK, 1 on error
  */
-l_ok
+l_int32
 pixRenderBoxa(PIX     *pix,
               BOXA    *boxa,
               l_int32  width,
@@ -1686,19 +1723,21 @@ pixRenderBoxa(PIX     *pix,
 {
 PTA  *pta;
 
+    PROCNAME("pixRenderBoxa");
+
     if (!pix)
-        return ERROR_INT("pix not defined", __func__, 1);
+        return ERROR_INT("pix not defined", procName, 1);
     if (!boxa)
-        return ERROR_INT("boxa not defined", __func__, 1);
+        return ERROR_INT("boxa not defined", procName, 1);
     if (width < 1) {
-        L_WARNING("width < 1; setting to 1\n", __func__);
+        L_WARNING("width < 1; setting to 1\n", procName);
         width = 1;
     }
     if (op != L_SET_PIXELS && op != L_CLEAR_PIXELS && op != L_FLIP_PIXELS)
-        return ERROR_INT("invalid op", __func__, 1);
+        return ERROR_INT("invalid op", procName, 1);
 
     if ((pta = generatePtaBoxa(boxa, width, 0)) == NULL)
-        return ERROR_INT("pta not made", __func__, 1);
+        return ERROR_INT("pta not made", procName, 1);
     pixRenderPta(pix, pta, op);
     ptaDestroy(&pta);
     return 0;
@@ -1708,13 +1747,13 @@ PTA  *pta;
 /*!
  * \brief   pixRenderBoxaArb()
  *
- * \param[in]    pix       any depth; colormapped is ok
+ * \param[in]    pix  any depth; colormapped is ok
  * \param[in]    boxa
- * \param[in]    width     thickness of line
+ * \param[in]    width  thickness of line
  * \param[in]    rval, gval, bval
  * \return  0 if OK, 1 on error
  */
-l_ok
+l_int32
 pixRenderBoxaArb(PIX     *pix,
                  BOXA    *boxa,
                  l_int32  width,
@@ -1724,17 +1763,19 @@ pixRenderBoxaArb(PIX     *pix,
 {
 PTA  *pta;
 
+    PROCNAME("pixRenderBoxaArb");
+
     if (!pix)
-        return ERROR_INT("pix not defined", __func__, 1);
+        return ERROR_INT("pix not defined", procName, 1);
     if (!boxa)
-        return ERROR_INT("boxa not defined", __func__, 1);
+        return ERROR_INT("boxa not defined", procName, 1);
     if (width < 1) {
-        L_WARNING("width < 1; setting to 1\n", __func__);
+        L_WARNING("width < 1; setting to 1\n", procName);
         width = 1;
     }
 
     if ((pta = generatePtaBoxa(boxa, width, 0)) == NULL)
-        return ERROR_INT("pta not made", __func__, 1);
+        return ERROR_INT("pta not made", procName, 1);
     pixRenderPtaArb(pix, pta, rval, gval, bval);
     ptaDestroy(&pta);
     return 0;
@@ -1744,16 +1785,16 @@ PTA  *pta;
 /*!
  * \brief   pixRenderBoxaBlend()
  *
- * \param[in]    pix          32 bpp rgb
+ * \param[in]    pix  32 bpp rgb
  * \param[in]    boxa
- * \param[in]    width        thickness of line
+ * \param[in]    width  thickness of line
  * \param[in]    rval, gval, bval
- * \param[in]    fract        in [0.0 - 1.0]: 1.0 is no transparency;
- *                            0.0 is complete transparency (no effect)
- * \param[in]    removedups   1 to remove; 0 otherwise
+ * \param[in]    fract in [0.0 - 1.0]; complete transparency (no effect
+ *                      if 0.0; no transparency if 1.0)
+ * \param[in]    removedups  1 to remove; 0 otherwise
  * \return  0 if OK, 1 on error
  */
-l_ok
+l_int32
 pixRenderBoxaBlend(PIX       *pix,
                    BOXA      *boxa,
                    l_int32    width,
@@ -1765,17 +1806,19 @@ pixRenderBoxaBlend(PIX       *pix,
 {
 PTA  *pta;
 
+    PROCNAME("pixRenderBoxaBlend");
+
     if (!pix)
-        return ERROR_INT("pix not defined", __func__, 1);
+        return ERROR_INT("pix not defined", procName, 1);
     if (!boxa)
-        return ERROR_INT("boxa not defined", __func__, 1);
+        return ERROR_INT("boxa not defined", procName, 1);
     if (width < 1) {
-        L_WARNING("width < 1; setting to 1\n", __func__);
+        L_WARNING("width < 1; setting to 1\n", procName);
         width = 1;
     }
 
     if ((pta = generatePtaBoxa(boxa, width, removedups)) == NULL)
-        return ERROR_INT("pta not made", __func__, 1);
+        return ERROR_INT("pta not made", procName, 1);
     pixRenderPtaBlend(pix, pta, rval, gval, bval, fract);
     ptaDestroy(&pta);
     return 0;
@@ -1785,16 +1828,16 @@ PTA  *pta;
 /*!
  * \brief   pixRenderHashBox()
  *
- * \param[in]    pix       any depth, not cmapped
+ * \param[in]    pix  any depth, not cmapped
  * \param[in]    box
- * \param[in]    spacing    spacing between lines; must be > 1
- * \param[in]    width      thickness of box and hash lines
- * \param[in]    orient     orientation of lines: L_HORIZONTAL_LINE, ...
- * \param[in]    outline    0 to skip drawing box outline
- * \param[in]    op         one of L_SET_PIXELS, L_CLEAR_PIXELS, L_FLIP_PIXELS
+ * \param[in]    spacing spacing between lines; must be > 1
+ * \param[in]    width  thickness of box and hash lines
+ * \param[in]    orient  orientation of lines: L_HORIZONTAL_LINE, ...
+ * \param[in]    outline  0 to skip drawing box outline
+ * \param[in]    op  one of L_SET_PIXELS, L_CLEAR_PIXELS, L_FLIP_PIXELS
  * \return  0 if OK, 1 on error
  */
-l_ok
+l_int32
 pixRenderHashBox(PIX     *pix,
                  BOX     *box,
                  l_int32  spacing,
@@ -1805,25 +1848,27 @@ pixRenderHashBox(PIX     *pix,
 {
 PTA  *pta;
 
+    PROCNAME("pixRenderHashBox");
+
     if (!pix)
-        return ERROR_INT("pix not defined", __func__, 1);
+        return ERROR_INT("pix not defined", procName, 1);
     if (!box)
-        return ERROR_INT("box not defined", __func__, 1);
+        return ERROR_INT("box not defined", procName, 1);
     if (spacing <= 1)
-        return ERROR_INT("spacing not > 1", __func__, 1);
+        return ERROR_INT("spacing not > 1", procName, 1);
     if (width < 1) {
-        L_WARNING("width < 1; setting to 1\n", __func__);
+        L_WARNING("width < 1; setting to 1\n", procName);
         width = 1;
     }
     if (orient != L_HORIZONTAL_LINE && orient != L_POS_SLOPE_LINE &&
         orient != L_VERTICAL_LINE && orient != L_NEG_SLOPE_LINE)
-        return ERROR_INT("invalid line orientation", __func__, 1);
+        return ERROR_INT("invalid line orientation", procName, 1);
     if (op != L_SET_PIXELS && op != L_CLEAR_PIXELS && op != L_FLIP_PIXELS)
-        return ERROR_INT("invalid op", __func__, 1);
+        return ERROR_INT("invalid op", procName, 1);
 
     pta = generatePtaHashBox(box, spacing, width, orient, outline);
     if (!pta)
-        return ERROR_INT("pta not made", __func__, 1);
+        return ERROR_INT("pta not made", procName, 1);
     pixRenderPta(pix, pta, op);
     ptaDestroy(&pta);
     return 0;
@@ -1833,16 +1878,16 @@ PTA  *pta;
 /*!
  * \brief   pixRenderHashBoxArb()
  *
- * \param[in]    pix         any depth; cmapped ok
+ * \param[in]    pix  any depth; cmapped ok
  * \param[in]    box
- * \param[in]    spacing     spacing between lines; must be > 1
- * \param[in]    width       thickness of box and hash lines
- * \param[in]    orient      orientation of lines: L_HORIZONTAL_LINE, ...
- * \param[in]    outline     0 to skip drawing box outline
+ * \param[in]    spacing spacing between lines; must be > 1
+ * \param[in]    width  thickness of box and hash lines
+ * \param[in]    orient  orientation of lines: L_HORIZONTAL_LINE, ...
+ * \param[in]    outline  0 to skip drawing box outline
  * \param[in]    rval, gval, bval
  * \return  0 if OK, 1 on error
  */
-l_ok
+l_int32
 pixRenderHashBoxArb(PIX     *pix,
                     BOX     *box,
                     l_int32  spacing,
@@ -1855,23 +1900,25 @@ pixRenderHashBoxArb(PIX     *pix,
 {
 PTA  *pta;
 
+    PROCNAME("pixRenderHashBoxArb");
+
     if (!pix)
-        return ERROR_INT("pix not defined", __func__, 1);
+        return ERROR_INT("pix not defined", procName, 1);
     if (!box)
-        return ERROR_INT("box not defined", __func__, 1);
+        return ERROR_INT("box not defined", procName, 1);
     if (spacing <= 1)
-        return ERROR_INT("spacing not > 1", __func__, 1);
+        return ERROR_INT("spacing not > 1", procName, 1);
     if (width < 1) {
-        L_WARNING("width < 1; setting to 1\n", __func__);
+        L_WARNING("width < 1; setting to 1\n", procName);
         width = 1;
     }
     if (orient != L_HORIZONTAL_LINE && orient != L_POS_SLOPE_LINE &&
         orient != L_VERTICAL_LINE && orient != L_NEG_SLOPE_LINE)
-        return ERROR_INT("invalid line orientation", __func__, 1);
+        return ERROR_INT("invalid line orientation", procName, 1);
 
     pta = generatePtaHashBox(box, spacing, width, orient, outline);
     if (!pta)
-        return ERROR_INT("pta not made", __func__, 1);
+        return ERROR_INT("pta not made", procName, 1);
     pixRenderPtaArb(pix, pta, rval, gval, bval);
     ptaDestroy(&pta);
     return 0;
@@ -1881,18 +1928,18 @@ PTA  *pta;
 /*!
  * \brief   pixRenderHashBoxBlend()
  *
- * \param[in]    pix        32 bpp
+ * \param[in]    pix   32 bpp
  * \param[in]    box
- * \param[in]    spacing    spacing between lines; must be > 1
- * \param[in]    width      thickness of box and hash lines
- * \param[in]    orient     orientation of lines: L_HORIZONTAL_LINE, ...
- * \param[in]    outline    0 to skip drawing box outline
+ * \param[in]    spacing spacing between lines; must be > 1
+ * \param[in]    width  thickness of box and hash lines
+ * \param[in]    orient  orientation of lines: L_HORIZONTAL_LINE, ...
+ * \param[in]    outline  0 to skip drawing box outline
  * \param[in]    rval, gval, bval
- * \param[in]    fract      in [0.0 - 1.0]: 1.0 is no transparency;
- *                          0.0 is complete transparency (no effect)
+ * \param[in]    fract in [0.0 - 1.0]; complete transparency (no effect
+ *                      if 0.0; no transparency if 1.0)
  * \return  0 if OK, 1 on error
  */
-l_ok
+l_int32
 pixRenderHashBoxBlend(PIX       *pix,
                       BOX       *box,
                       l_int32    spacing,
@@ -1906,23 +1953,25 @@ pixRenderHashBoxBlend(PIX       *pix,
 {
 PTA  *pta;
 
+    PROCNAME("pixRenderHashBoxBlend");
+
     if (!pix)
-        return ERROR_INT("pix not defined", __func__, 1);
+        return ERROR_INT("pix not defined", procName, 1);
     if (!box)
-        return ERROR_INT("box not defined", __func__, 1);
+        return ERROR_INT("box not defined", procName, 1);
     if (spacing <= 1)
-        return ERROR_INT("spacing not > 1", __func__, 1);
+        return ERROR_INT("spacing not > 1", procName, 1);
     if (width < 1) {
-        L_WARNING("width < 1; setting to 1\n", __func__);
+        L_WARNING("width < 1; setting to 1\n", procName);
         width = 1;
     }
     if (orient != L_HORIZONTAL_LINE && orient != L_POS_SLOPE_LINE &&
         orient != L_VERTICAL_LINE && orient != L_NEG_SLOPE_LINE)
-        return ERROR_INT("invalid line orientation", __func__, 1);
+        return ERROR_INT("invalid line orientation", procName, 1);
 
     pta = generatePtaHashBox(box, spacing, width, orient, outline);
     if (!pta)
-        return ERROR_INT("pta not made", __func__, 1);
+        return ERROR_INT("pta not made", procName, 1);
     pixRenderPtaBlend(pix, pta, rval, gval, bval, fract);
     ptaDestroy(&pta);
     return 0;
@@ -1932,15 +1981,13 @@ PTA  *pta;
 /*!
  * \brief   pixRenderHashMaskArb()
  *
- * \param[in]    pix       any depth; cmapped ok
- * \param[in]    pixm      1 bpp clipping mask for hash marks
- * \param[in]    x,y       UL corner of %pixm with respect to %pix
- * \param[in]    spacing   spacing between lines; must be > 1
- * \param[in]    width     thickness of box and hash lines
- * \param[in]    orient    orientation of lines: L_HORIZONTAL_LINE,
- *                            L_POS_SLOPE_LINE, L_VERTICAL_LINE,
- *                            L_NEG_SLOPE_LINE
- * \param[in]    outline   0 to skip drawing box outline
+ * \param[in]    pix  any depth; cmapped ok
+ * \param[in]    pixm  1 bpp clipping mask for hash marks
+ * \param[in]    x,y   UL corner of %pixm with respect to %pix
+ * \param[in]    spacing spacing between lines; must be > 1
+ * \param[in]    width  thickness of box and hash lines
+ * \param[in]    orient  orientation of lines: L_HORIZONTAL_LINE, ...
+ * \param[in]    outline  0 to skip drawing box outline
  * \param[in]    rval, gval, bval
  * \return  0 if OK, 1 on error
  * <pre>
@@ -1950,7 +1997,7 @@ PTA  *pta;
  *          translated by (%x,%y) relative to the origin of %pix.
  * </pre>
  */
-l_ok
+l_int32
 pixRenderHashMaskArb(PIX     *pix,
                      PIX     *pixm,
                      l_int32  x,
@@ -1968,19 +2015,21 @@ BOX     *box1, *box2;
 PIX     *pix1;
 PTA     *pta1, *pta2;
 
+    PROCNAME("pixRenderHashMaskArb");
+
     if (!pix)
-        return ERROR_INT("pix not defined", __func__, 1);
+        return ERROR_INT("pix not defined", procName, 1);
     if (!pixm || pixGetDepth(pixm) != 1)
-        return ERROR_INT("pixm not defined or not 1 bpp", __func__, 1);
+        return ERROR_INT("pixm not defined or not 1 bpp", procName, 1);
     if (spacing <= 1)
-        return ERROR_INT("spacing not > 1", __func__, 1);
+        return ERROR_INT("spacing not > 1", procName, 1);
     if (width < 1) {
-        L_WARNING("width < 1; setting to 1\n", __func__);
+        L_WARNING("width < 1; setting to 1\n", procName);
         width = 1;
     }
     if (orient != L_HORIZONTAL_LINE && orient != L_POS_SLOPE_LINE &&
         orient != L_VERTICAL_LINE && orient != L_NEG_SLOPE_LINE)
-        return ERROR_INT("invalid line orientation", __func__, 1);
+        return ERROR_INT("invalid line orientation", procName, 1);
 
         /* Get the points for masked hash lines */
     pixGetDimensions(pixm, &w, &h, NULL);
@@ -2007,18 +2056,16 @@ PTA     *pta1, *pta2;
 /*!
  * \brief   pixRenderHashBoxa()
  *
- * \param[in]    pix       any depth, not cmapped
+ * \param[in]    pix  any depth, not cmapped
  * \param[in]    boxa
- * \param[in]    spacing   spacing between lines; must be > 1
- * \param[in]    width     thickness of box and hash lines
- * \param[in]    orient    orientation of lines: L_HORIZONTAL_LINE,
- *                            L_POS_SLOPE_LINE, L_VERTICAL_LINE,
- *                            L_NEG_SLOPE_LINE
- * \param[in]    outline   0 to skip drawing box outline
- * \param[in]    op        one of L_SET_PIXELS, L_CLEAR_PIXELS, L_FLIP_PIXELS
+ * \param[in]    spacing spacing between lines; must be > 1
+ * \param[in]    width  thickness of box and hash lines
+ * \param[in]    orient  orientation of lines: L_HORIZONTAL_LINE, ...
+ * \param[in]    outline  0 to skip drawing box outline
+ * \param[in]    op  one of L_SET_PIXELS, L_CLEAR_PIXELS, L_FLIP_PIXELS
  * \return  0 if OK, 1 on error
  */
-l_ok
+l_int32
 pixRenderHashBoxa(PIX     *pix,
                   BOXA    *boxa,
                   l_int32  spacing,
@@ -2029,25 +2076,27 @@ pixRenderHashBoxa(PIX     *pix,
  {
 PTA  *pta;
 
+    PROCNAME("pixRenderHashBoxa");
+
     if (!pix)
-        return ERROR_INT("pix not defined", __func__, 1);
+        return ERROR_INT("pix not defined", procName, 1);
     if (!boxa)
-        return ERROR_INT("boxa not defined", __func__, 1);
+        return ERROR_INT("boxa not defined", procName, 1);
     if (spacing <= 1)
-        return ERROR_INT("spacing not > 1", __func__, 1);
+        return ERROR_INT("spacing not > 1", procName, 1);
     if (width < 1) {
-        L_WARNING("width < 1; setting to 1\n", __func__);
+        L_WARNING("width < 1; setting to 1\n", procName);
         width = 1;
     }
     if (orient != L_HORIZONTAL_LINE && orient != L_POS_SLOPE_LINE &&
         orient != L_VERTICAL_LINE && orient != L_NEG_SLOPE_LINE)
-        return ERROR_INT("invalid line orientation", __func__, 1);
+        return ERROR_INT("invalid line orientation", procName, 1);
     if (op != L_SET_PIXELS && op != L_CLEAR_PIXELS && op != L_FLIP_PIXELS)
-        return ERROR_INT("invalid op", __func__, 1);
+        return ERROR_INT("invalid op", procName, 1);
 
     pta = generatePtaHashBoxa(boxa, spacing, width, orient, outline, 1);
     if (!pta)
-        return ERROR_INT("pta not made", __func__, 1);
+        return ERROR_INT("pta not made", procName, 1);
     pixRenderPta(pix, pta, op);
     ptaDestroy(&pta);
     return 0;
@@ -2057,18 +2106,16 @@ PTA  *pta;
 /*!
  * \brief   pixRenderHashBoxaArb()
  *
- * \param[in]    pix         any depth; cmapped ok
- * \param[in]    box
- * \param[in]    spacing     spacing between lines; must be > 1
- * \param[in]    width       thickness of box and hash lines
- * \param[in]    orient      orientation of lines: L_HORIZONTAL_LINE,
- *                              L_POS_SLOPE_LINE, L_VERTICAL_LINE,
- *                              L_NEG_SLOPE_LINE
- * \param[in]    outline     0 to skip drawing box outline
+ * \param[in]    pix  any depth; cmapped ok
+ * \param[in]    boxa
+ * \param[in]    spacing spacing between lines; must be > 1
+ * \param[in]    width  thickness of box and hash lines
+ * \param[in]    orient  orientation of lines: L_HORIZONTAL_LINE, ...
+ * \param[in]    outline  0 to skip drawing box outline
  * \param[in]    rval, gval, bval
  * \return  0 if OK, 1 on error
  */
-l_ok
+l_int32
 pixRenderHashBoxaArb(PIX     *pix,
                      BOXA    *boxa,
                      l_int32  spacing,
@@ -2081,23 +2128,25 @@ pixRenderHashBoxaArb(PIX     *pix,
 {
 PTA  *pta;
 
+    PROCNAME("pixRenderHashBoxArb");
+
     if (!pix)
-        return ERROR_INT("pix not defined", __func__, 1);
+        return ERROR_INT("pix not defined", procName, 1);
     if (!boxa)
-        return ERROR_INT("boxa not defined", __func__, 1);
+        return ERROR_INT("boxa not defined", procName, 1);
     if (spacing <= 1)
-        return ERROR_INT("spacing not > 1", __func__, 1);
+        return ERROR_INT("spacing not > 1", procName, 1);
     if (width < 1) {
-        L_WARNING("width < 1; setting to 1\n", __func__);
+        L_WARNING("width < 1; setting to 1\n", procName);
         width = 1;
     }
     if (orient != L_HORIZONTAL_LINE && orient != L_POS_SLOPE_LINE &&
         orient != L_VERTICAL_LINE && orient != L_NEG_SLOPE_LINE)
-        return ERROR_INT("invalid line orientation", __func__, 1);
+        return ERROR_INT("invalid line orientation", procName, 1);
 
     pta = generatePtaHashBoxa(boxa, spacing, width, orient, outline, 1);
     if (!pta)
-        return ERROR_INT("pta not made", __func__, 1);
+        return ERROR_INT("pta not made", procName, 1);
     pixRenderPtaArb(pix, pta, rval, gval, bval);
     ptaDestroy(&pta);
     return 0;
@@ -2107,20 +2156,18 @@ PTA  *pta;
 /*!
  * \brief   pixRenderHashBoxaBlend()
  *
- * \param[in]    pix         32 bpp rgb
+ * \param[in]    pix  32 bpp rgb
  * \param[in]    boxa
- * \param[in]    spacing     spacing between lines; must be > 1
- * \param[in]    width       thickness of box and hash lines
- * \param[in]    orient      orientation of lines: L_HORIZONTAL_LINE,
- *                              L_POS_SLOPE_LINE, L_VERTICAL_LINE,
- *                              L_NEG_SLOPE_LINE
- * \param[in]    outline     0 to skip drawing box outline
+ * \param[in]    spacing spacing between lines; must be > 1
+ * \param[in]    width  thickness of box and hash lines
+ * \param[in]    orient  orientation of lines: L_HORIZONTAL_LINE, ...
+ * \param[in]    outline  0 to skip drawing box outline
  * \param[in]    rval, gval, bval
- * \param[in]    fract       in [0.0 - 1.0]: 1.0 is no transparency;
- *                           0.0 is complete transparency (no effect)
+ * \param[in]    fract in [0.0 - 1.0]; complete transparency (no effect
+ *                      if 0.0; no transparency if 1.0)
  * \return  0 if OK, 1 on error
  */
-l_ok
+l_int32
 pixRenderHashBoxaBlend(PIX       *pix,
                        BOXA      *boxa,
                        l_int32    spacing,
@@ -2134,23 +2181,25 @@ pixRenderHashBoxaBlend(PIX       *pix,
 {
 PTA  *pta;
 
+    PROCNAME("pixRenderHashBoxaBlend");
+
     if (!pix)
-        return ERROR_INT("pix not defined", __func__, 1);
+        return ERROR_INT("pix not defined", procName, 1);
     if (!boxa)
-        return ERROR_INT("boxa not defined", __func__, 1);
+        return ERROR_INT("boxa not defined", procName, 1);
     if (spacing <= 1)
-        return ERROR_INT("spacing not > 1", __func__, 1);
+        return ERROR_INT("spacing not > 1", procName, 1);
     if (width < 1) {
-        L_WARNING("width < 1; setting to 1\n", __func__);
+        L_WARNING("width < 1; setting to 1\n", procName);
         width = 1;
     }
     if (orient != L_HORIZONTAL_LINE && orient != L_POS_SLOPE_LINE &&
         orient != L_VERTICAL_LINE && orient != L_NEG_SLOPE_LINE)
-        return ERROR_INT("invalid line orientation", __func__, 1);
+        return ERROR_INT("invalid line orientation", procName, 1);
 
     pta = generatePtaHashBoxa(boxa, spacing, width, orient, outline, 1);
     if (!pta)
-        return ERROR_INT("pta not made", __func__, 1);
+        return ERROR_INT("pta not made", procName, 1);
     pixRenderPtaBlend(pix, pta, rval, gval, bval, fract);
     ptaDestroy(&pta);
     return 0;
@@ -2160,11 +2209,11 @@ PTA  *pta;
 /*!
  * \brief   pixRenderPolyline()
  *
- * \param[in]    pix         any depth, not cmapped
+ * \param[in]    pix  any depth, not cmapped
  * \param[in]    ptas
- * \param[in]    width       thickness of line
- * \param[in]    op          one of L_SET_PIXELS, L_CLEAR_PIXELS, L_FLIP_PIXELS
- * \param[in]    closeflag   1 to close the contour; 0 otherwise
+ * \param[in]    width  thickness of line
+ * \param[in]    op  one of L_SET_PIXELS, L_CLEAR_PIXELS, L_FLIP_PIXELS
+ * \param[in]    closeflag 1 to close the contour; 0 otherwise
  * \return  0 if OK, 1 on error
  *
  * <pre>
@@ -2172,7 +2221,7 @@ PTA  *pta;
  *      This renders a closed contour.
  * </pre>
  */
-l_ok
+l_int32
 pixRenderPolyline(PIX     *pix,
                   PTA     *ptas,
                   l_int32  width,
@@ -2181,19 +2230,21 @@ pixRenderPolyline(PIX     *pix,
 {
 PTA  *pta;
 
+    PROCNAME("pixRenderPolyline");
+
     if (!pix)
-        return ERROR_INT("pix not defined", __func__, 1);
+        return ERROR_INT("pix not defined", procName, 1);
     if (!ptas)
-        return ERROR_INT("ptas not defined", __func__, 1);
+        return ERROR_INT("ptas not defined", procName, 1);
     if (width < 1) {
-        L_WARNING("width < 1; setting to 1\n", __func__);
+        L_WARNING("width < 1; setting to 1\n", procName);
         width = 1;
     }
     if (op != L_SET_PIXELS && op != L_CLEAR_PIXELS && op != L_FLIP_PIXELS)
-        return ERROR_INT("invalid op", __func__, 1);
+        return ERROR_INT("invalid op", procName, 1);
 
     if ((pta = generatePtaPolyline(ptas, width, closeflag, 0)) == NULL)
-        return ERROR_INT("pta not made", __func__, 1);
+        return ERROR_INT("pta not made", procName, 1);
     pixRenderPta(pix, pta, op);
     ptaDestroy(&pta);
     return 0;
@@ -2203,11 +2254,11 @@ PTA  *pta;
 /*!
  * \brief   pixRenderPolylineArb()
  *
- * \param[in]    pix         any depth; cmapped ok
+ * \param[in]    pix  any depth; cmapped ok
  * \param[in]    ptas
- * \param[in]    width       thickness of line
+ * \param[in]    width  thickness of line
  * \param[in]    rval, gval, bval
- * \param[in]    closeflag   1 to close the contour; 0 otherwise
+ * \param[in]    closeflag 1 to close the contour; 0 otherwise
  * \return  0 if OK, 1 on error
  *
  * <pre>
@@ -2215,7 +2266,7 @@ PTA  *pta;
  *      This renders a closed contour.
  * </pre>
  */
-l_ok
+l_int32
 pixRenderPolylineArb(PIX     *pix,
                      PTA     *ptas,
                      l_int32  width,
@@ -2226,17 +2277,19 @@ pixRenderPolylineArb(PIX     *pix,
 {
 PTA  *pta;
 
+    PROCNAME("pixRenderPolylineArb");
+
     if (!pix)
-        return ERROR_INT("pix not defined", __func__, 1);
+        return ERROR_INT("pix not defined", procName, 1);
     if (!ptas)
-        return ERROR_INT("ptas not defined", __func__, 1);
+        return ERROR_INT("ptas not defined", procName, 1);
     if (width < 1) {
-        L_WARNING("width < 1; setting to 1\n", __func__);
+        L_WARNING("width < 1; setting to 1\n", procName);
         width = 1;
     }
 
     if ((pta = generatePtaPolyline(ptas, width, closeflag, 0)) == NULL)
-        return ERROR_INT("pta not made", __func__, 1);
+        return ERROR_INT("pta not made", procName, 1);
     pixRenderPtaArb(pix, pta, rval, gval, bval);
     ptaDestroy(&pta);
     return 0;
@@ -2246,17 +2299,17 @@ PTA  *pta;
 /*!
  * \brief   pixRenderPolylineBlend()
  *
- * \param[in]    pix          32 bpp rgb
+ * \param[in]    pix  32 bpp rgb
  * \param[in]    ptas
- * \param[in]    width        thickness of line
+ * \param[in]    width  thickness of line
  * \param[in]    rval, gval, bval
- * \param[in]    fract        in [0.0 - 1.0]: 1.0 is no transparency;
- *                            0.0 is complete transparency (no effect)
- * \param[in]    closeflag    1 to close the contour; 0 otherwise
- * \param[in]    removedups   1 to remove; 0 otherwise
+ * \param[in]    fract in [0.0 - 1.0]; complete transparency (no effect
+ *                      if 0.0; no transparency if 1.0)
+ * \param[in]    closeflag 1 to close the contour; 0 otherwise
+ * \param[in]    removedups  1 to remove; 0 otherwise
  * \return  0 if OK, 1 on error
  */
-l_ok
+l_int32
 pixRenderPolylineBlend(PIX       *pix,
                        PTA       *ptas,
                        l_int32    width,
@@ -2269,17 +2322,19 @@ pixRenderPolylineBlend(PIX       *pix,
 {
 PTA  *pta;
 
+    PROCNAME("pixRenderPolylineBlend");
+
     if (!pix)
-        return ERROR_INT("pix not defined", __func__, 1);
+        return ERROR_INT("pix not defined", procName, 1);
     if (!ptas)
-        return ERROR_INT("ptas not defined", __func__, 1);
+        return ERROR_INT("ptas not defined", procName, 1);
     if (width < 1) {
-        L_WARNING("width < 1; setting to 1\n", __func__);
+        L_WARNING("width < 1; setting to 1\n", procName);
         width = 1;
     }
 
     if ((pta = generatePtaPolyline(ptas, width, closeflag, removedups)) == NULL)
-        return ERROR_INT("pta not made", __func__, 1);
+        return ERROR_INT("pta not made", procName, 1);
     pixRenderPtaBlend(pix, pta, rval, gval, bval, fract);
     ptaDestroy(&pta);
     return 0;
@@ -2289,13 +2344,13 @@ PTA  *pta;
 /*!
  * \brief   pixRenderGridArb()
  *
- * \param[in]    pix        any depth, cmapped ok
- * \param[in]    nx, ny     number of rectangles in each direction
- * \param[in]    width      thickness of grid lines
+ * \param[in]    pix    any depth, cmapped ok
+ * \param[in]    nx, ny number of rectangles in each direction
+ * \param[in]    width  thickness of grid lines
  * \param[in]    rval, gval, bval
  * \return  0 if OK, 1 on error
  */
-l_ok
+l_int32
 pixRenderGridArb(PIX     *pix,
                  l_int32  nx,
                  l_int32  ny,
@@ -2307,18 +2362,20 @@ pixRenderGridArb(PIX     *pix,
 l_int32  w, h;
 PTA     *pta;
 
+    PROCNAME("pixRenderGridArb");
+
     if (!pix)
-        return ERROR_INT("pix not defined", __func__, 1);
+        return ERROR_INT("pix not defined", procName, 1);
     if (nx < 1 || ny < 1)
-        return ERROR_INT("nx, ny must be > 0", __func__, 1);
+        return ERROR_INT("nx, ny must be > 0", procName, 1);
     if (width < 1) {
-        L_WARNING("width < 1; setting to 1\n", __func__);
+        L_WARNING("width < 1; setting to 1\n", procName);
         width = 1;
     }
 
     pixGetDimensions(pix, &w, &h, NULL);
     if ((pta = generatePtaGrid(w, h, nx, ny, width)) == NULL)
-        return ERROR_INT("pta not made", __func__, 1);
+        return ERROR_INT("pta not made", procName, 1);
     pixRenderPtaArb(pix, pta, rval, gval, bval);
     ptaDestroy(&pta);
     return 0;
@@ -2328,13 +2385,13 @@ PTA     *pta;
 /*!
  * \brief   pixRenderRandomCmapPtaa()
  *
- * \param[in]    pix          1, 2, 4, 8, 16, 32 bpp
+ * \param[in]    pix 1, 2, 4, 8, 16, 32 bpp
  * \param[in]    ptaa
- * \param[in]    polyflag     1 to interpret each Pta as a polyline;
- *                            0 to simply render the Pta as a set of pixels
- * \param[in]    width        thickness of line; use only for polyline
- * \param[in]    closeflag    1 to close the contour; 0 otherwise;
- *                            use only for polyline mode
+ * \param[in]    polyflag 1 to interpret each Pta as a polyline; 0 to simply
+ *                        render the Pta as a set of pixels
+ * \param[in]    width  thickness of line; use only for polyline
+ * \param[in]    closeflag 1 to close the contour; 0 otherwise;
+ *                         use only for polyline mode
  * \return  pixd cmapped, 8 bpp or NULL on error
  *
  * <pre>
@@ -2365,12 +2422,14 @@ PIXCMAP  *cmap;
 PTA      *pta, *ptat;
 PIX      *pixd;
 
+    PROCNAME("pixRenderRandomCmapPtaa");
+
     if (!pix)
-        return (PIX *)ERROR_PTR("pix not defined", __func__, NULL);
+        return (PIX *)ERROR_PTR("pix not defined", procName, NULL);
     if (!ptaa)
-        return (PIX *)ERROR_PTR("ptaa not defined", __func__, NULL);
+        return (PIX *)ERROR_PTR("ptaa not defined", procName, NULL);
     if (polyflag != 0 && width < 1) {
-        L_WARNING("width < 1; setting to 1\n", __func__);
+        L_WARNING("width < 1; setting to 1\n", procName);
         width = 1;
     }
 
@@ -2405,10 +2464,10 @@ PIX      *pixd;
 /*!
  * \brief   pixRenderPolygon()
  *
- * \param[in]    ptas     of vertices, none repeated
- * \param[in]    width    of polygon outline
- * \param[out]   pxmin    [optional] min x value of input pts
- * \param[out]   pymin    [optional] min y value of input pts
+ * \param[in]    ptas of vertices, none repeated
+ * \param[in]    width of polygon outline
+ * \param[out]   pxmin [optional] min x value of input pts
+ * \param[out]   pymin [optional] min y value of input pts
  * \return  pix 1 bpp, with outline generated, or NULL on error
  *
  * <pre>
@@ -2430,14 +2489,16 @@ l_float32  fxmin, fxmax, fymin, fymax;
 PIX       *pixd;
 PTA       *pta1, *pta2;
 
+    PROCNAME("pixRenderPolygon");
+
     if (pxmin) *pxmin = 0;
     if (pymin) *pymin = 0;
     if (!ptas)
-        return (PIX *)ERROR_PTR("ptas not defined", __func__, NULL);
+        return (PIX *)ERROR_PTR("ptas not defined", procName, NULL);
 
         /* Generate a 4-connected polygon line */
     if ((pta1 = generatePtaPolyline(ptas, width, 1, 0)) == NULL)
-        return (PIX *)ERROR_PTR("pta1 not made", __func__, NULL);
+        return (PIX *)ERROR_PTR("pta1 not made", procName, NULL);
     if (width < 2)
         pta2 = convertPtaLineTo4cc(pta1);
     else
@@ -2458,16 +2519,16 @@ PTA       *pta1, *pta2;
 /*!
  * \brief   pixFillPolygon()
  *
- * \param[in]    pixs          1 bpp, with 4-connected polygon outline
- * \param[in]    pta           vertices of the polygon
- * \param[in]    xmin, ymin    min values of vertices of polygon
+ * \param[in]    pixs 1 bpp, with 4-connected polygon outline
+ * \param[in]    pta vertices of the polygon
+ * \param[in]    xmin, ymin min values of vertices of polygon
  * \return  pixd with outline filled, or NULL on error
  *
  * <pre>
  * Notes:
  *      (1) This fills the interior of the polygon, returning a
  *          new pix.  It works for both convex and non-convex polygons.
- *      (2) To generate a filled polygon from %pta:
+ *      (2) To generate a filled polygon from a pta:
  *            PIX *pixt = pixRenderPolygon(pta, 1, &xmin, &ymin);
  *            PIX *pixd = pixFillPolygon(pixt, pta, xmin, ymin);
  *            pixDestroy(&pixt);
@@ -2483,21 +2544,16 @@ l_int32   w, h, i, n, inside, found;
 l_int32  *xstart, *xend;
 PIX      *pixi, *pixd;
 
+    PROCNAME("pixFillPolygon");
+
     if (!pixs || (pixGetDepth(pixs) != 1))
-        return (PIX *)ERROR_PTR("pixs undefined or not 1 bpp", __func__, NULL);
+        return (PIX *)ERROR_PTR("pixs undefined or not 1 bpp", procName, NULL);
     if (!pta)
-        return (PIX *)ERROR_PTR("pta not defined", __func__, NULL);
-    if (ptaGetCount(pta) < 2)
-        return (PIX *)ERROR_PTR("pta has < 2 pts", __func__, NULL);
+        return (PIX *)ERROR_PTR("pta not defined", procName, NULL);
 
     pixGetDimensions(pixs, &w, &h, NULL);
-    xstart = (l_int32 *)LEPT_CALLOC(L_MAX(1, w / 2), sizeof(l_int32));
-    xend = (l_int32 *)LEPT_CALLOC(L_MAX(1, w / 2), sizeof(l_int32));
-    if (!xstart || !xend) {
-        LEPT_FREE(xstart);
-        LEPT_FREE(xend);
-        return (PIX *)ERROR_PTR("xstart and xend not made", __func__, NULL);
-    }
+    xstart = (l_int32 *)LEPT_CALLOC(w / 2, sizeof(l_int32));
+    xend = (l_int32 *)LEPT_CALLOC(w / 2, sizeof(l_int32));
 
         /* Find a raster with 2 or more black runs.  The first background
          * pixel after the end of the first run is likely to be inside
@@ -2514,7 +2570,7 @@ PIX      *pixi, *pixd;
         }
     }
     if (!found) {
-        L_WARNING("nothing found to fill\n", __func__);
+        L_WARNING("nothing found to fill\n", procName);
         LEPT_FREE(xstart);
         LEPT_FREE(xend);
         return 0;
@@ -2544,10 +2600,10 @@ PIX      *pixi, *pixd;
 /*!
  * \brief   pixRenderContours()
  *
- * \param[in]    pixs        8 or 16 bpp; no colormap
- * \param[in]    startval    value of lowest contour; must be in [0 ... maxval]
- * \param[in]    incr        increment to next contour; must be > 0
- * \param[in]    outdepth    either 1 or depth of pixs
+ * \param[in]    pixs 8 or 16 bpp; no colormap
+ * \param[in]    startval value of lowest contour; must be in [0 ... maxval]
+ * \param[in]    incr  increment to next contour; must be > 0
+ * \param[in]    outdepth either 1 or depth of pixs
  * \return  pixd, or NULL on error
  *
  * <pre>
@@ -2567,23 +2623,25 @@ l_int32    w, h, d, maxval, wpls, wpld, i, j, val, test;
 l_uint32  *datas, *datad, *lines, *lined;
 PIX       *pixd;
 
+    PROCNAME("pixRenderContours");
+
     if (!pixs)
-        return (PIX *)ERROR_PTR("pixs not defined", __func__, NULL);
+        return (PIX *)ERROR_PTR("pixs not defined", procName, NULL);
     if (pixGetColormap(pixs))
-        return (PIX *)ERROR_PTR("pixs has colormap", __func__, NULL);
+        return (PIX *)ERROR_PTR("pixs has colormap", procName, NULL);
     pixGetDimensions(pixs, &w, &h, &d);
     if (d != 8 && d != 16)
-        return (PIX *)ERROR_PTR("pixs not 8 or 16 bpp", __func__, NULL);
+        return (PIX *)ERROR_PTR("pixs not 8 or 16 bpp", procName, NULL);
     if (outdepth != 1 && outdepth != d) {
-        L_WARNING("invalid outdepth; setting to 1\n", __func__);
+        L_WARNING("invalid outdepth; setting to 1\n", procName);
         outdepth = 1;
     }
     maxval = (1 << d) - 1;
     if (startval < 0 || startval > maxval)
         return (PIX *)ERROR_PTR("startval not in [0 ... maxval]",
-               __func__, NULL);
+               procName, NULL);
     if (incr < 1)
-        return (PIX *)ERROR_PTR("incr < 1", __func__, NULL);
+        return (PIX *)ERROR_PTR("incr < 1", procName, NULL);
 
     if (outdepth == d)
         pixd = pixCopy(NULL, pixs);
@@ -2659,7 +2717,7 @@ PIX       *pixd;
         break;
 
     default:
-        return (PIX *)ERROR_PTR("pixs not 8 or 16 bpp", __func__, NULL);
+        return (PIX *)ERROR_PTR("pixs not 8 or 16 bpp", procName, NULL);
     }
 
     return pixd;
@@ -2670,7 +2728,7 @@ PIX       *pixd;
  * \brief   fpixAutoRenderContours()
  *
  * \param[in]    fpix
- * \param[in]    ncontours   in [2 ... 500]; typically about 50
+ * \param[in]    ncontours > 1, < 500, typ. about 50
  * \return  pixd 8 bpp, or NULL on error
  *
  * <pre>
@@ -2687,17 +2745,19 @@ fpixAutoRenderContours(FPIX    *fpix,
 {
 l_float32  minval, maxval, incr;
 
+    PROCNAME("fpixAutoRenderContours");
+
     if (!fpix)
-        return (PIX *)ERROR_PTR("fpix not defined", __func__, NULL);
+        return (PIX *)ERROR_PTR("fpix not defined", procName, NULL);
     if (ncontours < 2 || ncontours > 500)
-        return (PIX *)ERROR_PTR("ncontours < 2 or > 500", __func__, NULL);
+        return (PIX *)ERROR_PTR("ncontours < 2 or > 500", procName, NULL);
 
     fpixGetMin(fpix, &minval, NULL, NULL);
     fpixGetMax(fpix, &maxval, NULL, NULL);
     if (minval == maxval)
-        return (PIX *)ERROR_PTR("all values in fpix are equal", __func__, NULL);
+        return (PIX *)ERROR_PTR("all values in fpix are equal", procName, NULL);
     incr = (maxval - minval) / ((l_float32)ncontours - 1);
-    return fpixRenderContours(fpix, incr, 0.15f);
+    return fpixRenderContours(fpix, incr, 0.15);
 }
 
 
@@ -2705,8 +2765,8 @@ l_float32  minval, maxval, incr;
  * \brief   fpixRenderContours()
  *
  * \param[in]    fpixs
- * \param[in]    incr      increment between contours; must be > 0.0
- * \param[in]    proxim    required proximity to target value; default 0.15
+ * \param[in]    incr  increment between contours; must be > 0.0
+ * \param[in]    proxim required proximity to target value; default 0.15
  * \return  pixd 8 bpp, or NULL on error
  *
  * <pre>
@@ -2729,16 +2789,18 @@ l_float32  *datas, *lines;
 PIX        *pixd;
 PIXCMAP    *cmap;
 
+    PROCNAME("fpixRenderContours");
+
     if (!fpixs)
-        return (PIX *)ERROR_PTR("fpixs not defined", __func__, NULL);
+        return (PIX *)ERROR_PTR("fpixs not defined", procName, NULL);
     if (incr <= 0.0)
-        return (PIX *)ERROR_PTR("incr <= 0.0", __func__, NULL);
+        return (PIX *)ERROR_PTR("incr <= 0.0", procName, NULL);
     if (proxim <= 0.0)
-        proxim = 0.15f;  /* default */
+        proxim = 0.15;  /* default */
 
     fpixGetDimensions(fpixs, &w, &h);
     if ((pixd = pixCreate(w, h, 8)) == NULL)
-        return (PIX *)ERROR_PTR("pixd not made", __func__, NULL);
+        return (PIX *)ERROR_PTR("pixd not made", procName, NULL);
     cmap = pixcmapCreate(8);
     pixSetColormap(pixd, cmap);
     pixcmapAddColor(cmap, 255, 255, 255);  /* white */
@@ -2778,8 +2840,8 @@ PIXCMAP    *cmap;
 /*!
  * \brief   pixGeneratePtaBoundary()
  *
- * \param[in]    pixs     1 bpp
- * \param[in]    width    of boundary line
+ * \param[in]    pixs 1 bpp
+ * \param[in]    width of boundary line
  * \return  pta, or NULL on error
  *
  * <pre>
@@ -2801,10 +2863,12 @@ pixGeneratePtaBoundary(PIX     *pixs,
 PIX  *pix1;
 PTA  *pta;
 
+    PROCNAME("pixGeneratePtaBoundary");
+
     if (!pixs || pixGetDepth(pixs) != 1)
-        return (PTA *)ERROR_PTR("pixs undefined or not 1 bpp", __func__, NULL);
+        return (PTA *)ERROR_PTR("pixs undefined or not 1 bpp", procName, NULL);
     if (width < 1) {
-        L_WARNING("width < 1; setting to 1\n", __func__);
+        L_WARNING("width < 1; setting to 1\n", procName);
         width = 1;
     }
 

@@ -62,10 +62,6 @@
  * </pre>
  */
 
-#ifdef HAVE_CONFIG_H
-#include <config_auto.h>
-#endif  /* HAVE_CONFIG_H */
-
 #include <string.h>
 #include "allheaders.h"
 
@@ -74,6 +70,7 @@ static const l_int32  INITIAL_BUFFER_ARRAYSIZE = 1024;  /* n'importe quoi */
 
     /* Static function */
 static l_int32 lqueueExtendArray(L_QUEUE *lq);
+
 
 /*--------------------------------------------------------------------------*
  *                         L_Queue create/destroy                           *
@@ -94,13 +91,15 @@ lqueueCreate(l_int32  nalloc)
 {
 L_QUEUE  *lq;
 
+    PROCNAME("lqueueCreate");
+
     if (nalloc < MIN_BUFFER_SIZE)
         nalloc = INITIAL_BUFFER_ARRAYSIZE;
 
     lq = (L_QUEUE *)LEPT_CALLOC(1, sizeof(L_QUEUE));
     if ((lq->array = (void **)LEPT_CALLOC(nalloc, sizeof(void *))) == NULL) {
         lqueueDestroy(&lq, 0);
-        return (L_QUEUE *)ERROR_PTR("ptr array not made", __func__, NULL);
+        return (L_QUEUE *)ERROR_PTR("ptr array not made", procName, NULL);
     }
     lq->nalloc = nalloc;
     lq->nhead = lq->nelem = 0;
@@ -111,8 +110,8 @@ L_QUEUE  *lq;
 /*!
  * \brief   lqueueDestroy()
  *
- * \param[in,out]   plq       will be set to null before returning
- * \param[in]       freeflag  TRUE to free each remaining struct in the array
+ * \param[in,out]   plq to be nulled
+ * \param[in]    freeflag TRUE to free each remaining struct in the array
  * \return  void
  *
  * <pre>
@@ -135,8 +134,10 @@ lqueueDestroy(L_QUEUE  **plq,
 void     *item;
 L_QUEUE  *lq;
 
+    PROCNAME("lqueueDestroy");
+
     if (plq == NULL) {
-        L_WARNING("ptr address is NULL\n", __func__);
+        L_WARNING("ptr address is NULL\n", procName);
         return;
     }
     if ((lq = *plq) == NULL)
@@ -148,7 +149,7 @@ L_QUEUE  *lq;
             LEPT_FREE(item);
         }
     } else if (lq->nelem > 0) {
-        L_WARNING("memory leak of %d items in lqueue!\n", __func__, lq->nelem);
+        L_WARNING("memory leak of %d items in lqueue!\n", procName, lq->nelem);
     }
 
     if (lq->array)
@@ -157,6 +158,8 @@ L_QUEUE  *lq;
         lstackDestroy(&lq->stack, freeflag);
     LEPT_FREE(lq);
     *plq = NULL;
+
+    return;
 }
 
 
@@ -166,8 +169,8 @@ L_QUEUE  *lq;
 /*!
  * \brief   lqueueAdd()
  *
- * \param[in]    lq     lqueue
- * \param[in]    item   to be added to the tail of the queue
+ * \param[in]    lq lqueue
+ * \param[in]    item to be added to the tail of the queue
  * \return  0 if OK, 1 on error
  *
  * <pre>
@@ -180,14 +183,16 @@ L_QUEUE  *lq;
  *          Finally, add the item to the tail of the queue.
  * </pre>
  */
-l_ok
+l_int32
 lqueueAdd(L_QUEUE  *lq,
           void     *item)
 {
+    PROCNAME("lqueueAdd");
+
     if (!lq)
-        return ERROR_INT("lq not defined", __func__, 1);
+        return ERROR_INT("lq not defined", procName, 1);
     if (!item)
-        return ERROR_INT("item not defined", __func__, 1);
+        return ERROR_INT("item not defined", procName, 1);
 
         /* If filled to the end and the ptrs can be shifted to the left,
          * shift them. */
@@ -197,10 +202,8 @@ lqueueAdd(L_QUEUE  *lq,
     }
 
         /* If necessary, expand the allocated array by a factor of 2 */
-    if (lq->nelem > 0.75 * lq->nalloc) {
-        if (lqueueExtendArray(lq))
-            return ERROR_INT("extension failed", __func__, 1);
-    }
+    if (lq->nelem > 0.75 * lq->nalloc)
+        lqueueExtendArray(lq);
 
         /* Now add the item */
     lq->array[lq->nhead + lq->nelem] = (void *)item;
@@ -213,19 +216,21 @@ lqueueAdd(L_QUEUE  *lq,
 /*!
  * \brief   lqueueExtendArray()
  *
- * \param[in]    lq    lqueue
+ * \param[in]    lq lqueue
  * \return  0 if OK, 1 on error
  */
 static l_int32
 lqueueExtendArray(L_QUEUE  *lq)
 {
+    PROCNAME("lqueueExtendArray");
+
     if (!lq)
-        return ERROR_INT("lq not defined", __func__, 1);
+        return ERROR_INT("lq not defined", procName, 1);
 
     if ((lq->array = (void **)reallocNew((void **)&lq->array,
                                 sizeof(void *) * lq->nalloc,
                                 2 * sizeof(void *) * lq->nalloc)) == NULL)
-        return ERROR_INT("new ptr array not returned", __func__, 1);
+        return ERROR_INT("new ptr array not returned", procName, 1);
 
     lq->nalloc = 2 * lq->nalloc;
     return 0;
@@ -235,7 +240,7 @@ lqueueExtendArray(L_QUEUE  *lq)
 /*!
  * \brief   lqueueRemove()
  *
- * \param[in]    lq   lqueue
+ * \param[in]    lq lqueue
  * \return  ptr to item popped from the head of the queue,
  *              or NULL if the queue is empty or on error
  *
@@ -250,8 +255,10 @@ lqueueRemove(L_QUEUE  *lq)
 {
 void  *item;
 
+    PROCNAME("lqueueRemove");
+
     if (!lq)
-        return (void *)ERROR_PTR("lq not defined", __func__, NULL);
+        return (void *)ERROR_PTR("lq not defined", procName, NULL);
 
     if (lq->nelem == 0)
         return NULL;
@@ -269,14 +276,16 @@ void  *item;
 /*!
  * \brief   lqueueGetCount()
  *
- * \param[in]    lq   lqueue
+ * \param[in]    lq lqueue
  * \return  count, or 0 on error
  */
 l_int32
 lqueueGetCount(L_QUEUE  *lq)
 {
+    PROCNAME("lqueueGetCount");
+
     if (!lq)
-        return ERROR_INT("lq not defined", __func__, 0);
+        return ERROR_INT("lq not defined", procName, 0);
 
     return lq->nelem;
 }
@@ -288,20 +297,22 @@ lqueueGetCount(L_QUEUE  *lq)
 /*!
  * \brief   lqueuePrint()
  *
- * \param[in]    fp   file stream
- * \param[in]    lq   lqueue
+ * \param[in]    fp file stream
+ * \param[in]    lq lqueue
  * \return  0 if OK; 1 on error
  */
-l_ok
+l_int32
 lqueuePrint(FILE     *fp,
             L_QUEUE  *lq)
 {
 l_int32  i;
 
+    PROCNAME("lqueuePrint");
+
     if (!fp)
-        return ERROR_INT("stream not defined", __func__, 1);
+        return ERROR_INT("stream not defined", procName, 1);
     if (!lq)
-        return ERROR_INT("lq not defined", __func__, 1);
+        return ERROR_INT("lq not defined", procName, 1);
 
     fprintf(fp, "\n L_Queue: nalloc = %d, nhead = %d, nelem = %d, array = %p\n",
             lq->nalloc, lq->nhead, lq->nelem, lq->array);

@@ -33,10 +33,6 @@
  *     serialization, interconversion)
  */
 
-#ifdef HAVE_CONFIG_H
-#include <config_auto.h>
-#endif  /* HAVE_CONFIG_H */
-
 #include "allheaders.h"
 
 l_int32 main(int    argc,
@@ -193,7 +189,7 @@ L_REGPARAMS  *rp;
     pixt1 = fpixRenderContours(fpix3, 2.0, 0.2);
     regTestWritePixAndCheck(rp, pixt1, IFF_PNG);  /* 19 */
     pixDisplayWithTitle(pixt1, 400, 800, "v. disparity contours", rp->display);
-    regTestCompareSimilarPix(rp, pix1, pixt1, 1, 0.00001, 0);  /* 20 */
+    regTestCompareSimilarPix(rp, pix1, pixt1, 1, 0.00001, 1);  /* 20 */
     dpixDestroy(&dpix1);
     dpixDestroy(&dpix2);
     dpixDestroy(&dpix3);

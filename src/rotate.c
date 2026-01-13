@@ -24,6 +24,7 @@
  -  SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
  *====================================================================*/
 
+
 /*!
  * \file rotate.c
  * <pre>
@@ -52,17 +53,14 @@
  * </pre>
  */
 
-#ifdef HAVE_CONFIG_H
-#include <config_auto.h>
-#endif  /* HAVE_CONFIG_H */
-
 #include <math.h>
 #include "allheaders.h"
 
 extern l_float32  AlphaMaskBorderVals[2];
-static const l_float32  MinAngleToRotate = 0.001f;  /* radians; ~0.06 deg */
-static const l_float32  Max1BppShearAngle = 0.06f;  /* radians; ~3 deg    */
-static const l_float32  LimitShearAngle = 0.35f;    /* radians; ~20 deg   */
+static const l_float32  MIN_ANGLE_TO_ROTATE = 0.001;  /* radians; ~0.06 deg */
+static const l_float32  MAX_1BPP_SHEAR_ANGLE = 0.06;  /* radians; ~3 deg    */
+static const l_float32  LIMIT_SHEAR_ANGLE = 0.35;     /* radians; ~20 deg   */
+
 
 /*------------------------------------------------------------------*
  *                  General rotation about the center               *
@@ -110,15 +108,17 @@ l_uint32   fillval;
 PIX       *pix1, *pix2, *pix3, *pixd;
 PIXCMAP   *cmap;
 
+    PROCNAME("pixRotate");
+
     if (!pixs)
-        return (PIX *)ERROR_PTR("pixs not defined", __func__, NULL);
+        return (PIX *)ERROR_PTR("pixs not defined", procName, NULL);
     if (type != L_ROTATE_SHEAR && type != L_ROTATE_AREA_MAP &&
         type != L_ROTATE_SAMPLING)
-        return (PIX *)ERROR_PTR("invalid type", __func__, NULL);
+        return (PIX *)ERROR_PTR("invalid type", procName, NULL);
     if (incolor != L_BRING_IN_WHITE && incolor != L_BRING_IN_BLACK)
-        return (PIX *)ERROR_PTR("invalid incolor", __func__, NULL);
+        return (PIX *)ERROR_PTR("invalid incolor", procName, NULL);
 
-    if (L_ABS(angle) < MinAngleToRotate)
+    if (L_ABS(angle) < MIN_ANGLE_TO_ROTATE)
         return pixClone(pixs);
 
         /* Adjust rotation type if necessary:
@@ -127,16 +127,16 @@ PIXCMAP   *cmap;
          *  - If d > 1, only allow shear rotation up to about 20 degrees;
          *    beyond that, default a shear request to sampling. */
     if (pixGetDepth(pixs) == 1) {
-        if (L_ABS(angle) > Max1BppShearAngle) {
+        if (L_ABS(angle) > MAX_1BPP_SHEAR_ANGLE) {
             if (type != L_ROTATE_SAMPLING)
-                L_INFO("1 bpp, large angle; rotate by sampling\n", __func__);
+                L_INFO("1 bpp, large angle; rotate by sampling\n", procName);
             type = L_ROTATE_SAMPLING;
         } else if (type != L_ROTATE_SHEAR) {
-            L_INFO("1 bpp; rotate by shear\n", __func__);
+            L_INFO("1 bpp; rotate by shear\n", procName);
             type = L_ROTATE_SHEAR;
         }
-    } else if (L_ABS(angle) > LimitShearAngle && type == L_ROTATE_SHEAR) {
-        L_INFO("large angle; rotate by sampling\n", __func__);
+    } else if (L_ABS(angle) > LIMIT_SHEAR_ANGLE && type == L_ROTATE_SHEAR) {
+        L_INFO("large angle; rotate by sampling\n", procName);
         type = L_ROTATE_SAMPLING;
     }
 
@@ -248,11 +248,13 @@ l_int32    w, h, d, w1, h1, w2, h2, maxside, wnew, hnew, xoff, yoff, setcolor;
 l_float64  sina, cosa, fw, fh;
 PIX       *pixd;
 
+    PROCNAME("pixEmbedForRotation");
+
     if (!pixs)
-        return (PIX *)ERROR_PTR("pixs not defined", __func__, NULL);
+        return (PIX *)ERROR_PTR("pixs not defined", procName, NULL);
     if (incolor != L_BRING_IN_WHITE && incolor != L_BRING_IN_BLACK)
-        return (PIX *)ERROR_PTR("invalid incolor", __func__, NULL);
-    if (L_ABS(angle) < MinAngleToRotate)
+        return (PIX *)ERROR_PTR("invalid incolor", procName, NULL);
+    if (L_ABS(angle) < MIN_ANGLE_TO_ROTATE)
         return pixClone(pixs);
 
         /* Test if big enough to hold any rotation of the original image */
@@ -277,7 +279,7 @@ PIX       *pixd;
     hnew = L_MAX(h, L_MAX(h1, h2));
 
     if ((pixd = pixCreate(wnew, hnew, d)) == NULL)
-        return (PIX *)ERROR_PTR("pixd not made", __func__, NULL);
+        return (PIX *)ERROR_PTR("pixd not made", procName, NULL);
     pixCopyResolution(pixd, pixs);
     pixCopyColormap(pixd, pixs);
     pixCopySpp(pixd, pixs);
@@ -330,19 +332,21 @@ l_uint32  *datad, *lined;
 void     **lines;
 PIX       *pixd;
 
+    PROCNAME("pixRotateBySampling");
+
     if (!pixs)
-        return (PIX *)ERROR_PTR("pixs not defined", __func__, NULL);
+        return (PIX *)ERROR_PTR("pixs not defined", procName, NULL);
     if (incolor != L_BRING_IN_WHITE && incolor != L_BRING_IN_BLACK)
-        return (PIX *)ERROR_PTR("invalid incolor", __func__, NULL);
+        return (PIX *)ERROR_PTR("invalid incolor", procName, NULL);
     pixGetDimensions(pixs, &w, &h, &d);
     if (d != 1 && d != 2 && d != 4 && d != 8 && d != 16 && d != 32)
-        return (PIX *)ERROR_PTR("invalid depth", __func__, NULL);
+        return (PIX *)ERROR_PTR("invalid depth", procName, NULL);
 
-    if (L_ABS(angle) < MinAngleToRotate)
+    if (L_ABS(angle) < MIN_ANGLE_TO_ROTATE)
         return pixClone(pixs);
 
-    if ((pixd = pixCreateTemplate(pixs)) == NULL)
-        return (PIX *)ERROR_PTR("pixd not made", __func__, NULL);
+    if ((pixd = pixCreateTemplateNoInit(pixs)) == NULL)
+        return (PIX *)ERROR_PTR("pixd not made", procName, NULL);
     pixSetBlackOrWhite(pixd, incolor);
 
     sina = sin(angle);
@@ -409,7 +413,7 @@ PIX       *pixd;
                 SET_DATA_TWO_BYTES(lined, j, val);
                 break;
             default:
-                return (PIX *)ERROR_PTR("invalid depth", __func__, NULL);
+                return (PIX *)ERROR_PTR("invalid depth", procName, NULL);
             }
         }
     }
@@ -454,10 +458,12 @@ pixRotateBinaryNice(PIX       *pixs,
 {
 PIX  *pix1, *pix2, *pix3, *pix4, *pixd;
 
+    PROCNAME("pixRotateBinaryNice");
+
     if (!pixs || pixGetDepth(pixs) != 1)
-        return (PIX *)ERROR_PTR("pixs undefined or not 1 bpp", __func__, NULL);
+        return (PIX *)ERROR_PTR("pixs undefined or not 1 bpp", procName, NULL);
     if (incolor != L_BRING_IN_WHITE && incolor != L_BRING_IN_BLACK)
-        return (PIX *)ERROR_PTR("invalid incolor", __func__, NULL);
+        return (PIX *)ERROR_PTR("invalid incolor", procName, NULL);
 
     pix1 = pixConvertTo8(pixs, 0);
     pix2 = pixBlockconv(pix1, 1, 1);  /* smallest blur allowed */
@@ -532,22 +538,24 @@ pixRotateWithAlpha(PIX       *pixs,
 l_int32  ws, hs, d, spp;
 PIX     *pixd, *pix32, *pixg2, *pixgr;
 
+    PROCNAME("pixRotateWithAlpha");
+
     if (!pixs)
-        return (PIX *)ERROR_PTR("pixs not defined", __func__, NULL);
+        return (PIX *)ERROR_PTR("pixs not defined", procName, NULL);
     pixGetDimensions(pixs, &ws, &hs, &d);
     if (d != 32 && pixGetColormap(pixs) == NULL)
-        return (PIX *)ERROR_PTR("pixs not cmapped or 32 bpp", __func__, NULL);
+        return (PIX *)ERROR_PTR("pixs not cmapped or 32 bpp", procName, NULL);
     if (pixg && pixGetDepth(pixg) != 8) {
         L_WARNING("pixg not 8 bpp; using 'fract' transparent alpha\n",
-                  __func__);
+                  procName);
         pixg = NULL;
     }
     if (!pixg && (fract < 0.0 || fract > 1.0)) {
-        L_WARNING("invalid fract; using fully opaque\n", __func__);
+        L_WARNING("invalid fract; using fully opaque\n", procName);
         fract = 1.0;
     }
     if (!pixg && fract == 0.0)
-        L_WARNING("transparent alpha; image will not be blended\n", __func__);
+        L_WARNING("transparent alpha; image will not be blended\n", procName);
 
         /* Make sure input to rotation is 32 bpp rgb, and rotate it */
     if (d != 32)

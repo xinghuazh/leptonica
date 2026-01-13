@@ -32,25 +32,21 @@
  * morphological tophat.
  */
 
-#ifdef HAVE_CONFIG_H
-#include <config_auto.h>
-#endif  /* HAVE_CONFIG_H */
-
 #include "allheaders.h"
 
 int main(int    argc,
          char **argv)
 {
-PIX   *pixs, *pix1, *pix2, *pix3, *pixr, *pixg, *pixb, *pixsg, *pixsm;
-PIXA  *pixa;
+PIX         *pixs, *pix1, *pix2, *pix3, *pixr, *pixg, *pixb, *pixsg, *pixsm;
+PIXA        *pixa;
+static char  mainName[] = "livre_adapt";
 
     if (argc != 1)
-        return ERROR_INT(" Syntax:  livre_adapt", __func__, 1);
-    setLeptDebugOK(1);
+        return ERROR_INT(" Syntax:  livre_adapt", mainName, 1);
 
         /* Read the image in at 150 ppi. */
     if ((pixs = pixRead("brothers.150.jpg")) == NULL)
-        return ERROR_INT("pix not made", __func__, 1);
+        return ERROR_INT("pix not made", mainName, 1);
     pixa = pixaCreate(0);
     pixaAddPix(pixa, pixs, L_INSERT);
 
@@ -91,7 +87,7 @@ PIXA  *pixa;
 
             /* Generate the output image and pdf */
     lept_mkdir("lept/livre");
-    lept_stderr("Writing jpg and pdf to: /tmp/lept/livre/adapt.*\n");
+    fprintf(stderr, "Writing jpg and pdf to: /tmp/lept/livre/adapt.*\n");
     pix1 = pixaDisplayTiledAndScaled(pixa, 8, 350, 4, 0, 25, 2);
     pixWrite("/tmp/lept/livre/adapt.jpg", pix1, IFF_DEFAULT);
     pixDisplay(pix1, 100, 100);

@@ -71,7 +71,7 @@
  *       static void      strcodeDestroy()    (called as part of finalize)
  *       void             strcodeCreateFromFile()
  *       l_int32          strcodeGenerate()
- *       l_int32          strcodeFinalize()
+ *       void             strcodeFinalize()
  *       l_int32          l_getStructStrFromFile()   (useful externally)
  *
  *   Static helpers
@@ -83,10 +83,6 @@
  *       static char     *l_genDescrString()
  * </pre>
  */
-
-#ifdef HAVE_CONFIG_H
-#include <config_auto.h>
-#endif  /* HAVE_CONFIG_H */
 
 #include <string.h>
 #include "allheaders.h"
@@ -138,21 +134,22 @@ static char *l_genDataString(const char *filein, l_int32 ifunc);
 static char *l_genCaseString(l_int32 ifunc, l_int32 itype);
 static char *l_genDescrString(const char *filein, l_int32 ifunc, l_int32 itype);
 
+
 /*---------------------------------------------------------------------*/
 /*                         Stringcode functions                        */
 /*---------------------------------------------------------------------*/
 /*!
  * \brief   strcodeCreate()
  *
- * \param[in]    fileno    integer that labels the two output files
+ * \param[in]    fileno integer that labels the two output files
  * \return  initialized L_StrCode, or NULL on error
  *
  * <pre>
  * Notes:
  *      (1) This struct exists to build two files containing code for
  *          any number of data objects.  The two files are named
- *             autogen.[fileno].c
- *             autogen.[fileno].h
+ *             autogen.<fileno>.c
+ *             autogen.<fileno>.h
  * </pre>
  */
 L_STRCODE *
@@ -160,10 +157,12 @@ strcodeCreate(l_int32  fileno)
 {
 L_STRCODE  *strcode;
 
+    PROCNAME("strcodeCreate");
+
     lept_mkdir("lept/auto");
 
     if ((strcode = (L_STRCODE *)LEPT_CALLOC(1, sizeof(L_STRCODE))) == NULL)
-        return (L_STRCODE *)ERROR_PTR("strcode not made", __func__, NULL);
+        return (L_STRCODE *)ERROR_PTR("strcode not made", procName, NULL);
 
     strcode->fileno = fileno;
     strcode->function = sarrayCreate(0);
@@ -176,7 +175,7 @@ L_STRCODE  *strcode;
 /*!
  * \brief   strcodeDestroy()
  *
- * \param[out]  pstrcode    will be set to null after destroying the sarrays
+ * \param[out]  pstrcode &strcode is set to null after destroying the sarrays
  * \return  void
  */
 static void
@@ -184,8 +183,10 @@ strcodeDestroy(L_STRCODE  **pstrcode)
 {
 L_STRCODE  *strcode;
 
+    PROCNAME("strcodeDestroy");
+
     if (pstrcode == NULL) {
-        L_WARNING("ptr address is null!\n", __func__);
+        L_WARNING("ptr address is null!\n", procName);
         return;
     }
 
@@ -197,15 +198,16 @@ L_STRCODE  *strcode;
     sarrayDestroy(&strcode->descr);
     LEPT_FREE(strcode);
     *pstrcode = NULL;
+    return;
 }
 
 
 /*!
  * \brief   strcodeCreateFromFile()
  *
- * \param[in]    filein    containing filenames of serialized data
- * \param[in]    fileno    integer that labels the two output files
- * \param[in]    outdir    [optional] if null, files are made in /tmp/lept/auto
+ * \param[in]    filein containing filenames of serialized data
+ * \param[in]    fileno integer that labels the two output files
+ * \param[in]    outdir [optional] if null, files are made in /tmp/lept/auto
  * \return  0 if OK, 1 on error
  *
  * <pre>
@@ -213,11 +215,11 @@ L_STRCODE  *strcode;
  *      (1) The %filein has one filename on each line.
  *          Comment lines begin with "#".
  *      (2) The output is 2 files:
- *             autogen.[fileno].c
- *             autogen.[fileno].h
+ *             autogen.<fileno>.c
+ *             autogen.<fileno>.h
  * </pre>
  */
-l_ok
+l_int32
 strcodeCreateFromFile(const char  *filein,
                       l_int32      fileno,
                       const char  *outdir)
@@ -230,18 +232,20 @@ l_int32      i, n, index;
 SARRAY      *sa;
 L_STRCODE   *strcode;
 
+    PROCNAME("strcodeCreateFromFile");
+
     if (!filein)
-        return ERROR_INT("filein not defined", __func__, 1);
+        return ERROR_INT("filein not defined", procName, 1);
 
     if ((data = l_binaryRead(filein, &nbytes)) == NULL)
-        return ERROR_INT("data not read from file", __func__, 1);
+        return ERROR_INT("data not read from file", procName, 1);
     sa = sarrayCreateLinesFromString((char *)data, 0);
     LEPT_FREE(data);
     if (!sa)
-        return ERROR_INT("sa not made", __func__, 1);
+        return ERROR_INT("sa not made", procName, 1);
     if ((n = sarrayGetCount(sa)) == 0) {
         sarrayDestroy(&sa);
-        return ERROR_INT("no filenames in the file", __func__, 1);
+        return ERROR_INT("no filenames in the file", procName, 1);
     }
 
     strcode = strcodeCreate(fileno);
@@ -250,15 +254,14 @@ L_STRCODE   *strcode;
         fname = sarrayGetString(sa, i, L_NOCOPY);
         if (fname[0] == '#') continue;
         if (l_getIndexFromFile(fname, &index)) {
-            L_ERROR("File %s has no recognizable type\n", __func__, fname);
+            L_ERROR("File %s has no recognizable type\n", procName, fname);
         } else {
             type = l_assoc[index].type;
-            L_INFO("File %s is type %s\n", __func__, fname, type);
+            L_INFO("File %s is type %s\n", procName, fname, type);
             strcodeGenerate(strcode, fname, type);
         }
     }
     strcodeFinalize(&strcode, outdir);
-    sarrayDestroy(&sa);
     return 0;
 }
 
@@ -266,22 +269,22 @@ L_STRCODE   *strcode;
 /*!
  * \brief   strcodeGenerate()
  *
- * \param[in]    strcode    for accumulating data
- * \param[in]    filein     input file with serialized data
- * \param[in]    type       of data; use the typedef string
+ * \param[in]    strcode for accumulating data
+ * \param[in]    filein input file with serialized data
+ * \param[in]    type of data; use the typedef string
  * \return  0 if OK, 1 on error.
  *
  * <pre>
  * Notes:
  *      (1) The generated function name is
- *            l_autodecode_[fileno]()
- *          where [fileno] is the index label for the pair of output files.
+ *            l_autodecode_<fileno>()
+ *          where <fileno> is the index label for the pair of output files.
  *      (2) To deserialize this data, the function is called with the
  *          argument 'ifunc', which increments each time strcodeGenerate()
  *          is called.
  * </pre>
  */
-l_ok
+l_int32
 strcodeGenerate(L_STRCODE   *strcode,
                 const char  *filein,
                 const char  *type)
@@ -289,20 +292,22 @@ strcodeGenerate(L_STRCODE   *strcode,
 char    *strdata, *strfunc, *strdescr;
 l_int32  itype;
 
+    PROCNAME("strcodeGenerate");
+
     if (!strcode)
-        return ERROR_INT("strcode not defined", __func__, 1);
+        return ERROR_INT("strcode not defined", procName, 1);
     if (!filein)
-        return ERROR_INT("filein not defined", __func__, 1);
+        return ERROR_INT("filein not defined", procName, 1);
     if (!type)
-        return ERROR_INT("type not defined", __func__, 1);
+        return ERROR_INT("type not defined", procName, 1);
 
         /* Get the index corresponding to type and validate */
     if (l_getIndexFromType(type, &itype) == 1)
-        return ERROR_INT("data type unknown", __func__, 1);
+        return ERROR_INT("data type unknown", procName, 1);
 
         /* Generate the encoded data string */
     if ((strdata = l_genDataString(filein, strcode->ifunc)) == NULL)
-        return ERROR_INT("strdata not made", __func__, 1);
+        return ERROR_INT("strdata not made", procName, 1);
     sarrayAddString(strcode->data, strdata, L_INSERT);
 
         /* Generate the case data for the decoding function */
@@ -322,10 +327,9 @@ l_int32  itype;
 /*!
  * \brief   strcodeFinalize()
  *
- * \param[in,out]  pstrcode   destroys and sets to null after .c and .h files
- *                            have been generated
- * \param[in]      outdir     [optional] if NULL, make files in /tmp/lept/auto
- * \return     0 if OK; 1 on error
+ * \param[in,out]  pstrcode destroys after .c and .h files have been generated
+ * \param[in]      outdir [optional] if NULL, files are made in /tmp/lept/auto
+ * \return  void
  */
 l_int32
 strcodeFinalize(L_STRCODE  **pstrcode,
@@ -338,13 +342,15 @@ size_t      size;
 L_STRCODE  *strcode;
 SARRAY     *sa1, *sa2, *sa3;
 
+    PROCNAME("strcodeFinalize");
+
     lept_mkdir("lept/auto");
 
     if (!pstrcode || *pstrcode == NULL)
-        return ERROR_INT("No input data", __func__, 1);
+        return ERROR_INT("No input data", procName, 1);
     strcode = *pstrcode;
     if (!outdir) {
-        L_INFO("no outdir specified; writing to /tmp/lept/auto\n", __func__);
+        L_INFO("no outdir specified; writing to /tmp/lept/auto\n", procName);
         realoutdir = stringNew("/tmp/lept/auto");
     } else {
         realoutdir = stringNew(outdir);
@@ -355,10 +361,14 @@ SARRAY     *sa1, *sa2, *sa3;
     /* ------------------------------------------------------- */
 
        /* Make array of textlines from TEMPLATE1 */
-    filestr = (char *)l_binaryRead(TEMPLATE1, &size);
-    sa1 = sarrayCreateLinesFromString(filestr, 1);
+    if ((filestr = (char *)l_binaryRead(TEMPLATE1, &size)) == NULL)
+        return ERROR_INT("filestr not made", procName, 1);
+    if ((sa1 = sarrayCreateLinesFromString(filestr, 1)) == NULL)
+        return ERROR_INT("sa1 not made", procName, 1);
     LEPT_FREE(filestr);
-    sa3 = sarrayCreate(0);
+
+    if ((sa3 = sarrayCreate(0)) == NULL)
+        return ERROR_INT("sa3 not made", procName, 1);
 
         /* Copyright notice */
     sarrayParseRange(sa1, 0, &actstart, &end, &newstart, "--", 0);
@@ -389,7 +399,7 @@ SARRAY     *sa1, *sa2, *sa3;
     sarrayAppendRange(sa3, sa1, actstart, end);
 
         /* Function name (as comment) */
-    snprintf(buf, sizeof(buf), " * \\brief  l_autodecode_%d()", fileno);
+    snprintf(buf, sizeof(buf), " *  l_autodecode_%d()", fileno);
     sarrayAddString(sa3, buf, L_COPY);
 
         /* Input and return values */
@@ -426,7 +436,8 @@ SARRAY     *sa1, *sa2, *sa3;
     sarrayAppendRange(sa3, sa1, actstart, end);
 
         /* Flatten to string and output to autogen*.c file */
-    filestr = sarrayToString(sa3, 1);
+    if ((filestr = sarrayToString(sa3, 1)) == NULL)
+        return ERROR_INT("filestr from sa3 not made", procName, 1);
     nbytes = strlen(filestr);
     snprintf(buf, sizeof(buf), "%s/autogen.%d.c", realoutdir, fileno);
     l_binaryWrite(buf, "w", filestr, nbytes);
@@ -439,10 +450,14 @@ SARRAY     *sa1, *sa2, *sa3;
     /* ------------------------------------------------------- */
 
        /* Make array of textlines from TEMPLATE2 */
-    filestr = (char *)l_binaryRead(TEMPLATE2, &size);
-    sa2 = sarrayCreateLinesFromString(filestr, 1);
+    if ((filestr = (char *)l_binaryRead(TEMPLATE2, &size)) == NULL)
+        return ERROR_INT("filestr not made", procName, 1);
+    if ((sa2 = sarrayCreateLinesFromString(filestr, 1)) == NULL)
+        return ERROR_INT("sa2 not made", procName, 1);
     LEPT_FREE(filestr);
-    sa3 = sarrayCreate(0);
+
+    if ((sa3 = sarrayCreate(0)) == NULL)
+        return ERROR_INT("sa3 not made", procName, 1);
 
         /* Copyright notice */
     sarrayParseRange(sa2, 0, &actstart, &end, &newstart, "--", 0);
@@ -484,7 +499,8 @@ SARRAY     *sa1, *sa2, *sa3;
     sarrayAddString(sa3, buf, L_COPY);
 
         /* Flatten to string and output to autogen*.h file */
-    filestr = sarrayToString(sa3, 1);
+    if ((filestr = sarrayToString(sa3, 1)) == NULL)
+        return ERROR_INT("filestr from sa3 not made", procName, 1);
     nbytes = strlen(filestr);
     snprintf(buf, sizeof(buf), "%s/autogen.%d.h", realoutdir, fileno);
     l_binaryWrite(buf, "w", filestr, nbytes);
@@ -503,8 +519,8 @@ SARRAY     *sa1, *sa2, *sa3;
  * \brief   l_getStructStrFromFile()
  *
  * \param[in]    filename
- * \param[in]    field   (L_STR_TYPE, L_STR_NAME, L_STR_READER, L_STR_MEMREADER)
- * \param[out]   pstr    struct string for this file
+ * \param[in]    field  (L_STR_TYPE, L_STR_NAME, L_STR_READER, L_STR_MEMREADER)
+ * \param[out]   pstr  struct string for this file
  * \return  0 if found, 1 on error.
  *
  * <pre>
@@ -512,7 +528,6 @@ SARRAY     *sa1, *sa2, *sa3;
  *      (1) For example, if %field == L_STR_NAME, and the file is a serialized
  *          pixa, this will return "Pixa", the name of the struct.
  *      (2) Caller must free the returned string.
- * </pre>
  */
 l_int32
 l_getStructStrFromFile(const char  *filename,
@@ -521,17 +536,19 @@ l_getStructStrFromFile(const char  *filename,
 {
 l_int32  index;
 
+    PROCNAME("l_getStructStrFromFile");
+
     if (!pstr)
-        return ERROR_INT("&str not defined", __func__, 1);
+        return ERROR_INT("&str not defined", procName, 1);
     *pstr = NULL;
     if (!filename)
-        return ERROR_INT("filename not defined", __func__, 1);
+        return ERROR_INT("filename not defined", procName, 1);
     if (field != L_STR_TYPE && field != L_STR_NAME &&
         field != L_STR_READER && field != L_STR_MEMREADER)
-        return ERROR_INT("invalid field", __func__, 1);
+        return ERROR_INT("invalid field", procName, 1);
 
     if (l_getIndexFromFile(filename, &index))
-        return ERROR_INT("index not retrieved", __func__, 1);
+        return ERROR_INT("index not retrieved", procName, 1);
     if (field == L_STR_TYPE)
         *pstr = stringNew(l_assoc[index].type);
     else if (field == L_STR_NAME)
@@ -550,8 +567,8 @@ l_int32  index;
 /*!
  * \brief   l_getIndexFromType()
  *
- * \param[in]    type     e.g., "PIXA"
- * \param[out]   pindex   found index
+ * \param[in]    type e.g., "PIXA"
+ * \param[out]   pindex found index
  * \return  0 if found, 1 if not.
  *
  * <pre>
@@ -565,11 +582,13 @@ l_getIndexFromType(const char  *type,
 {
 l_int32  i, found;
 
+    PROCNAME("l_getIndexFromType");
+
     if (!pindex)
-        return ERROR_INT("&index not defined", __func__, 1);
+        return ERROR_INT("&index not defined", procName, 1);
     *pindex = 0;
     if (!type)
-        return ERROR_INT("type string not defined", __func__, 1);
+        return ERROR_INT("type string not defined", procName, 1);
 
     found = 0;
     for (i = 1; i <= l_ntypes; i++) {
@@ -586,8 +605,8 @@ l_int32  i, found;
 /*!
  * \brief   l_getIndexFromStructname()
  *
- * \param[in]    sn       structname e.g., "Pixa"
- * \param[out]   pindex   found index
+ * \param[in]    sn structname e.g., "Pixa"
+ * \param[out]   pindex found index
  * \return  0 if found, 1 if not.
  *
  * <pre>
@@ -603,11 +622,13 @@ l_getIndexFromStructname(const char  *sn,
 {
 l_int32  i, found;
 
+    PROCNAME("l_getIndexFromStructname");
+
     if (!pindex)
-        return ERROR_INT("&index not defined", __func__, 1);
+        return ERROR_INT("&index not defined", procName, 1);
     *pindex = 0;
     if (!sn)
-        return ERROR_INT("sn string not defined", __func__, 1);
+        return ERROR_INT("sn string not defined", procName, 1);
 
     found = 0;
     for (i = 1; i <= l_ntypes; i++) {
@@ -625,7 +646,7 @@ l_int32  i, found;
  * \brief   l_getIndexFromFile()
  *
  * \param[in]    filename
- * \param[out]   pindex     found index
+ * \param[out]   pindex found index
  * \return  0 if found, 1 on error.
  */
 static l_int32
@@ -638,20 +659,22 @@ FILE    *fp;
 l_int32  notfound, format;
 SARRAY  *sa;
 
+    PROCNAME("l_getIndexFromFile");
+
     if (!pindex)
-        return ERROR_INT("&index not defined", __func__, 1);
+        return ERROR_INT("&index not defined", procName, 1);
     *pindex = 0;
     if (!filename)
-        return ERROR_INT("filename not defined", __func__, 1);
+        return ERROR_INT("filename not defined", procName, 1);
 
         /* Open the stream, read lines until you find one with more
          * than a newline, and grab the first word. */
     if ((fp = fopenReadStream(filename)) == NULL)
-        return ERROR_INT_1("stream not opened", filename, __func__, 1);
+        return ERROR_INT("stream not opened", procName, 1);
     do {
         if ((fgets(buf, sizeof(buf), fp)) == NULL) {
             fclose(fp);
-            return ERROR_INT_1("fgets read fail", filename, __func__, 1);
+            return ERROR_INT("fgets read fail", procName, 1);
         }
     } while (buf[0] == '\n');
     fclose(fp);
@@ -666,8 +689,7 @@ SARRAY  *sa;
         if (findFileFormat(filename, &format) == 0) {
             l_getIndexFromStructname("Pix", pindex);
         } else {
-            return ERROR_INT_1("no file type identified",
-                               filename, __func__, 1);
+            return ERROR_INT("no file type identified", procName, 1);
         }
     }
 
@@ -678,8 +700,8 @@ SARRAY  *sa;
 /*!
  * \brief   l_genDataString()
  *
- * \param[in]    filein   input file of serialized data
- * \param[in]    ifunc    index into set of functions in output file
+ * \param[in]    filein input file of serialized data
+ * \param[in]    ifunc index into set of functions in output file
  * \return  encoded ascii data string, or NULL on error reading from file
  */
 static char *
@@ -693,13 +715,15 @@ l_int32   csize1, csize2;
 size_t    size1, size2;
 SARRAY   *sa;
 
+    PROCNAME("l_genDataString");
+
     if (!filein)
-        return (char *)ERROR_PTR("filein not defined", __func__, NULL);
+        return (char *)ERROR_PTR("filein not defined", procName, NULL);
 
         /* Read it in, gzip it, encode, and reformat.  We gzip because some
          * serialized data has a significant amount of ascii content. */
     if ((data1 = l_binaryRead(filein, &size1)) == NULL)
-        return (char *)ERROR_PTR("bindata not returned", __func__, NULL);
+        return (char *)ERROR_PTR("bindata not returned", procName, NULL);
     data2 = zlibCompress(data1, size1, &size2);
     cdata1 = encodeBase64(data2, size2, &csize1);
     cdata2 = reformatPacked64(cdata1, csize1, 4, 72, 1, &csize2);
@@ -712,7 +736,7 @@ SARRAY   *sa;
     snprintf(buf, sizeof(buf), "static const char *l_strdata_%d =\n", ifunc);
     sarrayAddString(sa, buf, L_COPY);
     sarrayAddString(sa, cdata2, L_INSERT);
-    sarrayAddString(sa, ";\n", L_COPY);
+    sarrayAddString(sa, (char *)";\n", L_COPY);
     cdata3 = sarrayToString(sa, 0);
     sarrayDestroy(&sa);
     return cdata3;
@@ -722,8 +746,8 @@ SARRAY   *sa;
 /*!
  * \brief   l_genCaseString()
  *
- * \param[in]    ifunc   index into set of functions in generated file
- * \param[in]    itype   index into type of function to be used
+ * \param[in]    ifunc index into set of functions in generated file
+ * \param[in]    itype index into type of function to be used
  * \return  case string for this decoding function
  *
  * <pre>
@@ -760,9 +784,9 @@ char  *code = NULL;
 /*!
  * \brief   l_genDescrString()
  *
- * \param[in]    filein   input file of serialized data
- * \param[in]    ifunc    index into set of functions in generated file
- * \param[in]    itype    index into type of function to be used
+ * \param[in]    filein input file of serialized data
+ * \param[in]    ifunc index into set of functions in generated file
+ * \param[in]    itype index into type of function to be used
  * \return  description string for this decoding function
  */
 static char *
@@ -773,8 +797,10 @@ l_genDescrString(const char  *filein,
 char   buf[256];
 char  *tail;
 
+    PROCNAME("l_genDescrString");
+
     if (!filein)
-        return (char *)ERROR_PTR("filein not defined", __func__, NULL);
+        return (char *)ERROR_PTR("filein not defined", procName, NULL);
 
     splitPathAtDirectory(filein, NULL, &tail);
     snprintf(buf, sizeof(buf), " *     %-2d       %-10s    %-14s   %s",

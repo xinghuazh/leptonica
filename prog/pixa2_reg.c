@@ -30,10 +30,6 @@
  *    Tests various replacement functions on pixa.
  */
 
-#ifdef HAVE_CONFIG_H
-#include <config_auto.h>
-#endif  /* HAVE_CONFIG_H */
-
 #include "allheaders.h"
 
 int main(int    argc,
@@ -53,14 +49,14 @@ L_REGPARAMS  *rp;
     /* ----------------  Find all the jpg and tif images --------------- */
     sa1 = getSortedPathnamesInDirectory(".", ".jpg", 0, 0);
     sa2 = getSortedPathnamesInDirectory(".", ".tif", 0, 0);
-    sa3 = sarraySelectRange(sa1, 10, 19);
-    sa4 = sarraySelectRange(sa2, 10, 19);
+    sa3 = sarraySelectByRange(sa1, 10, 19);
+    sa4 = sarraySelectByRange(sa2, 10, 19);
     sarrayJoin(sa3, sa4);
     n =sarrayGetCount(sa3);
     sarrayDestroy(&sa1);
     sarrayDestroy(&sa2);
     sarrayDestroy(&sa4);
-    if (rp->display) sarrayWriteStderr(sa3);
+    sarrayWriteStream(stderr, sa3);
 
     /* ---------------- Use replace to fill up a pixa -------------------*/
     pixa = pixaCreate(1);
@@ -80,8 +76,8 @@ L_REGPARAMS  *rp;
     for (i = 0; i < n; i++) {
         name = sarrayGetString(sa3, i, L_NOCOPY);
         if ((pix0 = pixRead(name)) == NULL) {
-            lept_stderr("Error in %s_reg: failed to read %s\n",
-                        rp->testname, name);
+            fprintf(stderr, "Error in %s_reg: failed to read %s\n",
+                    rp->testname, name);
             rp->success = FALSE;
             continue;
         }
@@ -101,8 +97,8 @@ L_REGPARAMS  *rp;
     for (i = 0; i < n; i++) {
         name = sarrayGetString(sa3, i, L_NOCOPY);
         if ((pix0 = pixRead(name)) == NULL) {
-            lept_stderr("Error in %s_reg: failed to read %s\n",
-                        rp->testname, name);
+            fprintf(stderr, "Error in %s_reg: failed to read %s\n",
+                    rp->testname, name);
             rp->success = FALSE;
             continue;
         }

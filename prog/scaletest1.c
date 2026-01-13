@@ -30,37 +30,30 @@
  *      scaletest1 filein scalex scaley fileout
  *    where
  *      scalex, scaley are floating point input
- *
- *  For d < 8 bpp, writes output in png
- *  For d >= 8 bpp, uses output file extension to determine output format.
- *
  */
-
-#ifdef HAVE_CONFIG_H
-#include <config_auto.h>
-#endif  /* HAVE_CONFIG_H */
 
 #include "allheaders.h"
 
 int main(int    argc,
          char **argv)
 {
-char      *filein, *fileout;
-l_int32    d, fmt;
-l_float32  scalex, scaley;
-PIX       *pixs, *pixd;
+char        *filein, *fileout;
+l_int32      d;
+l_float32    scalex, scaley;
+PIX         *pixs, *pixd;
+static char  mainName[] = "scaletest1";
 
     if (argc != 5)
 	return ERROR_INT(" Syntax:  scaletest1 filein scalex scaley fileout",
-	                 __func__, 1);
+	                 mainName, 1);
+
     filein = argv[1];
     scalex = atof(argv[2]);
     scaley = atof(argv[3]);
     fileout = argv[4];
-    setLeptDebugOK(1);
 
     if ((pixs = pixRead(filein)) == NULL)
-	return ERROR_INT("pixs not made", __func__, 1);
+	return ERROR_INT("pixs not made", mainName, 1);
 
         /* choose type of scaling operation */
 #if 1
@@ -79,12 +72,14 @@ PIX       *pixs, *pixd;
 
     d = pixGetDepth(pixd);
 
-    if (d < 8) {
+#if 1
+    if (d <= 8)
         pixWrite(fileout, pixd, IFF_PNG);
-    } else {
-        fmt = getImpliedFileFormat(fileout);
-        pixWrite(fileout, pixd, fmt);
-    }
+    else
+        pixWrite(fileout, pixd, IFF_JFIF_JPEG);
+#else
+    pixWrite(fileout, pixd, IFF_PNG);
+#endif
 
     pixDestroy(&pixs);
     pixDestroy(&pixd);

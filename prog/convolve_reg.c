@@ -30,10 +30,6 @@
  *    Tests a number of convolution functions.
  */
 
-#ifdef HAVE_CONFIG_H
-#include <config_auto.h>
-#endif  /* HAVE_CONFIG_H */
-
 #include "allheaders.h"
 
 static const char  *kel1str = " 20    50   80  50   20 "
@@ -145,7 +141,7 @@ L_REGPARAMS  *rp;
     pixd = pixConvolveWithBias(pixg, kel2, NULL, TRUE, &bias);
     regTestWritePixAndCheck(rp, pixd, IFF_JFIF_JPEG);  /* 10 */
     pixDisplayWithTitle(pixd, 400, 500, NULL, rp->display);
-    lept_stderr("bias = %d\n", bias);
+    fprintf(stderr, "bias = %d\n", bias);
     kernelDestroy(&kel2);
     pixDestroy(&pixd);
 
@@ -155,7 +151,7 @@ L_REGPARAMS  *rp;
     pixd = pixConvolveWithBias(pixg, kel3x, kel3y, TRUE, &bias);
     regTestWritePixAndCheck(rp, pixd, IFF_JFIF_JPEG);  /* 11 */
     pixDisplayWithTitle(pixd, 500, 500, NULL, rp->display);
-    lept_stderr("bias = %d\n", bias);
+    fprintf(stderr, "bias = %d\n", bias);
     kernelDestroy(&kel3x);
     kernelDestroy(&kel3y);
     pixDestroy(&pixd);

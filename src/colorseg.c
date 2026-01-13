@@ -39,17 +39,13 @@
  * </pre>
  */
 
-#ifdef HAVE_CONFIG_H
-#include <config_auto.h>
-#endif  /* HAVE_CONFIG_H */
-
 #include "allheaders.h"
 
     /* Maximum allowed iterations in Phase 1. */
 static const l_int32  MAX_ALLOWED_ITERATIONS = 20;
 
     /* Factor by which max dist is increased on each iteration */
-static const l_float32  DIST_EXPAND_FACT = 1.3f;
+static const l_float32  DIST_EXPAND_FACT = 1.3;
 
     /* Octcube division level for computing nearest colormap color using LUT.
      * Using 4 should suffice for up to 50 - 100 colors, and it is
@@ -140,31 +136,36 @@ pixColorSegment(PIX     *pixs,
 l_int32   *countarray;
 PIX       *pixd;
 
+    PROCNAME("pixColorSegment");
+
     if (!pixs)
-        return (PIX *)ERROR_PTR("pixs not defined", __func__, NULL);
+        return (PIX *)ERROR_PTR("pixs not defined", procName, NULL);
     if (pixGetDepth(pixs) != 32)
-        return (PIX *)ERROR_PTR("must be rgb color", __func__, NULL);
+        return (PIX *)ERROR_PTR("must be rgb color", procName, NULL);
 
         /* Phase 1; original segmentation */
     pixd = pixColorSegmentCluster(pixs, maxdist, maxcolors, debugflag);
     if (!pixd)
-        return (PIX *)ERROR_PTR("pixd not made", __func__, NULL);
+        return (PIX *)ERROR_PTR("pixd not made", procName, NULL);
     if (debugflag) {
         lept_mkdir("lept/segment");
-        pixWriteDebug("/tmp/lept/segment/colorseg1.png", pixd, IFF_PNG);
+        pixWrite("/tmp/lept/segment/colorseg1.png", pixd, IFF_PNG);
     }
 
         /* Phase 2; refinement in pixel assignment */
-    countarray = (l_int32 *)LEPT_CALLOC(256, sizeof(l_int32));
+    if ((countarray = (l_int32 *)LEPT_CALLOC(256, sizeof(l_int32))) == NULL) {
+        pixDestroy(&pixd);
+        return (PIX *)ERROR_PTR("countarray not made", procName, NULL);
+    }
     pixAssignToNearestColor(pixd, pixs, NULL, LEVEL_IN_OCTCUBE, countarray);
     if (debugflag)
-        pixWriteDebug("/tmp/lept/segment/colorseg2.png", pixd, IFF_PNG);
+        pixWrite("/tmp/lept/segment/colorseg2.png", pixd, IFF_PNG);
 
         /* Phase 3: noise removal by separately closing each color */
     pixColorSegmentClean(pixd, selsize, countarray);
     LEPT_FREE(countarray);
     if (debugflag)
-        pixWriteDebug("/tmp/lept/segment/colorseg3.png", pixd, IFF_PNG);
+        pixWrite("/tmp/lept/segment/colorseg3.png", pixd, IFF_PNG);
 
         /* Phase 4: removal of colors with small population and
          * reassignment of pixels to remaining colors */
@@ -205,14 +206,16 @@ l_int32   w, h, newmaxdist, ret, niters, ncolors, success;
 PIX      *pixd;
 PIXCMAP  *cmap;
 
+    PROCNAME("pixColorSegmentCluster");
+
     if (!pixs)
-        return (PIX *)ERROR_PTR("pixs not defined", __func__, NULL);
+        return (PIX *)ERROR_PTR("pixs not defined", procName, NULL);
     if (pixGetDepth(pixs) != 32)
-        return (PIX *)ERROR_PTR("must be rgb color", __func__, NULL);
+        return (PIX *)ERROR_PTR("must be rgb color", procName, NULL);
 
     pixGetDimensions(pixs, &w, &h, NULL);
     if ((pixd = pixCreate(w, h, 8)) == NULL)
-        return (PIX *)ERROR_PTR("pixd not made", __func__, NULL);
+        return (PIX *)ERROR_PTR("pixd not made", procName, NULL);
     cmap = pixcmapCreate(8);
     pixSetColormap(pixd, cmap);
     pixCopyResolution(pixd, pixs);
@@ -227,13 +230,13 @@ PIXCMAP  *cmap;
         if (!ret) {
             ncolors = pixcmapGetCount(cmap);
             if (debugflag)
-                L_INFO("Success with %d colors after %d iters\n", __func__,
+                L_INFO("Success with %d colors after %d iters\n", procName,
                        ncolors, niters);
             break;
         }
         if (niters == MAX_ALLOWED_ITERATIONS) {
             L_WARNING("too many iters; newmaxdist = %d\n",
-                      __func__, newmaxdist);
+                      procName, newmaxdist);
             success = FALSE;
             break;
         }
@@ -242,7 +245,7 @@ PIXCMAP  *cmap;
 
     if (!success) {
         pixDestroy(&pixd);
-        return (PIX *)ERROR_PTR("failure in phase 1", __func__, NULL);
+        return (PIX *)ERROR_PTR("failure in phase 1", procName, NULL);
     }
 
     return pixd;
@@ -280,10 +283,12 @@ l_uint32  *ppixel;
 l_uint32  *datas, *datad, *lines, *lined;
 PIXCMAP   *cmap;
 
+    PROCNAME("pixColorSegmentTryCluster");
+
     if (!pixs)
-        return ERROR_INT("pixs not defined", __func__, 1);
+        return ERROR_INT("pixs not defined", procName, 1);
     if (!pixd)
-        return ERROR_INT("pixd not defined", __func__, 1);
+        return ERROR_INT("pixd not defined", procName, 1);
 
     w = pixGetWidth(pixs);
     h = pixGetHeight(pixs);
@@ -326,7 +331,7 @@ PIXCMAP   *cmap;
             }
             if (!found) {  /* Add a new color */
                 ret = pixcmapAddNewColor(cmap, rval, gval, bval, &index);
-/*                lept_stderr(
+/*                fprintf(stderr,
                         "index = %d, (i,j) = (%d,%d), rgb = (%d, %d, %d)\n",
                         index, i, j, rval, gval, bval); */
                 if (ret == 0 && index < maxcolors) {
@@ -341,7 +346,7 @@ PIXCMAP   *cmap;
                 } else {
                     if (debugflag) {
                         L_INFO("maxcolors exceeded for maxdist = %d\n",
-                               __func__, maxdist);
+                               procName, maxdist);
                     }
                     return 1;
                 }
@@ -403,7 +408,7 @@ PIXCMAP   *cmap;
  *          pixel in the image.
  * </pre>
  */
-l_ok
+l_int32
 pixAssignToNearestColor(PIX      *pixd,
                         PIX      *pixs,
                         PIX      *pixm,
@@ -416,26 +421,28 @@ l_int32   *cmaptab;
 l_uint32   octindex;
 l_uint32  *rtab, *gtab, *btab;
 l_uint32  *ppixel;
-l_uint32  *datas, *datad, *datam = NULL, *lines, *lined, *linem = NULL;
+l_uint32  *datas, *datad, *datam, *lines, *lined, *linem;
 PIXCMAP   *cmap;
 
+    PROCNAME("pixAssignToNearestColor");
+
     if (!pixd)
-        return ERROR_INT("pixd not defined", __func__, 1);
+        return ERROR_INT("pixd not defined", procName, 1);
     if ((cmap = pixGetColormap(pixd)) == NULL)
-        return ERROR_INT("cmap not found", __func__, 1);
+        return ERROR_INT("cmap not found", procName, 1);
     if (!pixs)
-        return ERROR_INT("pixs not defined", __func__, 1);
+        return ERROR_INT("pixs not defined", procName, 1);
     if (pixGetDepth(pixs) != 32)
-        return ERROR_INT("pixs not 32 bpp", __func__, 1);
+        return ERROR_INT("pixs not 32 bpp", procName, 1);
     if (level < 1 || level > 6)
-        return ERROR_INT("level not in [1 ... 6]", __func__, 1);
+        return ERROR_INT("level not in [1 ... 6]", procName, 1);
 
         /* Set up the tables to map rgb to the nearest colormap index */
     success = TRUE;
-    makeRGBToIndexTables(level, &rtab, &gtab, &btab);
+    makeRGBToIndexTables(&rtab, &gtab, &btab, level);
     cmaptab = pixcmapToOctcubeLUT(cmap, level, L_MANHATTAN_DISTANCE);
     if (!rtab || !gtab || !btab || !cmaptab) {
-        L_ERROR("failure to make a table\n", __func__);
+        L_ERROR("failure to make a table\n", procName);
         success = FALSE;
         goto cleanup_arrays;
     }
@@ -501,7 +508,7 @@ cleanup_arrays:
  *          small sets of intercolated pixels of a different color.
  * </pre>
  */
-l_ok
+l_int32
 pixColorSegmentClean(PIX      *pixs,
                      l_int32   selsize,
                      l_int32  *countarray)
@@ -512,14 +519,16 @@ NUMA      *na, *nasi;
 PIX       *pixt1, *pixt2;
 PIXCMAP   *cmap;
 
+    PROCNAME("pixColorSegmentClean");
+
     if (!pixs)
-        return ERROR_INT("pixs not defined", __func__, 1);
+        return ERROR_INT("pixs not defined", procName, 1);
     if (pixGetDepth(pixs) != 8)
-        return ERROR_INT("pixs not 8 bpp", __func__, 1);
+        return ERROR_INT("pixs not 8 bpp", procName, 1);
     if ((cmap = pixGetColormap(pixs)) == NULL)
-        return ERROR_INT("cmap not found", __func__, 1);
+        return ERROR_INT("cmap not found", procName, 1);
     if (!countarray)
-        return ERROR_INT("countarray not defined", __func__, 1);
+        return ERROR_INT("countarray not defined", procName, 1);
     if (selsize <= 1)
         return 0;  /* nothing to do */
 
@@ -531,7 +540,7 @@ PIXCMAP   *cmap;
     nasi = numaGetSortIndex(na, L_SORT_DECREASING);
     numaDestroy(&na);
     if (!nasi)
-        return ERROR_INT("nasi not made", __func__, 1);
+        return ERROR_INT("nasi not made", procName, 1);
 
         /* For each color, in order of decreasing population,
          * do a closing and absorb the added pixels.  Note that
@@ -571,7 +580,7 @@ PIXCMAP   *cmap;
  *          we find the nearest colormap color  to the original rgb color.
  * </pre>
  */
-l_ok
+l_int32
 pixColorSegmentRemoveColors(PIX     *pixd,
                             PIX     *pixs,
                             l_int32  finalcolors)
@@ -583,14 +592,16 @@ NUMA      *na, *nasi;
 PIX       *pixm;
 PIXCMAP   *cmap;
 
+    PROCNAME("pixColorSegmentRemoveColors");
+
     if (!pixd)
-        return ERROR_INT("pixd not defined", __func__, 1);
+        return ERROR_INT("pixd not defined", procName, 1);
     if (pixGetDepth(pixd) != 8)
-        return ERROR_INT("pixd not 8 bpp", __func__, 1);
+        return ERROR_INT("pixd not 8 bpp", procName, 1);
     if ((cmap = pixGetColormap(pixd)) == NULL)
-        return ERROR_INT("cmap not found", __func__, 1);
+        return ERROR_INT("cmap not found", procName, 1);
     if (!pixs)
-        return ERROR_INT("pixs not defined", __func__, 1);
+        return ERROR_INT("pixs not defined", procName, 1);
     ncolors = pixcmapGetCount(cmap);
     if (finalcolors >= ncolors)  /* few enough colors already; nothing to do */
         return 0;
@@ -604,7 +615,7 @@ PIXCMAP   *cmap;
     na = pixGetCmapHistogram(pixd, 1);
     if ((nasi = numaGetSortIndex(na, L_SORT_DECREASING)) == NULL) {
         numaDestroy(&na);
-        return ERROR_INT("nasi not made", __func__, 1);
+        return ERROR_INT("nasi not made", procName, 1);
     }
     numaGetIValue(nasi, finalcolors - 1, &tempindex);  /* retain down to this */
     pixcmapGetColor32(cmap, tempindex, &tempcolor);  /* use this color */

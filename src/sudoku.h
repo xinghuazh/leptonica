@@ -66,7 +66,6 @@ typedef struct L_Sudoku  L_SUDOKU;
 
 
     /*! For printing out array data */
-/*! Sudoku Output */
 enum {
     L_SUDOKU_INIT = 0,
     L_SUDOKU_STATE = 1

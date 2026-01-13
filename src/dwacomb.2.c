@@ -25,15 +25,11 @@
  *====================================================================*/
 
 /*!
- *      Top-level fast binary morphology with auto-generated sels
+ * \brief       Top-level fast binary morphology with auto-generated sels
  *
  *             PIX     *pixMorphDwa_2()
  *             PIX     *pixFMorphopGen_2()
  */
-
-#ifdef HAVE_CONFIG_H
-#include <config_auto.h>
-#endif  /* HAVE_CONFIG_H */
 
 #include <string.h>
 #include "allheaders.h"
@@ -127,12 +123,12 @@ static char  SEL_NAMES[][80] = {
 /*!
  * \brief   pixMorphDwa_2()
  *
- * \param[in]    pixd         usual 3 choices: null, == pixs, != pixs
- * \param[in]    pixs         1 bpp
- * \param[in]    operation    L_MORPH_DILATE, L_MORPH_ERODE,
- *                            L_MORPH_OPEN, L_MORPH_CLOSE
- * \param[in]    sel          name
- * \return    pixd
+ * \param[in]    pixd usual 3 choices: null, == pixs, != pixs
+ * \param[in]    pixs 1 bpp
+ * \param[in]    operation  L_MORPH_DILATE, L_MORPH_ERODE,
+ *                          L_MORPH_OPEN, L_MORPH_CLOSE
+ * \param[in]    sel name
+ * \return  pixd
  *
  * <pre>
  * Notes:
@@ -152,10 +148,12 @@ pixMorphDwa_2(PIX     *pixd,
 l_int32  bordercolor, bordersize;
 PIX     *pixt1, *pixt2, *pixt3;
 
+    PROCNAME("pixMorphDwa_2");
+
     if (!pixs)
-        return (PIX *)ERROR_PTR("pixs not defined", __func__, pixd);
+        return (PIX *)ERROR_PTR("pixs not defined", procName, pixd);
     if (pixGetDepth(pixs) != 1)
-        return (PIX *)ERROR_PTR("pixs must be 1 bpp", __func__, pixd);
+        return (PIX *)ERROR_PTR("pixs must be 1 bpp", procName, pixd);
 
         /* Set the border size */
     bordercolor = getMorphBorderPixelColor(L_MORPH_ERODE, 1);
@@ -181,12 +179,12 @@ PIX     *pixt1, *pixt2, *pixt3;
 /*!
  * \brief   pixFMorphopGen_2()
  *
- * \param[in]    pixd        usual 3 choices: null, == pixs, != pixs
- * \param[in]    pixs        1 bpp
- * \param[in]    operation   L_MORPH_DILATE, L_MORPH_ERODE,
- *                           L_MORPH_OPEN, L_MORPH_CLOSE
+ * \param[in]    pixd usual 3 choices: null, == pixs, != pixs
+ * \param[in]    pixs 1 bpp
+ * \param[in]    operation  L_MORPH_DILATE, L_MORPH_ERODE,
+ *                          L_MORPH_OPEN, L_MORPH_CLOSE
  * \param[in]    sel name
- * \return     pixd
+ * \return  pixd
  *
  * <pre>
  * Notes:
@@ -211,10 +209,12 @@ l_int32    i, index, found, w, h, wpls, wpld, bordercolor, erodeop, borderop;
 l_uint32  *datad, *datas, *datat;
 PIX       *pixt;
 
+    PROCNAME("pixFMorphopGen_2");
+
     if (!pixs)
-        return (PIX *)ERROR_PTR("pixs not defined", __func__, pixd);
+        return (PIX *)ERROR_PTR("pixs not defined", procName, pixd);
     if (pixGetDepth(pixs) != 1)
-        return (PIX *)ERROR_PTR("pixs must be 1 bpp", __func__, pixd);
+        return (PIX *)ERROR_PTR("pixs must be 1 bpp", procName, pixd);
 
         /* Get boundary colors to use */
     bordercolor = getMorphBorderPixelColor(L_MORPH_ERODE, 1);
@@ -232,11 +232,11 @@ PIX       *pixt;
         }
     }
     if (found == FALSE)
-        return (PIX *)ERROR_PTR("sel index not found", __func__, pixd);
+        return (PIX *)ERROR_PTR("sel index not found", procName, pixd);
 
     if (!pixd) {
         if ((pixd = pixCreateTemplate(pixs)) == NULL)
-            return (PIX *)ERROR_PTR("pixd not made", __func__, NULL);
+            return (PIX *)ERROR_PTR("pixd not made", procName, NULL);
     }
     else  /* for in-place or pre-allocated */
         pixResizeImageData(pixd, pixs);
@@ -260,7 +260,7 @@ PIX       *pixt;
         }
         if (pixd == pixs) {  /* in-place; generate a temp image */
             if ((pixt = pixCopy(NULL, pixs)) == NULL)
-                return (PIX *)ERROR_PTR("pixt not made", __func__, pixd);
+                return (PIX *)ERROR_PTR("pixt not made", procName, pixd);
             datat = pixGetData(pixt) + 32 * wpls + 1;
             pixSetOrClearBorder(pixt, 32, 32, 32, 32, borderop);
             fmorphopgen_low_2(datad, w, h, wpld, datat, wpls, index);
@@ -273,7 +273,7 @@ PIX       *pixt;
     }
     else {  /* opening or closing; generate a temp image */
         if ((pixt = pixCreateTemplate(pixs)) == NULL)
-            return (PIX *)ERROR_PTR("pixt not made", __func__, pixd);
+            return (PIX *)ERROR_PTR("pixt not made", procName, pixd);
         datat = pixGetData(pixt) + 32 * wpls + 1;
         if (operation == L_MORPH_OPEN) {
             pixSetOrClearBorder(pixs, 32, 32, 32, 32, erodeop);
@@ -292,4 +292,3 @@ PIX       *pixt;
 
     return pixd;
 }
-

@@ -71,10 +71,6 @@
  * </pre>
  */
 
-#ifdef HAVE_CONFIG_H
-#include <config_auto.h>
-#endif  /* HAVE_CONFIG_H */
-
 #include "allheaders.h"
 
     /* The node color enum is only needed in the rbtree implementation */
@@ -122,6 +118,7 @@ static void verify_properties(L_RBTREE *t);
 #define  VERIFY_RBTREE     0   /* only for debugging */
 #endif  /* ~NO_CONSOLE_IO */
 
+
 /* ------------------------------------------------------------- *
  *                   Interface to Red-black Tree                 *
  * ------------------------------------------------------------- */
@@ -134,13 +131,13 @@ static void verify_properties(L_RBTREE *t);
 L_RBTREE *
 l_rbtreeCreate(l_int32  keytype)
 {
-L_RBTREE  *t;
+    PROCNAME("l_rbtreeCreate");
 
     if (keytype != L_INT_TYPE && keytype != L_UINT_TYPE &&
         keytype != L_FLOAT_TYPE && keytype)
-        return (L_RBTREE *)ERROR_PTR("invalid keytype", __func__, NULL);
+        return (L_RBTREE *)ERROR_PTR("invalid keytype", procName, NULL);
 
-    t = (L_RBTREE *)LEPT_CALLOC(1, sizeof(L_RBTREE));
+    L_RBTREE *t = (L_RBTREE *)LEPT_CALLOC(1, sizeof(L_RBTREE));
     t->keytype = keytype;
     verify_properties(t);
     return t;
@@ -150,19 +147,19 @@ L_RBTREE  *t;
  * \brief   l_rbtreeLookup()
  *
  * \param[in]   t        rbtree, including root node
- * \param[in]   key      find a node with this key
+ * \param[in    key      find a node with this key
  * \return    &value     a pointer to a union, if the node exists; else NULL
  */
 RB_TYPE *
 l_rbtreeLookup(L_RBTREE  *t,
                RB_TYPE    key)
 {
-node  *n;
+    PROCNAME("l_rbtreeLookup");
 
     if (!t)
-        return (RB_TYPE *)ERROR_PTR("tree is null\n", __func__, NULL);
+        return (RB_TYPE *)ERROR_PTR("tree is null\n", procName, NULL);
 
-    n = lookup_node(t, key);
+    node *n = lookup_node(t, key);
     return n == NULL ? NULL : &n->value;
 }
 
@@ -187,8 +184,10 @@ l_rbtreeInsert(L_RBTREE     *t,
 {
 node  *n, *inserted_node;
 
+    PROCNAME("l_rbtreeInsert");
+
     if (!t) {
-        L_ERROR("tree is null\n", __func__);
+        L_ERROR("tree is null\n", procName);
         return;
     }
 
@@ -229,7 +228,7 @@ node  *n, *inserted_node;
  * \brief   l_rbtreeDelete()
  *
  * \param[in]   t     rbtree, including root node
- * \param[in]   key   delete the node with this key
+ * \param[in]   key  (delete the node with this key
  * \return      void
  */
 void
@@ -238,8 +237,10 @@ l_rbtreeDelete(L_RBTREE  *t,
 {
 node  *n, *child;
 
+    PROCNAME("l_rbtreeDelete");
+
     if (!t) {
-        L_ERROR("tree is null\n", __func__);
+        L_ERROR("tree is null\n", procName);
         return;
     }
 
@@ -270,7 +271,7 @@ node  *n, *child;
 /*!
  * \brief   l_rbtreeDestroy()
  *
- * \param[in]   pt     pointer to tree; will be wet to null before returning
+ * \param[in]   &t     ptr to rbtree
  * \return      void
  *
  * <pre>
@@ -289,6 +290,7 @@ node    *n;
     destroy_helper(n);
     LEPT_FREE(*pt);
     *pt = NULL;
+    return;
 }
 
     /* postorder DFS */
@@ -305,7 +307,7 @@ destroy_helper(node  *n)
  * \brief   l_rbtreeGetFirst()
  *
  * \param[in]    t    rbtree, including root node
- * \return       first node, or NULL on error or if the tree is empty
+ * \return       void
  *
  * <pre>
  * Notes:
@@ -317,10 +319,12 @@ l_rbtreeGetFirst(L_RBTREE  *t)
 {
 node  *n;
 
+    PROCNAME("l_rbtreeGetFirst");
+
     if (!t)
-        return (L_RBTREE_NODE *)ERROR_PTR("tree is null", __func__, NULL);
+        return (L_RBTREE_NODE *)ERROR_PTR("tree is null", procName, NULL);
     if (t->root == NULL) {
-        L_INFO("tree is empty\n", __func__);
+        L_INFO("tree is empty\n", procName);
         return NULL;
     }
 
@@ -348,8 +352,10 @@ node  *n;
 L_RBTREE_NODE *
 l_rbtreeGetNext(L_RBTREE_NODE  *n)
 {
+    PROCNAME("l_rbtreeGetNext");
+
     if (!n)
-        return (L_RBTREE_NODE *)ERROR_PTR("n not defined", __func__, NULL);
+        return (L_RBTREE_NODE *)ERROR_PTR("n not defined", procName, NULL);
 
         /* If there is a right child, go to it, and then go left all the
          * way to the end.  Otherwise go up to the parent; continue upward
@@ -371,7 +377,7 @@ l_rbtreeGetNext(L_RBTREE_NODE  *n)
  * \brief   l_rbtreeGetLast()
  *
  * \param[in]   t      rbtree, including root node
- * \return      last node, or NULL on error or if the tree is empty
+ * \return      void
  *
  * <pre>
  * Notes:
@@ -383,10 +389,12 @@ l_rbtreeGetLast(L_RBTREE  *t)
 {
 node  *n;
 
+    PROCNAME("l_rbtreeGetLast");
+
     if (!t)
-        return (L_RBTREE_NODE *)ERROR_PTR("tree is null", __func__, NULL);
+        return (L_RBTREE_NODE *)ERROR_PTR("tree is null", procName, NULL);
     if (t->root == NULL) {
-        L_INFO("tree is empty\n", __func__);
+        L_INFO("tree is empty\n", procName);
         return NULL;
     }
 
@@ -414,8 +422,10 @@ node  *n;
 L_RBTREE_NODE *
 l_rbtreeGetPrev(L_RBTREE_NODE  *n)
 {
+    PROCNAME("l_rbtreeGetPrev");
+
     if (!n)
-        return (L_RBTREE_NODE *)ERROR_PTR("n not defined", __func__, NULL);
+        return (L_RBTREE_NODE *)ERROR_PTR("n not defined", procName, NULL);
 
         /* If there is a left child, go to it, and then go right all the
          * way to the end.  Otherwise go up to the parent; continue upward
@@ -436,7 +446,7 @@ l_rbtreeGetPrev(L_RBTREE_NODE  *n)
 /*!
  * \brief   l_rbtreeGetCount()
  *
- * \param[in]  t      rbtree
+ * \param[in   t      rbtree
  * \return     count  the number of nodes in the tree, or 0 on error
  */
 l_int32
@@ -476,12 +486,13 @@ void
 l_rbtreePrint(FILE      *fp,
               L_RBTREE  *t)
 {
+    PROCNAME("l_rbtreePrint");
     if (!fp) {
-        L_ERROR("stream not defined\n", __func__);
+        L_ERROR("stream not defined\n", procName);
         return;
     }
     if (!t) {
-        L_ERROR("tree not defined\n", __func__);
+        L_ERROR("tree not defined\n", procName);
         return;
     }
 
@@ -537,6 +548,8 @@ compareKeys(l_int32  keytype,
             RB_TYPE  left,
             RB_TYPE  right)
 {
+static char  procName[] = "compareKeys";
+
     if (keytype == L_INT_TYPE) {
         if (left.itype < right.itype)
             return -1;
@@ -562,7 +575,7 @@ compareKeys(l_int32  keytype,
             return 0;
         }
     } else {
-        L_ERROR("unknown keytype %d\n", __func__, keytype);
+        L_ERROR("unknown keytype %d\n", procName, keytype);
         return 0;
     }
 }

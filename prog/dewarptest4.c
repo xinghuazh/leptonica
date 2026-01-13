@@ -30,10 +30,6 @@
  *   Tests serialization functions for dewarpa and dewarp structs.
  */
 
-#ifdef HAVE_CONFIG_H
-#include <config_auto.h>
-#endif  /* HAVE_CONFIG_H */
-
 #include "allheaders.h"
 
 
@@ -46,7 +42,6 @@ PIX        *pixs, *pixn, *pixg, *pixb, *pixd;
 PIX        *pixs2, *pixn2, *pixg2, *pixb2, *pixd2;
 PIX        *pixd3, *pixc1, *pixc2;
 
-    setLeptDebugOK(1);
     lept_mkdir("lept");
 
 /*    pixs = pixRead("1555.007.jpg"); */

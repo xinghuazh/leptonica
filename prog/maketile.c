@@ -43,38 +43,35 @@
  *    Note: this program is Unix only; it will not compile under cygwin.
  */
 
-#ifdef HAVE_CONFIG_H
-#include <config_auto.h>
-#endif  /* HAVE_CONFIG_H */
-
 #include <string.h>
 #include "allheaders.h"
 
 int main(int    argc,
          char **argv)
 {
-char      *dirin, *fileout, *fname, *fullname;
-l_int32    depth, width, background, i, nfiles;
-l_float32  scale;
-SARRAY    *safiles;
-PIX       *pix, *pixt, *pixd;
-PIXA      *pixa;
+char        *dirin, *fileout, *fname, *fullname;
+l_int32      depth, width, background, i, nfiles;
+l_float32    scale;
+SARRAY      *safiles;
+PIX         *pix, *pixt, *pixd;
+PIXA        *pixa;
+static char  mainName[] = "maketile";
 
     if (argc != 7)
         return ERROR_INT(
             "Syntax:  maketile dirin depth scale width background fileout",
-            __func__, 1);
+            mainName, 1);
+
     dirin = argv[1];
     depth = atoi(argv[2]);
     scale = atof(argv[3]);
     width = atoi(argv[4]);
     background = atoi(argv[5]);
     fileout = argv[6];
-    setLeptDebugOK(1);
 
         /* capture the filenames in the input directory; ignore directories */
     if ((safiles = getFilenamesInDirectory(dirin)) == NULL)
-        return ERROR_INT("safiles not made", __func__, 1);
+        return ERROR_INT("safiles not made", mainName, 1);
 
             /* capture images with the requisite depth */
     nfiles = sarrayGetCount(safiles);
@@ -91,15 +88,15 @@ PIXA      *pixa;
             continue;
         }
         if (pixGetHeight(pix) > 5000) {
-            lept_stderr("%s too tall\n", fname);
+            fprintf(stderr, "%s too tall\n", fname);
             continue;
         }
         pixt = pixScale(pix, scale, scale);
         pixaAddPix(pixa, pixt, L_INSERT);
         pixDestroy(&pix);
-/*        lept_stderr("%d..", i); */
+/*        fprintf(stderr, "%d..", i); */
     }
-    lept_stderr("\n");
+    fprintf(stderr, "\n");
 
         /* tile them */
     pixd = pixaDisplayTiled(pixa, width, background, 15);

@@ -28,56 +28,45 @@
  * \file colorcontent.c
  * <pre>
  *
- *      Build an image of the color content, on a per-pixel basis,
+ *      Builds an image of the color content, on a per-pixel basis,
  *      as a measure of the amount of divergence of each color
  *      component (R,G,B) from gray.
  *         l_int32    pixColorContent()
  *
- *      Find the 'amount' of color in an image, on a per-pixel basis,
+ *      Finds the 'amount' of color in an image, on a per-pixel basis,
  *      as a measure of the difference of the pixel color from gray.
  *         PIX       *pixColorMagnitude()
  *
- *      Find the fraction of pixels with "color" that are not close to black
- *         l_int32    pixColorFraction()
- *
- *      Do a linear TRC to map colors so that the three input reference
- *      values go to white.  These three numbers are typically the median
- *      or average background values.
- *         PIX       *pixColorShiftWhitePoint()
- *
- *      Generate a mask over pixels that have sufficient color and
+ *      Generates a mask over pixels that have sufficient color and
  *      are not too close to gray pixels.
  *         PIX       *pixMaskOverColorPixels()
  *
- *      Generate a mask over dark pixels with little color
- *         PIX       *pixMaskOverGrayPixels()
- *
- *      Generate mask over pixels within a prescribed cube in RGB space
+ *      Generates mask over pixels within a prescribed cube in RGB space
  *         PIX       *pixMaskOverColorRange()
+ *
+ *      Finds the fraction of pixels with "color" that are not close to black
+ *         l_int32    pixColorFraction()
  *
  *      Determine if there are significant color regions that are
  *      not background in a page image
  *         l_int32    pixFindColorRegions()
  *
- *      Find the number of perceptually significant gray intensities
+ *      Finds the number of perceptually significant gray intensities
  *      in a grayscale image.
  *         l_int32    pixNumSignificantGrayColors()
  *
- *      Identify images where color quantization will cause posterization
+ *      Identifies images where color quantization will cause posterization
  *      due to the existence of many colors in low-gradient regions.
  *         l_int32    pixColorsForQuantization()
  *
- *      Find the number of unique colors in an image
+ *      Finds the number of unique colors in an image
  *         l_int32    pixNumColors()
- *
- *      Lossless conversion of RGB image to colormapped
- *         PIX       *pixConvertRGBToCmapLossless()
  *
  *      Find the most "populated" colors in the image (and quantize)
  *         l_int32    pixGetMostPopulatedColors()
  *         PIX       *pixSimpleColorQuantize()
  *
- *      Construct a color histogram based on rgb indices
+ *      Constructs a color histogram based on rgb indices
  *         NUMA      *pixGetRGBHistogram()
  *         l_int32    makeRGBIndexTables()
  *         l_int32    getRGBFromIndex()
@@ -99,8 +88,8 @@
  *      from the other two.
  *
  *  How might one choose from among these?  Consider two different situations:
- *  (a) r = g = 0, b = 255            {255}   /255/   <255>
- *  (b) r = 0, g = 127, b = 255       {191}   /128/   <255>
+ *  (a) r = g = 0, b = 255            {255}   /255/
+ *  (b) r = 0, g = 127, b = 255       {191}   /128/
  *  How much g is in each of these?  The three methods above give:
  *  (a)  1: 85   2: 127   3: 0        [85]
  *  (b)  1: 0    2: 0     3: 127      [0]
@@ -128,12 +117,8 @@
  *      (c) the maximum (over components) of one of the color
  *          content measures given above.
  *
- *  For now, we will consider three of the methods in (c):
- *    L_INTERMED_DIFF
- *        Define the color magnitude as the intermediate value of the
- *        three differences between the three components.
- *        For (a) and (b) above, this value is in /../.
- *     L_AVE_MAX_DIFF_2
+ *  For now, we will choose two of the methods in (c):
+ *     L_MAX_DIFF_FROM_AVERAGE_2
  *        Define the color magnitude as the maximum over components
  *        of the difference between the component value and the
  *        average of the other two.  It is easy to show that
@@ -141,35 +126,32 @@
  *        that are closest to each other, averaging them, and
  *        using the distance from that average to the third component.
  *        For (a) and (b) above, this value is in {..}.
- *    L_MAX_DIFF
- *        Define the color magnitude as the maximum value of the
- *        three differences between the three components.
- *        For (a) and (b) above, this value is in <..>.
+ *    L_MAX_MIN_DIFF_FROM_2
+ *        Define the color magnitude as the maximum over components
+ *        of the minimum difference between the component value and the
+ *        other two values.  It is easy to show that this is equivalent
+ *        to selecting the intermediate value of the three differences
+ *        between the three components.  For (a) and (b) above,
+ *        this value is in /../.
  * </pre>
  */
-
-#ifdef HAVE_CONFIG_H
-#include <config_auto.h>
-#endif  /* HAVE_CONFIG_H */
 
 #include "allheaders.h"
 
 /* ----------------------------------------------------------------------- *
- *      Build an image of the color content, on a per-pixel basis,         *
+ *      Builds an image of the color content, on a per-pixel basis,        *
  *      as a measure of the amount of divergence of each color             *
  *      component (R,G,B) from gray.                                       *
  * ----------------------------------------------------------------------- */
 /*!
  * \brief   pixColorContent()
  *
- * \param[in]    pixs      32 bpp rgb or 8 bpp colormapped
- * \param[in]    rref      reference value for red component
- * \param[in]    gref      reference value for green component
- * \param[in]    bref      reference value for blue component
- * \param[in]    mingray   min gray value for which color is measured
- * \param[out]   ppixr     [optional] 8 bpp red 'content'
- * \param[out]   ppixg     [optional] 8 bpp green 'content'
- * \param[out]   ppixb     [optional] 8 bpp blue 'content'
+ * \param[in]    pixs  32 bpp rgb or 8 bpp colormapped
+ * \param[in]    rwhite, gwhite, bwhite color value associated with white point
+ * \param[in]    mingray min gray value for which color is measured
+ * \param[out]   ppixr [optional] 8 bpp red 'content'
+ * \param[out]   ppixg [optional] 8 bpp green 'content'
+ * \param[out]   ppixb [optional] 8 bpp blue 'content'
  * \return  0 if OK, 1 on error
  *
  * <pre>
@@ -179,16 +161,11 @@
  *          as the difference between the component and the average of
  *          the other two components.  See the discussion at the
  *          top of this file.
- *      (2) The three numbers (rref, gref and bref) can be thought
- *          of in two ways:
- *            (a) as the values in the image corresponding to white,
- *                to compensate for an unbalanced color white point.
- *            (b) the median or mean values of the background color of
- *                a scan.
- *          The gamma TRC transformation is used to modify all colors so that
- *          these reference values become white.
- *          These three numbers must either be all 0 or all non-zero.
- *          To skip the TRC transform, set them all to 0.
+ *      (2) The three numbers (rwhite, gwhite and bwhite) can be thought
+ *          of as the values in the image corresponding to white.
+ *          They are used to compensate for an unbalanced color white point.
+ *          They must either be all 0 or all non-zero.  To turn this
+ *          off, set them all to 0.
  *      (3) If the maximum component after white point correction,
  *          max(r,g,b), is less than mingray, all color components
  *          for that pixel are set to zero.
@@ -198,42 +175,54 @@
  *          correction or dark filtering.
  * </pre>
  */
-l_ok
+l_int32
 pixColorContent(PIX     *pixs,
-                l_int32  rref,
-                l_int32  gref,
-                l_int32  bref,
+                l_int32  rwhite,
+                l_int32  gwhite,
+                l_int32  bwhite,
                 l_int32  mingray,
                 PIX    **ppixr,
                 PIX    **ppixg,
                 PIX    **ppixb)
 {
-l_int32    w, h, i, j, wpl1, wplr, wplg, wplb;
+l_int32    w, h, d, i, j, wplc, wplr, wplg, wplb;
 l_int32    rval, gval, bval, rgdiff, rbdiff, gbdiff, maxval, colorval;
+l_int32   *rtab, *gtab, *btab;
 l_uint32   pixel;
-l_uint32  *data1, *datar, *datag, *datab, *line1, *liner, *lineg, *lineb;
-PIX       *pix1, *pixr, *pixg, *pixb;
+l_uint32  *datac, *datar, *datag, *datab, *linec, *liner, *lineg, *lineb;
+NUMA      *nar, *nag, *nab;
+PIX       *pixc;   /* rgb */
+PIX       *pixr, *pixg, *pixb;   /* 8 bpp grayscale */
+PIXCMAP   *cmap;
+
+    PROCNAME("pixColorContent");
 
     if (!ppixr && !ppixg && !ppixb)
-        return ERROR_INT("no return val requested", __func__, 1);
+        return ERROR_INT("no return val requested", procName, 1);
     if (ppixr) *ppixr = NULL;
     if (ppixg) *ppixg = NULL;
     if (ppixb) *ppixb = NULL;
     if (!pixs)
-        return ERROR_INT("pixs not defined", __func__, 1);
+        return ERROR_INT("pixs not defined", procName, 1);
     if (mingray < 0) mingray = 0;
+    pixGetDimensions(pixs, &w, &h, &d);
     if (mingray > 255)
-        return ERROR_INT("mingray > 255", __func__, 1);
+        return ERROR_INT("mingray > 255", procName, 1);
+    if (rwhite < 0 || gwhite < 0 || bwhite < 0)
+        return ERROR_INT("some white vals are negative", procName, 1);
+    if ((rwhite || gwhite || bwhite) && (rwhite * gwhite * bwhite == 0))
+        return ERROR_INT("white vals not all zero or all nonzero", procName, 1);
 
-        /* Do the optional linear color map; this checks the ref vals */
-    if ((pix1 = pixColorShiftWhitePoint(pixs, rref, gref, bref)) == NULL)
-        return ERROR_INT("pix1 not returned", __func__, 1);
+    cmap = pixGetColormap(pixs);
+    if (!cmap && d != 32)
+        return ERROR_INT("pixs neither cmapped nor 32 bpp", procName, 1);
+    if (cmap)
+        pixc = pixRemoveColormap(pixs, REMOVE_CMAP_TO_FULL_COLOR);
+    else
+        pixc = pixClone(pixs);
 
     pixr = pixg = pixb = NULL;
-    datar = datag = datab = NULL;
-    liner = lineg = lineb = NULL;
-
-	pixGetDimensions(pix1, &w, &h, NULL);
+    pixGetDimensions(pixc, &w, &h, NULL);
     if (ppixr) {
         pixr = pixCreate(w, h, 8);
         datar = pixGetData(pixr);
@@ -253,10 +242,18 @@ PIX       *pix1, *pixr, *pixg, *pixb;
         *ppixb = pixb;
     }
 
-    data1 = pixGetData(pix1);
-    wpl1 = pixGetWpl(pix1);
+    datac = pixGetData(pixc);
+    wplc = pixGetWpl(pixc);
+    if (rwhite) {  /* all white pt vals are nonzero */
+        nar = numaGammaTRC(1.0, 0, rwhite);
+        rtab = numaGetIArray(nar);
+        nag = numaGammaTRC(1.0, 0, gwhite);
+        gtab = numaGetIArray(nag);
+        nab = numaGammaTRC(1.0, 0, bwhite);
+        btab = numaGetIArray(nab);
+    }
     for (i = 0; i < h; i++) {
-        line1 = data1 + i * wpl1;
+        linec = datac + i * wplc;
         if (pixr)
             liner = datar + i * wplr;
         if (pixg)
@@ -264,8 +261,13 @@ PIX       *pix1, *pixr, *pixg, *pixb;
         if (pixb)
             lineb = datab + i * wplb;
         for (j = 0; j < w; j++) {
-            pixel = line1[j];
+            pixel = linec[j];
             extractRGBValues(pixel, &rval, &gval, &bval);
+            if (rwhite) {  /* color correct for white point */
+                rval = rtab[rval];
+                gval = gtab[gval];
+                bval = btab[bval];
+            }
             if (mingray > 0) {  /* dark pixels have no color value */
                 maxval = L_MAX(rval, gval);
                 maxval = L_MAX(maxval, bval);
@@ -290,24 +292,31 @@ PIX       *pix1, *pixr, *pixg, *pixb;
         }
     }
 
-    pixDestroy(&pix1);
+    if (rwhite) {
+        numaDestroy(&nar);
+        numaDestroy(&nag);
+        numaDestroy(&nab);
+        LEPT_FREE(rtab);
+        LEPT_FREE(gtab);
+        LEPT_FREE(btab);
+    }
+    pixDestroy(&pixc);
     return 0;
 }
 
 
 /* ----------------------------------------------------------------------- *
- *      Find the 'amount' of color in an image, on a per-pixel basis,      *
+ *      Finds the 'amount' of color in an image, on a per-pixel basis,     *
  *      as a measure of the difference of the pixel color from gray.       *
  * ----------------------------------------------------------------------- */
 /*!
  * \brief   pixColorMagnitude()
  *
- * \param[in]    pixs    32 bpp rgb or 8 bpp colormapped
- * \param[in]    rref    reference value for red component
- * \param[in]    gref    reference value for green component
- * \param[in]    bref    reference value for blue component
- * \param[in]    type    chooses the method for calculating the color magnitude:
- *                       L_INTERMED_DIFF, L_AVE_MAX_DIFF_2, L_MAX_DIFF
+ * \param[in]    pixs  32 bpp rgb or 8 bpp colormapped
+ * \param[in]    rwhite, gwhite, bwhite color value associated with white point
+ * \param[in]    type chooses the method for calculating the color magnitude:
+ *                    L_MAX_DIFF_FROM_AVERAGE_2, L_MAX_MIN_DIFF_FROM_2,
+ *                    L_MAX_DIFF
  * \return  pixd 8 bpp, amount of color in each source pixel,
  *                    or NULL on error
  *
@@ -321,81 +330,108 @@ PIX       *pix1, *pixr, *pixg, *pixb;
  *          two differences is the color farthest from the other two.
  *          The color magnitude in an RGB pixel can be taken as one
  *          of these three definitions:
- *            (a) The minimum value of these two differences.  This is
- *                the intermediate value of the three distances between
- *                component values.
- *            (b) The average of these two differences.  This is the
+ *            (a) The average of these two differences.  This is the
  *                average distance from the two components that are
  *                nearest to each other to the third component.
+ *            (b) The minimum value of these two differences.  This is
+ *                the intermediate value of the three distances between
+ *                component values.  Stated otherwise, it is the
+ *                maximum over all components of the minimum distance
+ *                from that component to the other two components.
  *            (c) The maximum difference between component values.
  *      (2) As an example, suppose that R and G are the closest in
  *          magnitude.  Then the color is determined as either:
- *            (a) The minimum distance of B from these two:
- *                   min(|B - R|, |B - G|).
- *            (b) The average distance of B from these two:
+ *            (a) The average distance of B from these two:
  *                   (|B - R| + |B - G|) / 2
+ *            (b) The minimum distance of B from these two:
+ *                   min(|B - R|, |B - G|).
  *            (c) The maximum distance of B from these two:
  *                   max(|B - R|, |B - G|)
- *      (3) This example can be visualized graphically.  Put the R,G and B
- *          component values on a line; e.g.,
- *                G...R...........B
- *            (a) B - R
- *            (b) B - (R + G) / 2
- *            (c) B - G
- *      (4) The three methods for choosing the color magnitude from
+ *      (3) The three methods for choosing the color magnitude from
  *          the components are selected with these flags:
- *            (a) L_INTERMED_DIFF
- *            (b) L_AVE_MAX_DIFF_2
+ *            (a) L_MAX_DIFF_FROM_AVERAGE_2
+ *            (b) L_MAX_MIN_DIFF_FROM_2
  *            (c) L_MAX_DIFF
- *      (5) The three numbers (rref, gref and bref) can be thought
- *          of in two ways:
- *            (a) as the values in the image corresponding to white,
- *                to compensate for an unbalanced color white point.
- *            (b) the median or mean values of the background color of
- *                a scan.
- *          The gamma TRC transformation is used to modify all colors so that
- *          these reference values become white.
- *          These three numbers must either be all 0 or all non-zero.
- *          To skip the TRC transform, set them all to 0.
+ *      (4) The three numbers (rwhite, gwhite and bwhite) can be thought
+ *          of as the values in the image corresponding to white.
+ *          They are used to compensate for an unbalanced color white point.
+ *          They must either be all 0 or all non-zero.  To turn this
+ *          off, set them all to 0.
  * </pre>
  */
 PIX *
 pixColorMagnitude(PIX     *pixs,
-                  l_int32  rref,
-                  l_int32  gref,
-                  l_int32  bref,
+                  l_int32  rwhite,
+                  l_int32  gwhite,
+                  l_int32  bwhite,
                   l_int32  type)
 {
-l_int32    w, h, i, j, wpl1, wpld;
+l_int32    w, h, d, i, j, wplc, wpld;
 l_int32    rval, gval, bval, rdist, gdist, bdist, colorval;
 l_int32    rgdist, rbdist, gbdist, mindist, maxdist, minval, maxval;
+l_int32   *rtab, *gtab, *btab;
 l_uint32   pixel;
-l_uint32  *data1, *datad, *line1, *lined;
-PIX       *pix1, *pixd;
+l_uint32  *datac, *datad, *linec, *lined;
+NUMA      *nar, *nag, *nab;
+PIX       *pixc, *pixd;
+PIXCMAP   *cmap;
+
+    PROCNAME("pixColorMagnitude");
 
     if (!pixs)
-        return (PIX *)ERROR_PTR("pixs not defined", __func__, NULL);
-    if (type != L_INTERMED_DIFF && type != L_AVE_MAX_DIFF_2 &&
+        return (PIX *)ERROR_PTR("pixs not defined", procName, NULL);
+    pixGetDimensions(pixs, &w, &h, &d);
+    if (type != L_MAX_DIFF_FROM_AVERAGE_2 && type != L_MAX_MIN_DIFF_FROM_2 &&
         type != L_MAX_DIFF)
-        return (PIX *)ERROR_PTR("invalid type", __func__, NULL);
+        return (PIX *)ERROR_PTR("invalid type", procName, NULL);
+    if (rwhite < 0 || gwhite < 0 || bwhite < 0)
+        return (PIX *)ERROR_PTR("some white vals are negative", procName, NULL);
+    if ((rwhite || gwhite || bwhite) && (rwhite * gwhite * bwhite == 0))
+        return (PIX *)ERROR_PTR("white vals not all zero or all nonzero",
+                                procName, NULL);
 
-        /* Do the optional linear color map; this checks the ref vals */
-    if ((pix1 = pixColorShiftWhitePoint(pixs, rref, gref, bref)) == NULL)
-        return (PIX *)ERROR_PTR("pix1 not returned", __func__, NULL);
+    cmap = pixGetColormap(pixs);
+    if (!cmap && d != 32)
+        return (PIX *)ERROR_PTR("pixs not cmapped or 32 bpp", procName, NULL);
+    if (cmap)
+        pixc = pixRemoveColormap(pixs, REMOVE_CMAP_TO_FULL_COLOR);
+    else
+        pixc = pixClone(pixs);
 
-    pixGetDimensions(pix1, &w, &h, NULL);
     pixd = pixCreate(w, h, 8);
     datad = pixGetData(pixd);
     wpld = pixGetWpl(pixd);
-    data1 = pixGetData(pix1);
-    wpl1 = pixGetWpl(pix1);
+    datac = pixGetData(pixc);
+    wplc = pixGetWpl(pixc);
+    if (rwhite) {  /* all white pt vals are nonzero */
+        nar = numaGammaTRC(1.0, 0, rwhite);
+        rtab = numaGetIArray(nar);
+        nag = numaGammaTRC(1.0, 0, gwhite);
+        gtab = numaGetIArray(nag);
+        nab = numaGammaTRC(1.0, 0, bwhite);
+        btab = numaGetIArray(nab);
+    }
     for (i = 0; i < h; i++) {
-        line1 = data1 + i * wpl1;
+        linec = datac + i * wplc;
         lined = datad + i * wpld;
         for (j = 0; j < w; j++) {
-            pixel = line1[j];
+            pixel = linec[j];
             extractRGBValues(pixel, &rval, &gval, &bval);
-            if (type == L_INTERMED_DIFF) {
+            if (rwhite) {  /* color correct for white point */
+                rval = rtab[rval];
+                gval = gtab[gval];
+                bval = btab[bval];
+            }
+            if (type == L_MAX_DIFF_FROM_AVERAGE_2) {
+                rdist = ((gval + bval ) / 2 - rval);
+                rdist = L_ABS(rdist);
+                gdist = ((rval + bval ) / 2 - gval);
+                gdist = L_ABS(gdist);
+                bdist = ((rval + gval ) / 2 - bval);
+                bdist = L_ABS(bdist);
+                colorval = L_MAX(rdist, gdist);
+                colorval = L_MAX(colorval, bdist);
+            } else if (type == L_MAX_MIN_DIFF_FROM_2) {  /* intermediate dist */
                 rgdist = L_ABS(rval - gval);
                 rbdist = L_ABS(rval - bval);
                 gbdist = L_ABS(gval - bval);
@@ -406,15 +442,6 @@ PIX       *pix1, *pixd;
                     mindist = L_MIN(rgdist, rbdist);
                     colorval = L_MAX(mindist, gbdist);
                 }
-            } else if (type == L_AVE_MAX_DIFF_2) {
-                rdist = ((gval + bval ) / 2 - rval);
-                rdist = L_ABS(rdist);
-                gdist = ((rval + bval ) / 2 - gval);
-                gdist = L_ABS(gdist);
-                bdist = ((rval + gval ) / 2 - bval);
-                bdist = L_ABS(bdist);
-                colorval = L_MAX(rdist, gdist);
-                colorval = L_MAX(colorval, bdist);
             } else {  /* type == L_MAX_DIFF */
                 minval = L_MIN(rval, gval);
                 minval = L_MIN(minval, bval);
@@ -426,33 +453,191 @@ PIX       *pix1, *pixd;
         }
     }
 
-    pixDestroy(&pix1);
+    if (rwhite) {
+        numaDestroy(&nar);
+        numaDestroy(&nag);
+        numaDestroy(&nab);
+        LEPT_FREE(rtab);
+        LEPT_FREE(gtab);
+        LEPT_FREE(btab);
+    }
+    pixDestroy(&pixc);
     return pixd;
 }
 
 
 /* ----------------------------------------------------------------------- *
- *   Find the fraction of pixels with "color" that are not close to black  *
+ *      Generates a mask over pixels that have sufficient color and        *
+ *      are not too close to gray pixels.                                  *
+ * ----------------------------------------------------------------------- */
+/*!
+ * \brief   pixMaskOverColorPixels()
+ *
+ * \param[in]    pixs  32 bpp rgb or 8 bpp colormapped
+ * \param[in]    threshdiff threshold for minimum of the max difference
+ *                          between components
+ * \param[in]    mindist minimum allowed distance from nearest non-color pixel
+ * \return  pixd 1 bpp, mask over color pixels, or NULL on error
+ *
+ * <pre>
+ * Notes:
+ *      (1) The generated mask identifies each pixel as either color or
+ *          non-color.  For a pixel to be color, it must satisfy two
+ *          constraints:
+ *            (a) The max difference between the r,g and b components must
+ *                equal or exceed a threshold %threshdiff.
+ *            (b) It must be at least %mindist (in an 8-connected way)
+ *                from the nearest non-color pixel.
+ *      (2) The distance constraint (b) is only applied if %mindist > 1.
+ *          For example, if %mindist == 2, the color pixels identified
+ *          by (a) are eroded by a 3x3 Sel.  In general, the Sel size
+ *          for erosion is 2 * (%mindist - 1) + 1.
+ *          Why have this constraint?  In scanned images that are
+ *          essentially gray, color artifacts are typically introduced
+ *          in transition regions near sharp edges that go from dark
+ *          to light, so this allows these transition regions to be removed.
+ * </pre>
+ */
+PIX *
+pixMaskOverColorPixels(PIX     *pixs,
+                       l_int32  threshdiff,
+                       l_int32  mindist)
+{
+l_int32    w, h, d, i, j, wpls, wpld, size;
+l_int32    rval, gval, bval, minval, maxval;
+l_uint32  *datas, *datad, *lines, *lined;
+PIX       *pixc, *pixd;
+PIXCMAP   *cmap;
+
+    PROCNAME("pixMaskOverColorPixels");
+
+    if (!pixs)
+        return (PIX *)ERROR_PTR("pixs not defined", procName, NULL);
+    pixGetDimensions(pixs, &w, &h, &d);
+
+    cmap = pixGetColormap(pixs);
+    if (!cmap && d != 32)
+        return (PIX *)ERROR_PTR("pixs not cmapped or 32 bpp", procName, NULL);
+    if (cmap)
+        pixc = pixRemoveColormap(pixs, REMOVE_CMAP_TO_FULL_COLOR);
+    else
+        pixc = pixClone(pixs);
+
+    pixd = pixCreate(w, h, 1);
+    datad = pixGetData(pixd);
+    wpld = pixGetWpl(pixd);
+    datas = pixGetData(pixc);
+    wpls = pixGetWpl(pixc);
+    for (i = 0; i < h; i++) {
+        lines = datas + i * wpls;
+        lined = datad + i * wpld;
+        for (j = 0; j < w; j++) {
+            extractRGBValues(lines[j], &rval, &gval, &bval);
+            minval = L_MIN(rval, gval);
+            minval = L_MIN(minval, bval);
+            maxval = L_MAX(rval, gval);
+            maxval = L_MAX(maxval, bval);
+            if (maxval - minval >= threshdiff)
+                SET_DATA_BIT(lined, j);
+        }
+    }
+
+    if (mindist > 1) {
+        size = 2 * (mindist - 1) + 1;
+        pixErodeBrick(pixd, pixd, size, size);
+    }
+
+    pixDestroy(&pixc);
+    return pixd;
+}
+
+
+/* ----------------------------------------------------------------------- *
+ *      Generates a mask over pixels that have RGB color components        *
+ *      within the prescribed range (a cube in RGB color space)            *
+ * ----------------------------------------------------------------------- */
+/*!
+ * \brief   pixMaskOverColorRange()
+ *
+ * \param[in]    pixs  32 bpp rgb or 8 bpp colormapped
+ * \param[in]    rmin, rmax min and max allowed values for red component
+ * \param[in]    gmin, gmax
+ * \param[in]    bmin, bmax
+ * \return  pixd 1 bpp, mask over color pixels, or NULL on error
+ */
+PIX *
+pixMaskOverColorRange(PIX     *pixs,
+                      l_int32  rmin,
+                      l_int32  rmax,
+                      l_int32  gmin,
+                      l_int32  gmax,
+                      l_int32  bmin,
+                      l_int32  bmax)
+{
+l_int32    w, h, d, i, j, wpls, wpld;
+l_int32    rval, gval, bval;
+l_uint32  *datas, *datad, *lines, *lined;
+PIX       *pixc, *pixd;
+PIXCMAP   *cmap;
+
+    PROCNAME("pixMaskOverColorRange");
+
+    if (!pixs)
+        return (PIX *)ERROR_PTR("pixs not defined", procName, NULL);
+    pixGetDimensions(pixs, &w, &h, &d);
+
+    cmap = pixGetColormap(pixs);
+    if (!cmap && d != 32)
+        return (PIX *)ERROR_PTR("pixs not cmapped or 32 bpp", procName, NULL);
+    if (cmap)
+        pixc = pixRemoveColormap(pixs, REMOVE_CMAP_TO_FULL_COLOR);
+    else
+        pixc = pixClone(pixs);
+
+    pixd = pixCreate(w, h, 1);
+    datad = pixGetData(pixd);
+    wpld = pixGetWpl(pixd);
+    datas = pixGetData(pixc);
+    wpls = pixGetWpl(pixc);
+    for (i = 0; i < h; i++) {
+        lines = datas + i * wpls;
+        lined = datad + i * wpld;
+        for (j = 0; j < w; j++) {
+            extractRGBValues(lines[j], &rval, &gval, &bval);
+            if (rval < rmin || rval > rmax) continue;
+            if (gval < gmin || gval > gmax) continue;
+            if (bval < bmin || bval > bmax) continue;
+            SET_DATA_BIT(lined, j);
+        }
+    }
+
+    pixDestroy(&pixc);
+    return pixd;
+}
+
+
+/* ----------------------------------------------------------------------- *
+ *   Finds the fraction of pixels with "color" that are not close to black *
  * ----------------------------------------------------------------------- */
 /*!
  * \brief   pixColorFraction()
  *
  * \param[in]    pixs  32 bpp rgb
- * \param[in]    darkthresh    threshold near black; if the largest (lightest)
- *                             component is below this, the pixel is not
- *                             considered in the statistics; typ. 20
- * \param[in]    lightthresh   threshold near white; if the smallest (darkest)
- *                             component is above this, the pixel is not
- *                             considered in the statistics; typ. 244
- * \param[in]    diffthresh    thresh for the maximum difference between
- *                             component values; below this the pixel is not
- *                             considered to have sufficient color; typ. 60.
- * \param[in]    factor        subsampling factor
- * \param[out]   ppixfract     [optional] fraction of pixels in intermediate
- *                             brightness range that were considered
- *                             for color content
- * \param[out]   pcolorfract   [optional] fraction of pixels that meet the
- *                             criterion for sufficient color; 0.0 on error
+ * \param[in]    darkthresh threshold near black; if the lightest component
+ *                          is below this, the pixel is not considered in
+ *                          the statistics; typ. 20
+ * \param[in]    lightthresh threshold near white; if the darkest component
+ *                           is above this, the pixel is not considered in
+ *                           the statistics; typ. 244
+ * \param[in]    diffthresh thresh for the maximum difference between
+ *                          component value; below this the pixel is not
+ *                          considered to have sufficient color
+ * \param[in]    factor subsampling factor
+ * \param[out]   ppixfract fraction of pixels in intermediate
+ *                         brightness range that were considered
+ *                         for color content
+ * \param[out]   pcolorfract fraction of pixels that meet the
+ *                           criterion for sufficient color; 0.0 on error
  * \return  0 if OK, 1 on error
  *
  * <pre>
@@ -489,7 +674,7 @@ PIX       *pix1, *pixd;
  *          that can be occupied.
  * </pre>
  */
-l_ok
+l_int32
 pixColorFraction(PIX        *pixs,
                  l_int32     darkthresh,
                  l_int32     lightthresh,
@@ -503,13 +688,15 @@ l_int32    total, npix, ncolor;
 l_uint32   pixel;
 l_uint32  *data, *line;
 
+    PROCNAME("pixColorFraction");
+
     if (ppixfract) *ppixfract = 0.0;
     if (pcolorfract) *pcolorfract = 0.0;
-    if (!ppixfract && !pcolorfract)
-        return ERROR_INT("neither &pixfract nor &colorfract are defined",
-                         __func__, 1);
+    if (!ppixfract || !pcolorfract)
+        return ERROR_INT("&pixfract and &colorfract not defined",
+                         procName, 1);
     if (!pixs || pixGetDepth(pixs) != 32)
-        return ERROR_INT("pixs not defined or not 32 bpp", __func__, 1);
+        return ERROR_INT("pixs not defined or not 32 bpp", procName, 1);
 
     pixGetDimensions(pixs, &w, &h, NULL);
     data = pixGetData(pixs);
@@ -537,330 +724,12 @@ l_uint32  *data, *line;
     }
 
     if (npix == 0) {
-        L_WARNING("No pixels found for consideration\n", __func__);
+        L_WARNING("No pixels found for consideration\n", procName);
         return 0;
     }
-    if (ppixfract) *ppixfract = (l_float32)npix / (l_float32)total;
-    if (pcolorfract) *pcolorfract = (l_float32)ncolor / (l_float32)npix;
+    *ppixfract = (l_float32)npix / (l_float32)total;
+    *pcolorfract = (l_float32)ncolor / (l_float32)npix;
     return 0;
-}
-
-
-/* ----------------------------------------------------------------------- *
- *      Do a linear TRC to map colors so that the three input reference    *
- *      values go to white.  These three numbers are typically the median  *
- *      or average background values.                                      *
- * ----------------------------------------------------------------------- */
-/*!
- * \brief   pixColorShiftWhitePoint()
- *
- * \param[in]    pixs      32 bpp rgb or 8 bpp colormapped
- * \param[in]    rref      reference value for red component
- * \param[in]    gref      reference value for green component
- * \param[in]    bref      reference value for blue component
- * \return  pix2  32 bpp if OK, NULL on error
- *
- * <pre>
- * Notes:
- *      (1) This returns a pix where the colors are linearly mapped to
- *          so that the components go to 255 at the input reference values.
- *      (2) These three numbers (rref, gref and bref) can be thought
- *          of in two ways:
- *            (a) as the values in the image corresponding to white,
- *                to compensate for an unbalanced color white point.
- *            (b) the median or mean values of the background color of
- *                an image.
- *          A linear (gamma = 1) TRC transformation is used.
- *      (3) Any existing colormap is removed and a 32 bpp rgb pix is returned.
- *      (4) No transformation is applied if any of the three numbers are <= 0.
- *          If any are < 0, or if some but not all are 0, a warning is given.
- * </pre>
- */
-PIX *
-pixColorShiftWhitePoint(PIX     *pixs,
-                        l_int32  rref,
-                        l_int32  gref,
-                        l_int32  bref)
-{
-l_int32    w, h, i, j, wpl1, wpl2, rval, gval, bval;
-l_int32   *rtab, *gtab, *btab;
-l_uint32   pixel;
-l_uint32  *data1, *data2, *line1, *line2;
-NUMA      *nar, *nag, *nab;
-PIX       *pix1, *pix2;
-PIXCMAP   *cmap;
-
-    if (!pixs)
-        return (PIX *)ERROR_PTR("pixs not defined", __func__, NULL);
-
-    cmap = pixGetColormap(pixs);
-    if (!cmap && pixGetDepth(pixs) != 32)
-        return (PIX *)ERROR_PTR("pixs neither cmapped nor 32 bpp",
-                                __func__, NULL);
-    if (cmap)
-        pix1 = pixRemoveColormap(pixs, REMOVE_CMAP_TO_FULL_COLOR);
-    else
-        pix1 = pixClone(pixs);
-
-    if (!rref && !gref && !bref)  /* all 0; no transform requested */
-        return pix1;
-
-        /* Some ref values are < 0, or some (but not all) are 0 */
-    if ((rref < 0 || gref < 0 || bref < 0) || (rref * gref * bref == 0)) {
-        L_WARNING("invalid set of ref values\n", __func__);
-        return pix1;
-    }
-
-        /* All white point ref values > 0; do transformation */
-    pixGetDimensions(pix1, &w, &h, NULL);
-    pix2 = pixCreate(w, h, 32);
-    data1 = pixGetData(pix1);
-    wpl1 = pixGetWpl(pix1);
-    data2 = pixGetData(pix2);
-    wpl2 = pixGetWpl(pix2);
-    nar = numaGammaTRC(1.0, 0, rref);
-    rtab = numaGetIArray(nar);
-    nag = numaGammaTRC(1.0, 0, gref);
-    gtab = numaGetIArray(nag);
-    nab = numaGammaTRC(1.0, 0, bref);
-    btab = numaGetIArray(nab);
-    for (i = 0; i < h; i++) {
-        line1 = data1 + i * wpl1;
-        line2 = data2 + i * wpl2;
-        for (j = 0; j < w; j++) {
-            pixel = line1[j];
-            extractRGBValues(pixel, &rval, &gval, &bval);
-            rval = rtab[rval];
-            gval = gtab[gval];
-            bval = btab[bval];
-            composeRGBPixel(rval, gval, bval, line2 + j);
-        }
-    }
-    numaDestroy(&nar);
-    numaDestroy(&nag);
-    numaDestroy(&nab);
-    LEPT_FREE(rtab);
-    LEPT_FREE(gtab);
-    LEPT_FREE(btab);
-    pixDestroy(&pix1);
-    return pix2;
-}
-
-
-/* ----------------------------------------------------------------------- *
- *      Generate a mask over pixels that have sufficient color and         *
- *      are not too close to gray pixels.                                  *
- * ----------------------------------------------------------------------- */
-/*!
- * \brief   pixMaskOverColorPixels()
- *
- * \param[in]    pixs         32 bpp rgb or 8 bpp colormapped
- * \param[in]    threshdiff   threshold for minimum of the max difference
- *                            between components
- * \param[in]    mindist      min allowed distance from nearest non-color pixel
- * \return  pixd 1 bpp, mask over color pixels, or NULL on error
- *
- * <pre>
- * Notes:
- *      (1) The generated mask identifies each pixel as either color or
- *          non-color.  For a pixel to be color, it must satisfy two
- *          constraints:
- *            (a) The max difference between the r,g and b components must
- *                equal or exceed a threshold %threshdiff.
- *            (b) It must be at least %mindist (in an 8-connected way)
- *                from the nearest non-color pixel.
- *      (2) The distance constraint (b) is only applied if %mindist > 1.
- *          For example, if %mindist == 2, the color pixels identified
- *          by (a) are eroded by a 3x3 Sel.  In general, the Sel size
- *          for erosion is 2 * (%mindist - 1) + 1.
- *          Why have this constraint?  In scanned images that are
- *          essentially gray, color artifacts are typically introduced
- *          in transition regions near sharp edges that go from dark
- *          to light, so this allows these transition regions to be removed.
- * </pre>
- */
-PIX *
-pixMaskOverColorPixels(PIX     *pixs,
-                       l_int32  threshdiff,
-                       l_int32  mindist)
-{
-l_int32    w, h, d, i, j, wpls, wpld, size;
-l_int32    rval, gval, bval, minval, maxval;
-l_uint32  *datas, *datad, *lines, *lined;
-PIX       *pixc, *pixd;
-PIXCMAP   *cmap;
-
-    if (!pixs)
-        return (PIX *)ERROR_PTR("pixs not defined", __func__, NULL);
-    pixGetDimensions(pixs, &w, &h, &d);
-
-    cmap = pixGetColormap(pixs);
-    if (!cmap && d != 32)
-        return (PIX *)ERROR_PTR("pixs not cmapped or 32 bpp", __func__, NULL);
-    if (cmap)
-        pixc = pixRemoveColormap(pixs, REMOVE_CMAP_TO_FULL_COLOR);
-    else
-        pixc = pixClone(pixs);
-    if (!pixc || pixGetDepth(pixc) != 32) {
-        pixDestroy(&pixc);
-        return (PIX *)ERROR_PTR("rgb pix not made", __func__, NULL);
-    }
-
-    pixd = pixCreate(w, h, 1);
-    datad = pixGetData(pixd);
-    wpld = pixGetWpl(pixd);
-    datas = pixGetData(pixc);
-    wpls = pixGetWpl(pixc);
-    for (i = 0; i < h; i++) {
-        lines = datas + i * wpls;
-        lined = datad + i * wpld;
-        for (j = 0; j < w; j++) {
-            extractRGBValues(lines[j], &rval, &gval, &bval);
-            minval = L_MIN(rval, gval);
-            minval = L_MIN(minval, bval);
-            maxval = L_MAX(rval, gval);
-            maxval = L_MAX(maxval, bval);
-            if (maxval - minval >= threshdiff)
-                SET_DATA_BIT(lined, j);
-        }
-    }
-
-    if (mindist > 1) {
-        size = 2 * (mindist - 1) + 1;
-        pixErodeBrick(pixd, pixd, size, size);
-    }
-
-    pixDestroy(&pixc);
-    return pixd;
-}
-
-
-/* ----------------------------------------------------------------------- *
- *          Generate a mask over dark pixels with little color             *
- * ----------------------------------------------------------------------- */
-/*!
- * \brief   pixMaskOverGrayPixels()
- *
- * \param[in]    pixs      32 bpp rgb
- * \param[in]    maxlimit  only consider pixels with max component <= %maxlimit
- * \param[in]    satlimit  only consider pixels with saturation <= %satlimit
- * \return  pixd (1 bpp), or NULL on error
- *
- * <pre>
- * Notes:
- *      (1) This generates a mask over rgb pixels that are gray (i.e.,
- *          have low saturation) and are not too bright.  For example, if
- *          we know that the gray pixels in %pixs have saturation
- *          (max - min) less than 10, and brightness (max) less than 200,
- *             pixMaskOverGrayPixels(pixs, 220, 10)
- *          will generate a mask over the gray pixels.  Other pixels that
- *          are not too dark and have a relatively large saturation will
- *          be little affected.
- *      (2) The algorithm is related to pixDarkenGray().
- * </pre>
- */
-PIX *
-pixMaskOverGrayPixels(PIX     *pixs,
-                      l_int32  maxlimit,
-                      l_int32  satlimit)
-{
-l_int32    w, h, i, j, wpls, wpld;
-l_int32    rval, gval, bval, minrg, min, maxrg, max, sat;
-l_uint32  *datas, *datad, *lines, *lined;
-PIX       *pixd;
-
-    if (!pixs || pixGetDepth(pixs) != 32)
-        return (PIX *)ERROR_PTR("pixs undefined or not 32 bpp", __func__, NULL);
-    if (maxlimit < 0 || maxlimit > 255)
-        return (PIX *)ERROR_PTR("invalid maxlimit", __func__, NULL);
-    if (satlimit < 1)
-        return (PIX *)ERROR_PTR("invalid satlimit", __func__, NULL);
-
-    pixGetDimensions(pixs, &w, &h, NULL);
-    datas = pixGetData(pixs);
-    wpls = pixGetWpl(pixs);
-    if ((pixd = pixCreate(w, h, 1)) == NULL)
-        return (PIX *)ERROR_PTR("pixd not made", __func__, NULL);
-    datad = pixGetData(pixd);
-    wpld = pixGetWpl(pixd);
-
-    for (i = 0; i < h; i++) {
-        lines = datas + i * wpls;
-        lined = datad + i * wpld;
-        for (j = 0; j < w; j++) {
-            extractRGBValues(lines[j], &rval, &gval, &bval);
-            minrg = L_MIN(rval, gval);
-            min = L_MIN(minrg, bval);
-            maxrg = L_MAX(rval, gval);
-            max = L_MAX(maxrg, bval);
-            sat = max - min;
-            if (max <= maxlimit && sat <= satlimit)
-                SET_DATA_BIT(lined, j);
-        }
-    }
-    return pixd;
-}
-
-
-/* ----------------------------------------------------------------------- *
- *      Generate a mask over pixels that have RGB color components         *
- *      within the prescribed range (a cube in RGB color space)            *
- * ----------------------------------------------------------------------- */
-/*!
- * \brief   pixMaskOverColorRange()
- *
- * \param[in]    pixs          32 bpp rgb or 8 bpp colormapped
- * \param[in]    rmin, rmax    min and max allowed values for red component
- * \param[in]    gmin, gmax    ditto for green
- * \param[in]    bmin, bmax    ditto for blue
- * \return  pixd 1 bpp, mask over color pixels, or NULL on error
- */
-PIX *
-pixMaskOverColorRange(PIX     *pixs,
-                      l_int32  rmin,
-                      l_int32  rmax,
-                      l_int32  gmin,
-                      l_int32  gmax,
-                      l_int32  bmin,
-                      l_int32  bmax)
-{
-l_int32    w, h, d, i, j, wpls, wpld;
-l_int32    rval, gval, bval;
-l_uint32  *datas, *datad, *lines, *lined;
-PIX       *pixc, *pixd;
-PIXCMAP   *cmap;
-
-    if (!pixs)
-        return (PIX *)ERROR_PTR("pixs not defined", __func__, NULL);
-    pixGetDimensions(pixs, &w, &h, &d);
-
-    cmap = pixGetColormap(pixs);
-    if (!cmap && d != 32)
-        return (PIX *)ERROR_PTR("pixs not cmapped or 32 bpp", __func__, NULL);
-    if (cmap)
-        pixc = pixRemoveColormap(pixs, REMOVE_CMAP_TO_FULL_COLOR);
-    else
-        pixc = pixClone(pixs);
-
-    pixd = pixCreate(w, h, 1);
-    datad = pixGetData(pixd);
-    wpld = pixGetWpl(pixd);
-    datas = pixGetData(pixc);
-    wpls = pixGetWpl(pixc);
-    for (i = 0; i < h; i++) {
-        lines = datas + i * wpls;
-        lined = datad + i * wpld;
-        for (j = 0; j < w; j++) {
-            extractRGBValues(lines[j], &rval, &gval, &bval);
-            if (rval < rmin || rval > rmax) continue;
-            if (gval < gmin || gval > gmax) continue;
-            if (bval < bmin || bval > bmax) continue;
-            SET_DATA_BIT(lined, j);
-        }
-    }
-
-    pixDestroy(&pixc);
-    return pixd;
 }
 
 
@@ -870,23 +739,23 @@ PIXCMAP   *cmap;
 /*!
  * \brief   pixFindColorRegions()
  *
- * \param[in]    pixs         32 bpp rgb
- * \param[in]    pixm         [optional] 1 bpp mask image
- * \param[in]    factor       subsample factor; integer >= 1
- * \param[in]    lightthresh  threshold for component average in lightest
- *                            of 10 buckets; typ. 210; -1 for default
- * \param[in]    darkthresh   threshold to eliminate dark pixels (e.g., text)
- *                            from consideration; typ. 70; -1 for default.
- * \param[in]    mindiff      minimum difference (b - r) and (g - r), used to
- *                            find blue or green pixels; typ. 10; -1 for default
- * \param[in]    colordiff    minimum difference in (max - min) component to
- *                            qualify as a color pixel; typ. 90; -1 for default
- * \param[in]    edgefract    fraction of image half-width and half-height
- *                            for which color pixels are ignored; typ. 0.05.
- * \param[out]   pcolorfract  fraction of 'color' pixels found
- * \param[out]   pcolormask1  [optional] mask over background color, if any
- * \param[out]   pcolormask2  [optional] filtered mask over background color
- * \param[out]   pixadb       [optional] debug intermediate results
+ * \param[in]    pixs        32 bpp rgb
+ * \param[in]    pixm        [optional] 1 bpp mask image
+ * \param[in]    factor      subsample factor; integer >= 1
+ * \param[in]    lightthresh threshold for component average in lightest
+ *                           of 10 buckets; typ. 210; -1 for default
+ * \param[in]    darkthresh  threshold to eliminate dark pixels (e.g., text)
+ *                           from consideration; typ. 70; -1 for default.
+ * \param[in]    mindiff     minimum difference (b - r) and (g - r), used to
+ *                           find blue or green pixels; typ. 10; -1 for default
+ * \param[in]    colordiff   minimum difference in (max - min) component to
+ *                           qualify as a color pixel; typ. 90; -1 for default
+ * \param[in]    edgefract   fraction of image half-width and half-height
+ *                           for which color pixels are ignored; typ. 0.05.
+ * \param[out]   pcolorfract fraction of 'color' pixels found
+ * \param[out]   pcolormask1 [optional] mask over background color, if any
+ * \param[out]   pcolormask2 [optional] filtered mask over background color
+ * \param[out]   pixadb      [optional] debug intermediate results
  * \return  0 if OK, 1 on error
  *
  * <pre>
@@ -932,7 +801,7 @@ PIXCMAP   *cmap;
  *          This is done here in debug mode.
  * </pre>
  */
-l_ok
+l_int32
 pixFindColorRegions(PIX        *pixs,
                     PIX        *pixm,
                     l_int32     factor,
@@ -952,25 +821,29 @@ l_uint32  *carray;
 BOXA      *boxa1, *boxa2;
 PIX       *pix1, *pix2, *pix3, *pix4, *pix5, *pixm1, *pixm2, *pixm3;
 
+    PROCNAME("pixFindColorRegions");
+
     if (pcolormask1) *pcolormask1 = NULL;
     if (pcolormask2) *pcolormask2 = NULL;
     if (!pcolorfract)
-        return ERROR_INT("&colorfract not defined", __func__, 1);
+        return ERROR_INT("&colorfract not defined", procName, 1);
     *pcolorfract = 0.0;
     if (!pixs || pixGetDepth(pixs) != 32)
-        return ERROR_INT("pixs not defined or not 32 bpp", __func__, 1);
+        return ERROR_INT("pixs not defined or not 32 bpp", procName, 1);
     if (factor < 1) factor = 1;
     if (lightthresh < 0) lightthresh = 210;  /* defaults */
     if (darkthresh < 0) darkthresh = 70;
     if (mindiff < 0) mindiff = 10;
     if (colordiff < 0) colordiff = 90;
-    if (edgefract < 0.0 || edgefract > 1.0) edgefract = 0.05f;
+    if (edgefract < 0.0 || edgefract > 1.0) edgefract = 0.05;
 
         /* Check if pixm covers most of the image.  If so, just return. */
+    pixGetDimensions(pixs, &w, &h, NULL);
     if (pixm) {
-        pixForegroundFraction(pixm, &ratio);
+        pixCountPixels(pixm, &count, NULL);
+        ratio = (l_float32)count / (w * h);
         if (ratio > 0.7) {
-            if (pixadb) L_INFO("pixm has big fg: %f5.2\n", __func__, ratio);
+            if (pixadb) L_INFO("pixm has big fg: %f5.2\n", procName, ratio);
             return 0;
         }
     }
@@ -978,20 +851,20 @@ PIX       *pix1, *pix2, *pix3, *pix4, *pix5, *pixm1, *pixm2, *pixm3;
         /* Get the light background color.  Use the average component value
          * and select the lightest of 10 buckets.  Require that it is
          * reddish and, using lightthresh, not too dark. */
-    pixGetRankColorArray(pixs, 10, L_SELECT_AVERAGE, factor, &carray, NULL, 0);
+    pixGetRankColorArray(pixs, 10, L_SELECT_AVERAGE, factor, &carray, 0, 0);
     if (!carray)
-        return ERROR_INT("rank color array not made", __func__, 1);
+        return ERROR_INT("rank color array not made", procName, 1);
     extractRGBValues(carray[9], &rval, &gval, &bval);
     if (pixadb) L_INFO("lightest background color: (r,g,b) = (%d,%d,%d)\n",
-                       __func__, rval, gval, bval);
+                       procName, rval, gval, bval);
     proceed = TRUE;
     if ((rval < bval - 2) || (rval < gval - 2)) {
-        if (pixadb) L_INFO("background not reddish\n", __func__);
+        if (pixadb) L_INFO("background not reddish\n", procName);
         proceed = FALSE;
     }
     aveval = (rval + gval + bval) / 3;
     if (aveval < lightthresh) {
-        if (pixadb) L_INFO("background too dark\n", __func__);
+        if (pixadb) L_INFO("background too dark\n", procName);
         proceed = FALSE;
     }
     if (pixadb) {
@@ -1005,7 +878,7 @@ PIX       *pix1, *pix2, *pix3, *pix4, *pix5, *pixm1, *pixm2, *pixm3;
          * convert to gray using the average of the components;
          * threshold using darkthresh; do a small dilation;
          * combine with pixm. */
-    pix1 = pixConvertRGBToGray(pixs, 0.33f, 0.34f, 0.33f);
+    pix1 = pixConvertRGBToGray(pixs, 0.33, 0.34, 0.33);
     if (pixadb) pixaAddPix(pixadb, pix1, L_COPY);
     pixm1 = pixThresholdToBinary(pix1, darkthresh);
     pixDilateBrick(pixm1, pixm1, 7, 7);
@@ -1048,10 +921,9 @@ PIX       *pix1, *pix2, *pix3, *pix4, *pix5, *pixm1, *pixm2, *pixm3;
          * remove any pixels within the normalized fraction %distfract
          * of the image border. */
     pixm3 = pixRemoveBorderConnComps(pixm2, 8);
-    pixGetDimensions(pixm3, &w, &h, NULL);
     pixDestroy(&pixm2);
     if (edgefract > 0.0) {
-        pix2 = pixMakeSymmetricMask(w, h, edgefract, edgefract, L_USE_INNER);
+        pix2 = pixMakeFrameMask(w, h, edgefract, 1.0, edgefract, 1.0);
         pixAnd(pixm3, pixm3, pix2);
         pixDestroy(&pix2);
     }
@@ -1059,12 +931,12 @@ PIX       *pix1, *pix2, *pix3, *pix4, *pix5, *pixm1, *pixm2, *pixm3;
 
         /* Get the fraction of light color pixels */
     pixCountPixels(pixm3, &count, NULL);
-    *pcolorfract = (l_float32)count / ((l_float32)(w) * h);
+    *pcolorfract = (l_float32)count / (w * h);
     if (pixadb) {
         if (count == 0)
-            L_INFO("no light color pixels found\n", __func__);
+            L_INFO("no light color pixels found\n", procName);
         else
-            L_INFO("fraction of light color pixels = %5.3f\n", __func__,
+            L_INFO("fraction of light color pixels = %5.3f\n", procName,
                    *pcolorfract);
     }
 
@@ -1112,21 +984,21 @@ PIX       *pix1, *pix2, *pix3, *pix4, *pix5, *pixm1, *pixm2, *pixm3;
 
 
 /* ----------------------------------------------------------------------- *
- *      Find the number of perceptually significant gray intensities       *
+ *      Finds the number of perceptually significant gray intensities      *
  *      in a grayscale image.                                              *
  * ----------------------------------------------------------------------- */
 /*!
  * \brief   pixNumSignificantGrayColors()
  *
- * \param[in]    pixs          8 bpp gray
- * \param[in]    darkthresh    dark threshold for minimum intensity to be
- *                             considered; typ. 20
- * \param[in]    lightthresh   threshold near white, for maximum intensity
- *                             to be considered; typ. 236
- * \param[in]    minfract      minimum fraction of all pixels to include a level
- *                             as significant; typ. 0.0001; should be < 0.001
- * \param[in]    factor        subsample factor; integer >= 1
- * \param[out]   pncolors      number of significant colors; 0 on error
+ * \param[in]    pixs  8 bpp gray
+ * \param[in]    darkthresh dark threshold for minimum intensity to be
+ *                          considered; typ. 20
+ * \param[in]    lightthresh threshold near white, for maximum intensity
+ *                           to be considered; typ. 236
+ * \param[in]    minfract minimum fraction of all pixels to include a level
+ *                        as significant; typ. 0.0001; should be < 0.001
+ * \param[in]    factor subsample factor; integer >= 1
+ * \param[out]   pncolors number of significant colors; 0 on error
  * \return  0 if OK, 1 on error
  *
  * <pre>
@@ -1146,7 +1018,7 @@ PIX       *pix1, *pix2, *pix3, *pix4, *pix5, *pixm1, *pixm2, *pixm3;
  *          to obtain a clean image by quantizing this noise away.
  * </pre>
  */
-l_ok
+l_int32
 pixNumSignificantGrayColors(PIX       *pixs,
                             l_int32    darkthresh,
                             l_int32    lightthresh,
@@ -1157,28 +1029,29 @@ pixNumSignificantGrayColors(PIX       *pixs,
 l_int32  i, w, h, count, mincount, ncolors;
 NUMA    *na;
 
+    PROCNAME("pixNumSignificantGrayColors");
+
     if (!pncolors)
-        return ERROR_INT("&ncolors not defined", __func__, 1);
+        return ERROR_INT("&ncolors not defined", procName, 1);
     *pncolors = 0;
     if (!pixs || pixGetDepth(pixs) != 8)
-        return ERROR_INT("pixs not defined or not 8 bpp", __func__, 1);
+        return ERROR_INT("pixs not defined or not 8 bpp", procName, 1);
     if (darkthresh < 0) darkthresh = 20;  /* defaults */
     if (lightthresh < 0) lightthresh = 236;
-    if (minfract < 0.0)
-		minfract = 0.0001f;
+    if (minfract < 0.0) minfract = 0.0001;
     if (minfract > 1.0)
-        return ERROR_INT("minfract > 1.0", __func__, 1);
+        return ERROR_INT("minfract > 1.0", procName, 1);
     if (minfract >= 0.001)
         L_WARNING("minfract too big; likely to underestimate ncolors\n",
-                  __func__);
+                  procName);
     if (lightthresh > 255 || darkthresh >= lightthresh)
-        return ERROR_INT("invalid thresholds", __func__, 1);
+        return ERROR_INT("invalid thresholds", procName, 1);
     if (factor < 1) factor = 1;
 
     pixGetDimensions(pixs, &w, &h, NULL);
     mincount = (l_int32)(minfract * w * h * factor * factor);
     if ((na = pixGetGrayHistogram(pixs, factor)) == NULL)
-        return ERROR_INT("na not made", __func__, 1);
+        return ERROR_INT("na not made", procName, 1);
     ncolors = 2;  /* add in black and white */
     for (i = darkthresh; i <= lightthresh; i++) {
         numaGetIValue(na, i, &count);
@@ -1198,14 +1071,14 @@ NUMA    *na;
  * ----------------------------------------------------------------------- */
 /*!
  * \brief   pixColorsForQuantization()
- * \param[in]    pixs 8     bpp gray or 32 bpp rgb; with or without colormap
- * \param[in]    thresh     binary threshold on edge gradient; 0 for default
- * \param[out]   pncolors   the number of colors found
- * \param[out]   piscolor   [optional] 1 if significant color is found;
- *                          0 otherwise.  If pixs is 8 bpp, and does not have
- *                          a colormap with color entries, this is 0
- * \param[in]    debug      1 to output masked image that is tested for colors;
- *                          0 otherwise
+ * \param[in]    pixs 8 bpp gray or 32 bpp rgb; with or without colormap
+ * \param[in]    thresh binary threshold on edge gradient; 0 for default
+ * \param[out]   pncolors the number of colors found
+ * \param[out]   piscolor [optional] 1 if significant color is found;
+ *                        0 otherwise.  If pixs is 8 bpp, and does not have
+ *                        a colormap with color entries, this is 0
+ * \param[in]    debug 1 to output masked image that is tested for colors;
+ *                     0 otherwise
  * \return  0 if OK, 1 on error.
  *
  * <pre>
@@ -1268,7 +1141,7 @@ NUMA    *na;
  *          in the white background of grayscale or color images.
  * </pre>
  */
-l_ok
+l_int32
 pixColorsForQuantization(PIX      *pixs,
                          l_int32   thresh,
                          l_int32  *pncolors,
@@ -1280,12 +1153,14 @@ l_float32  pixfract, colorfract;
 PIX       *pixt, *pixsc, *pixg, *pixe, *pixb, *pixm;
 PIXCMAP   *cmap;
 
+    PROCNAME("pixColorsForQuantization");
+
     if (piscolor) *piscolor = 0;
     if (!pncolors)
-        return ERROR_INT("&ncolors not defined", __func__, 1);
+        return ERROR_INT("&ncolors not defined", procName, 1);
     *pncolors = 0;
     if (!pixs)
-        return ERROR_INT("pixs not defined", __func__, 1);
+        return ERROR_INT("pixs not defined", procName, 1);
     if ((cmap = pixGetColormap(pixs)) != NULL) {
         *pncolors = pixcmapGetCount(cmap);
         if (piscolor)
@@ -1295,7 +1170,7 @@ PIXCMAP   *cmap;
 
     pixGetDimensions(pixs, &w, &h, &d);
     if (d != 8 && d != 32)
-        return ERROR_INT("pixs not 8 or 32 bpp", __func__, 1);
+        return ERROR_INT("pixs not 8 or 32 bpp", procName, 1);
     if (thresh <= 0)
         thresh = 15;
 
@@ -1366,7 +1241,7 @@ PIXCMAP   *cmap;
     if (d == 8) {
         pixSetMasked(pixg, pixm, 0xff);
         if (debug) pixWrite("junkpix8.png", pixg, IFF_PNG);
-        pixNumSignificantGrayColors(pixg, 20, 236, 0.0001f, 1, pncolors);
+        pixNumSignificantGrayColors(pixg, 20, 236, 0.0001, 1, pncolors);
     } else {  /* d == 32 */
         pixSetMasked(pixsc, pixm, 0xffffffff);
         if (debug) pixWrite("junkpix32.png", pixsc, IFF_PNG);
@@ -1384,50 +1259,52 @@ PIXCMAP   *cmap;
 
 
 /* ----------------------------------------------------------------------- *
- *               Find the number of unique colors in an image              *
+ *               Finds the number of unique colors in an image             *
  * ----------------------------------------------------------------------- */
 /*!
  * \brief   pixNumColors()
- * \param[in]    pixs       2, 4, 8, 32 bpp
- * \param[in]    factor     subsampling factor; integer
- * \param[out]   pncolors   the number of colors found in the pix
+ * \param[in]    pixs 2, 4, 8, 32 bpp
+ * \param[in]    factor subsampling factor; integer
+ * \param[out]   pncolors the number of colors found, or 0 if
+ *                        there are more than 256
  * \return  0 if OK, 1 on error.
  *
  * <pre>
  * Notes:
- *      (1) This returns the number of colors found in the image,
+ *      (1) This returns the actual number of colors found in the image,
  *          even if there is a colormap.  If %factor == 1 and the
  *          number of colors differs from the number of entries
  *          in the colormap, a warning is issued.
  *      (2) Use %factor == 1 to find the actual number of colors.
- *          Use %factor > 1 to more efficiently find an approximate
- *          number of colors.
+ *          Use %factor > 1 to quickly find the approximate number of colors.
  *      (3) For d = 2, 4 or 8 bpp grayscale, this returns the number
  *          of colors found in the image in 'ncolors'.
- *      (4) For d = 32 bpp (rgb), if the number of colors is greater
- *          than 256, this uses a hash set with %factor == 1.
+ *      (4) For d = 32 bpp (rgb), if the number of colors is
+ *          greater than 256, this returns 0 in 'ncolors'.
  * </pre>
  */
-l_ok
+l_int32
 pixNumColors(PIX      *pixs,
              l_int32   factor,
              l_int32  *pncolors)
 {
-l_int32    w, h, d, i, j, wpl, hashsize, sum, count, manycolors;
+l_int32    w, h, d, i, j, wpl, hashsize, sum, count;
 l_int32    rval, gval, bval, val;
 l_int32   *inta;
 l_uint32   pixel;
 l_uint32  *data, *line;
 PIXCMAP   *cmap;
 
+    PROCNAME("pixNumColors");
+
     if (!pncolors)
-        return ERROR_INT("&ncolors not defined", __func__, 1);
+        return ERROR_INT("&ncolors not defined", procName, 1);
     *pncolors = 0;
     if (!pixs)
-        return ERROR_INT("pixs not defined", __func__, 1);
+        return ERROR_INT("pixs not defined", procName, 1);
     pixGetDimensions(pixs, &w, &h, &d);
     if (d != 2 && d != 4 && d != 8 && d != 32)
-        return ERROR_INT("d not in {2, 4, 8, 32}", __func__, 1);
+        return ERROR_INT("d not in {2, 4, 8, 32}", procName, 1);
     if (factor < 1) factor = 1;
 
     data = pixGetData(pixs);
@@ -1457,7 +1334,7 @@ PIXCMAP   *cmap;
             count = pixcmapGetCount(cmap);
             if (sum != count)
                 L_WARNING("colormap size %d differs from actual colors\n",
-                          __func__, count);
+                          procName, count);
         }
         return 0;
     }
@@ -1465,8 +1342,7 @@ PIXCMAP   *cmap;
         /* 32 bpp rgb; quit if we get above 256 colors */
     hashsize = 5507;  /* big and prime; collisions are not likely */
     inta = (l_int32 *)LEPT_CALLOC(hashsize, sizeof(l_int32));
-    manycolors = 0;
-    for (i = 0; i < h && manycolors == 0; i += factor) {
+    for (i = 0; i < h; i += factor) {
         line = data + i * wpl;
         for (j = 0; j < w; j += factor) {
             pixel = line[j];
@@ -1476,107 +1352,16 @@ PIXCMAP   *cmap;
                 inta[val] = 1;
                 sum++;
                 if (sum > 256) {
-                    manycolors = 1;
-                    break;
+                    LEPT_FREE(inta);
+                    return 0;
                 }
             }
         }
     }
+
+    *pncolors = sum;
     LEPT_FREE(inta);
-
-    if (manycolors == 0) {
-        *pncolors = sum;
-        return 0;
-    }
-
-        /* More than 256 colors in RGB image; count all the pixels */
-    return pixCountRGBColorsByHash(pixs, pncolors);
-}
-
-
-/* ----------------------------------------------------------------------- *
- *             Lossless conversion of RGB image to colormapped             *
- * ----------------------------------------------------------------------- */
-/*!
- * \brief   pixConvertRGBToCmapLossless()
- * \param[in]    pixs     32 bpp RGB
- * \return  pixd   if num colors <= 256; null otherwise or on error
- *
- * <pre>
- * Notes:
- *      (1) If there are not more than 256 colors, this losslessly
- *          converts and RGB image to a colormapped one, with the
- *          smallest pixel depth required to hold all the colors.
- * </pre>
- */
-PIX *
-pixConvertRGBToCmapLossless(PIX  *pixs)
-{
-l_int32    w, h, d, i, j, wpls, wpld, hashsize, hashval, ncolors, index;
-l_int32    rval, gval, bval, val;
-l_int32   *hasha1, *hasha2;
-l_uint32   pixel;
-l_uint32  *datas, *lines, *datad, *lined;
-PIX       *pixd;
-PIXCMAP   *cmap;
-
-    if (!pixs || pixGetDepth(pixs) != 32)
-        return (PIX *)ERROR_PTR("pixs undefined or not 32 bpp", __func__, NULL);
-
-    pixNumColors(pixs, 1, &ncolors);
-    if (ncolors > 256) {
-        L_ERROR("too many colors found: %d\n", __func__, ncolors);
-        return NULL;
-    }
-
-    pixGetDimensions(pixs, &w, &h, NULL);
-    if (ncolors <= 2)
-        d = 1;
-    else if (ncolors <= 4)
-        d = 2;
-    else if (ncolors <= 16)
-        d = 4;
-    else  /* ncolors <= 256 */
-        d = 8;
-
-    if ((pixd = pixCreate(w, h, d)) == NULL)
-        return (PIX *)ERROR_PTR("pixd not made", __func__, NULL);
-    cmap = pixcmapCreate(d);
-    datas = pixGetData(pixs);
-    wpls = pixGetWpl(pixs);
-    datad = pixGetData(pixd);
-    wpld = pixGetWpl(pixd);
-
-        /* hasha1 is a 1/0 indicator array for colors seen.
-           hasha2 holds the index into the colormap that will be
-           generated from the colors in the order seen. This is
-           the value inserted into pixd.  */
-    hashsize = 5507;  /* big and prime; collisions are not likely */
-    hasha1 = (l_int32 *)LEPT_CALLOC(hashsize, sizeof(l_int32));
-    hasha2 = (l_int32 *)LEPT_CALLOC(hashsize, sizeof(l_int32));
-    index = -1;
-    for (i = 0; i < h; i++) {
-        lines = datas + i * wpls;
-        lined = datad + i * wpld;
-        for (j = 0; j < w; j++) {
-            pixel = lines[j];
-            extractRGBValues(pixel, &rval, &gval, &bval);
-            hashval = (137 * rval + 269 * gval + 353 * bval) % hashsize;
-            if (hasha1[hashval] == 0) {  /* new color */
-                hasha1[hashval] = 1;
-                index++;
-                hasha2[hashval] = index;
-                pixcmapAddColor(cmap, rval, gval, bval);
-            }
-            val = hasha2[hashval];
-            setLineDataVal(lined, j, d, val);
-        }
-    }
-    pixSetColormap(pixd, cmap);
-
-    LEPT_FREE(hasha1);
-    LEPT_FREE(hasha2);
-    return pixd;
+    return 0;
 }
 
 
@@ -1585,13 +1370,13 @@ PIXCMAP   *cmap;
  * ----------------------------------------------------------------------- */
 /*!
  * \brief   pixGetMostPopulatedColors()
- * \param[in]    pixs 32   bpp rgb
- * \param[in]    sigbits   2-6, significant bits retained in the quantizer
- *                         for each component of the input image
- * \param[in]    factor    subsampling factor; use 1 for no subsampling
- * \param[in]    ncolors   the number of most populated colors to select
- * \param[out]   parray    [optional] array of colors, each as 0xrrggbb00
- * \param[out]   pcmap     [optional] colormap of the colors
+ * \param[in]    pixs 32 bpp rgb
+ * \param[in]    sigbits 2-6, significant bits retained in the quantizer
+ *                       for each component of the input image
+ * \param[in]    factor subsampling factor; use 1 for no subsampling
+ * \param[in]    ncolors the number of most populated colors to select
+ * \param[out]   parray [optional] array of colors, each as 0xrrggbb00
+ * \param[out]   pcmap [optional] colormap of the colors
  * \return  0 if OK, 1 on error
  *
  * <pre>
@@ -1604,7 +1389,7 @@ PIXCMAP   *cmap;
  *               pixDisplayColorArray(array, ncolors, ...);
  * </pre>
  */
-l_ok
+l_int32
 pixGetMostPopulatedColors(PIX        *pixs,
                           l_int32     sigbits,
                           l_int32     factor,
@@ -1615,25 +1400,27 @@ pixGetMostPopulatedColors(PIX        *pixs,
 l_int32  n, i, rgbindex, rval, gval, bval;
 NUMA    *nahisto, *naindex;
 
+    PROCNAME("pixGetMostPopulatedColors");
+
     if (!parray && !pcmap)
-        return ERROR_INT("no return val requested", __func__, 1);
+        return ERROR_INT("no return val requested", procName, 1);
     if (parray) *parray = NULL;
     if (pcmap) *pcmap = NULL;
     if (!pixs || pixGetDepth(pixs) != 32)
-        return ERROR_INT("pixs not defined", __func__, 1);
+        return ERROR_INT("pixs not defined", procName, 1);
     if (sigbits < 2 || sigbits > 6)
-        return ERROR_INT("sigbits not in [2 ... 6]", __func__, 1);
+        return ERROR_INT("sigbits not in [2 ... 6]", procName, 1);
     if (factor < 1 || ncolors < 1)
-        return ERROR_INT("factor < 1 or ncolors < 1", __func__, 1);
+        return ERROR_INT("factor < 1 or ncolors < 1", procName, 1);
 
     if ((nahisto = pixGetRGBHistogram(pixs, sigbits, factor)) == NULL)
-        return ERROR_INT("nahisto not made", __func__, 1);
+        return ERROR_INT("nahisto not made", procName, 1);
 
         /* naindex contains the index into nahisto, which is the rgbindex */
     naindex = numaSortIndexAutoSelect(nahisto, L_SORT_DECREASING);
     numaDestroy(&nahisto);
     if (!naindex)
-        return ERROR_INT("naindex not made", __func__, 1);
+        return ERROR_INT("naindex not made", procName, 1);
 
     n = numaGetCount(naindex);
     ncolors = L_MIN(n, ncolors);
@@ -1653,11 +1440,11 @@ NUMA    *nahisto, *naindex;
 
 /*!
  * \brief   pixSimpleColorQuantize()
- * \param[in]    pixs      32 bpp rgb
- * \param[in]    sigbits   2-4, significant bits retained in the quantizer
- *                         for each component of the input image
- * \param[in]    factor    subsampling factor; use 1 for no subsampling
- * \param[in]    ncolors   the number of most populated colors to select
+ * \param[in]    pixs 32 bpp rgb
+ * \param[in]    sigbits 2-4, significant bits retained in the quantizer
+ *                       for each component of the input image
+ * \param[in]    factor subsampling factor; use 1 for no subsampling
+ * \param[in]    ncolors the number of most populated colors to select
  * \return  pixd 8 bpp cmapped or NULL on error
  *
  * <pre>
@@ -1675,8 +1462,6 @@ NUMA    *nahisto, *naindex;
  *          are generally found for %sigbits = 3 and ncolors ~ 20.
  *      (4) See also pixColorSegment() for a method of quantizing the
  *          colors to generate regions of similar color.
- *      (5) See also pixConvertRGBToCmapLossless() to losslessly convert
- *          an RGB image with not more than 256 colors.
  * </pre>
  */
 PIX *
@@ -1689,10 +1474,12 @@ l_int32   w, h;
 PIX      *pixd;
 PIXCMAP  *cmap;
 
+    PROCNAME("pixSimpleColorQuantize");
+
     if (!pixs || pixGetDepth(pixs) != 32)
-        return (PIX *)ERROR_PTR("pixs not defined", __func__, NULL);
+        return (PIX *)ERROR_PTR("pixs not defined", procName, NULL);
     if (sigbits < 2 || sigbits > 4)
-        return (PIX *)ERROR_PTR("sigbits not in {2,3,4}", __func__, NULL);
+        return (PIX *)ERROR_PTR("sigbits not in {2,3,4}", procName, NULL);
 
     pixGetMostPopulatedColors(pixs, sigbits, factor, ncolors, NULL, &cmap);
     pixGetDimensions(pixs, &w, &h, NULL);
@@ -1708,10 +1495,10 @@ PIXCMAP  *cmap;
  * ----------------------------------------------------------------------- */
 /*!
  * \brief   pixGetRGBHistogram()
- * \param[in]    pixs      32 bpp rgb
- * \param[in]    sigbits   2-6, significant bits retained in the quantizer
- *                         for each component of the input image
- * \param[in]    factor    subsampling factor; use 1 for no subsampling
+ * \param[in]    pixs 32 bpp rgb
+ * \param[in]    sigbits 2-6, significant bits retained in the quantizer
+ *                       for each component of the input image
+ * \param[in]    factor subsampling factor; use 1 for no subsampling
  * \return  numa histogram of colors, indexed by RGB
  *                    components, or NULL on error
  *
@@ -1734,12 +1521,14 @@ l_float32  *array;
 l_uint32   *data, *line, *rtab, *gtab, *btab;
 NUMA       *na;
 
+    PROCNAME("pixGetRGBHistogram");
+
     if (!pixs || pixGetDepth(pixs) != 32)
-        return (NUMA *)ERROR_PTR("pixs not defined", __func__, NULL);
+        return (NUMA *)ERROR_PTR("pixs not defined", procName, NULL);
     if (sigbits < 2 || sigbits > 6)
-        return (NUMA *)ERROR_PTR("sigbits not in [2 ... 6]", __func__, NULL);
+        return (NUMA *)ERROR_PTR("sigbits not in [2 ... 6]", procName, NULL);
     if (factor < 1)
-        return (NUMA *)ERROR_PTR("factor < 1", __func__, NULL);
+        return (NUMA *)ERROR_PTR("factor < 1", procName, NULL);
 
         /* Get histogram size: 2^(3 * sigbits) */
     size = 1 << (3 * sigbits);  /* 64, 512, 4096, 32768, 262144 */
@@ -1752,7 +1541,7 @@ NUMA       *na;
     pixGetDimensions(pixs, &w, &h, NULL);
     npts = ((w + factor - 1) / factor) * ((h + factor - 1) / factor);
     if (npts < 1000)
-        L_WARNING("only sampling %d pixels\n", __func__, npts);
+        L_WARNING("only sampling %d pixels\n", procName, npts);
     wpl = pixGetWpl(pixs);
     data = pixGetData(pixs);
     for (i = 0; i < h; i += factor) {
@@ -1775,9 +1564,9 @@ NUMA       *na;
 /*!
  * \brief   makeRGBIndexTables()
  *
- * \param[out]   prtab, pgtab, pbtab    256-entry rgb index tables
- * \param[in]    sigbits   2-6, significant bits retained in the quantizer
- *                         for each component of the input image
+ * \param[out]   prtab, pgtab, pbtab 256-entry index tables
+ * \param[in]    sigbits 2-6, significant bits retained in the quantizer
+ *                       for each component of the input image
  * \return  0 if OK, 1 on error
  *
  * <pre>
@@ -1789,7 +1578,7 @@ NUMA       *na;
  *             r7 r6 r5 g7 g6 g5 b7 b6 b5
  * </pre>
  */
-l_ok
+l_int32
 makeRGBIndexTables(l_uint32  **prtab,
                    l_uint32  **pgtab,
                    l_uint32  **pbtab,
@@ -1798,23 +1587,19 @@ makeRGBIndexTables(l_uint32  **prtab,
 l_int32    i;
 l_uint32  *rtab, *gtab, *btab;
 
+    PROCNAME("makeRGBIndexTables");
+
     if (prtab) *prtab = NULL;
     if (pgtab) *pgtab = NULL;
     if (pbtab) *pbtab = NULL;
     if (!prtab || !pgtab || !pbtab)
-        return ERROR_INT("not all table ptrs defined", __func__, 1);
+        return ERROR_INT("not all table ptrs defined", procName, 1);
     if (sigbits < 2 || sigbits > 6)
-        return ERROR_INT("sigbits not in [2 ... 6]", __func__, 1);
+        return ERROR_INT("sigbits not in [2 ... 6]", procName, 1);
 
     rtab = (l_uint32 *)LEPT_CALLOC(256, sizeof(l_uint32));
     gtab = (l_uint32 *)LEPT_CALLOC(256, sizeof(l_uint32));
     btab = (l_uint32 *)LEPT_CALLOC(256, sizeof(l_uint32));
-    if (!rtab || !gtab || !btab) {
-        LEPT_FREE(rtab);
-        LEPT_FREE(gtab);
-        LEPT_FREE(btab);
-        return ERROR_INT("calloc fail for tab", __func__, 1);
-    }
     *prtab = rtab;
     *pgtab = gtab;
     *pbtab = btab;
@@ -1855,8 +1640,8 @@ l_uint32  *rtab, *gtab, *btab;
         }
         break;
     default:
-        L_ERROR("Illegal sigbits = %d\n", __func__, sigbits);
-        return ERROR_INT("sigbits not in [2 ... 6]", __func__, 1);
+        L_ERROR("Illegal sigbits = %d\n", procName, sigbits);
+        return ERROR_INT("sigbits not in [2 ... 6]", procName, 1);
     }
 
     return 0;
@@ -1866,10 +1651,10 @@ l_uint32  *rtab, *gtab, *btab;
 /*!
  * \brief   getRGBFromIndex()
  *
- * \param[in]    index      rgbindex
- * \param[in]    sigbits    2-6, significant bits retained in the quantizer
- *                          for each component of the input image
- * \param[out]   prval, pgval, pbval   rgb values
+ * \param[in]    index rgbindex
+ * \param[in]    sigbits 2-6, significant bits retained in the quantizer
+ *                       for each component of the input image
+ * \param[out]   prval, pgval, pbval rgb values
  * \return  0 if OK, 1 on error
  *
  * <pre>
@@ -1881,20 +1666,22 @@ l_uint32  *rtab, *gtab, *btab;
  *          The extra bit that is OR'd accomplishes this.
  * </pre>
  */
-l_ok
+l_int32
 getRGBFromIndex(l_uint32  index,
                 l_int32   sigbits,
                 l_int32  *prval,
                 l_int32  *pgval,
                 l_int32  *pbval)
 {
+    PROCNAME("getRGBFromIndex");
+
     if (prval) *prval = 0;
     if (pgval) *pgval = 0;
     if (pbval) *pbval = 0;
     if (!prval || !pgval || !pbval)
-        return ERROR_INT("not all component ptrs defined", __func__, 1);
+        return ERROR_INT("not all component ptrs defined", procName, 1);
     if (sigbits < 2 || sigbits > 6)
-        return ERROR_INT("sigbits not in [2 ... 6]", __func__, 1);
+        return ERROR_INT("sigbits not in [2 ... 6]", procName, 1);
 
     switch (sigbits) {
     case 2:
@@ -1923,8 +1710,8 @@ getRGBFromIndex(l_uint32  index,
         *pbval = ((index << 2) & 0xfc) | 0x02;
         break;
     default:
-        L_ERROR("Illegal sigbits = %d\n", __func__, sigbits);
-        return ERROR_INT("sigbits not in [2 ... 6]", __func__, 1);
+        L_ERROR("Illegal sigbits = %d\n", procName, sigbits);
+        return ERROR_INT("sigbits not in [2 ... 6]", procName, 1);
     }
 
     return 0;
@@ -1937,14 +1724,14 @@ getRGBFromIndex(l_uint32  index,
 /*!
  * \brief   pixHasHighlightRed()
  *
- * \param[in]    pixs      32 bpp rgb
- * \param[in]    factor    subsampling; an integer >= 1; use 1 for all pixels
- * \param[in]    minfract  threshold fraction of all image pixels; must be > 0.0
- * \param[in]    fthresh   threshold on a function of the components; typ. ~2.5
- * \param[out]   phasred   1 if red pixels are above threshold
- * \param[out]   pratio    [optional] normalized fraction of threshold
- *                         red pixels that is actually observed
- * \param[out]   ppixdb    [optional] seed pixel mask
+ * \param[in]    pixs  32 bpp rgb
+ * \param[in]    factor subsampling; an integer >= 1; use 1 for all pixels
+ * \param[in]    fract threshold fraction of all image pixels
+ * \param[in]    fthresh threshold on a function of the components; typ. ~2.5
+ * \param[out]   phasred 1 if red pixels are above threshold
+ * \param[out]   pratio [optional] normalized fraction of threshold
+ *                      red pixels that is actually observed
+ * \param[out]   ppixdb [optional] seed pixel mask
  * \return  0 if OK, 1 on error
  *
  * <pre>
@@ -1955,39 +1742,40 @@ getRGBFromIndex(l_uint32  index,
  *          Masks are generated for (a) and (b), and the intersection
  *          gives the pixels that are red but not either light bg or
  *          dark fg.
- *      (2) A typical value for minfract = 0.0001, which gives sensitivity
+ *      (2) A typical value for fract = 0.0001, which gives sensitivity
  *          to an image where a small fraction of the pixels are printed
  *          in red.
  *      (3) A typical value for fthresh = 2.5.  Higher values give less
  *          sensitivity to red, and fewer false positives.
  * </pre>
  */
-l_ok
+l_int32
 pixHasHighlightRed(PIX        *pixs,
                    l_int32     factor,
-                   l_float32   minfract,
+                   l_float32   fract,
                    l_float32   fthresh,
                    l_int32    *phasred,
                    l_float32  *pratio,
                    PIX       **ppixdb)
 {
-l_float32  fract, ratio;
+l_int32    w, h, count;
+l_float32  ratio;
 PIX       *pix1, *pix2, *pix3, *pix4;
 FPIX      *fpix;
+
+    PROCNAME("pixHasHighlightRed");
 
     if (pratio) *pratio = 0.0;
     if (ppixdb) *ppixdb = NULL;
     if (phasred) *phasred = 0;
     if (!pratio && !ppixdb)
-        return ERROR_INT("no return val requested", __func__, 1);
+        return ERROR_INT("no return val requested", procName, 1);
     if (!phasred)
-        return ERROR_INT("&hasred not defined", __func__, 1);
+        return ERROR_INT("&hasred not defined", procName, 1);
     if (!pixs || pixGetDepth(pixs) != 32)
-        return ERROR_INT("pixs not defined or not 32 bpp", __func__, 1);
-    if (minfract <= 0.0)
-        return ERROR_INT("minfract must be > 0.0", __func__, 1);
+        return ERROR_INT("pixs not defined or not 32 bpp", procName, 1);
     if (fthresh < 1.5 || fthresh > 3.5)
-        L_WARNING("fthresh = %f is out of normal bounds\n", __func__, fthresh);
+        L_WARNING("fthresh = %f is out of normal bounds\n", procName, fthresh);
 
     if (factor > 1)
         pix1 = pixScaleByIntSampling(pixs, factor);
@@ -2005,9 +1793,11 @@ FPIX      *fpix;
     pixInvert(pix4, pix4);
 
     pixAnd(pix4, pix4, pix2);
-    pixForegroundFraction(pix4, &fract);
-    ratio = fract / minfract;
-    L_INFO("fract = %7.5f, ratio = %7.3f\n", __func__, fract, ratio);
+    pixCountPixels(pix4, &count, NULL);
+    pixGetDimensions(pix4, &w, &h, NULL);
+    L_INFO("count = %d, thresh = %d\n", procName, count,
+           (l_int32)(fract * w * h));
+    ratio = (l_float32)count / (fract * w * h);
     if (pratio) *pratio = ratio;
     if (ratio >= 1.0)
         *phasred = 1;

@@ -42,10 +42,6 @@
  *    Use pageseg*.tif input images.
  */
 
-#ifdef HAVE_CONFIG_H
-#include <config_auto.h>
-#endif  /* HAVE_CONFIG_H */
-
 #include "allheaders.h"
 
     /* Control the display output */
@@ -57,17 +53,17 @@ l_int32 DoPageSegmentation(PIX *pixs, l_int32 which);
 int main(int    argc,
          char **argv)
 {
-char    *filein;
-l_int32  i;
-PIX     *pixs;   /* input image should be at least 300 ppi */
+char        *filein;
+l_int32      i;
+PIX         *pixs;   /* input image should be at least 300 ppi */
+static char  mainName[] = "livre_pageseg";
 
     if (argc != 2)
-        return ERROR_INT(" Syntax:  livre_pageseg filein", __func__, 1);
-    filein = argv[1];
-    setLeptDebugOK(1);
+        return ERROR_INT(" Syntax:  livre_pageseg filein", mainName, 1);
 
+    filein = argv[1];
     if ((pixs = pixRead(filein)) == NULL)
-        return ERROR_INT("pix not made", __func__, 1);
+        return ERROR_INT("pix not made", mainName, 1);
 
     for (i = 1; i <= 4; i++)
         DoPageSegmentation(pixs, i);
@@ -80,32 +76,34 @@ l_int32
 DoPageSegmentation(PIX     *pixs,   /* should be at least 300 ppi */
                    l_int32  which)  /* 1, 2, 3, 4 */
 {
-char      buf[256];
-l_int32   zero;
-BOXA     *boxatm, *boxahm;
-PIX      *pixr;   /* image reduced to 150 ppi */
-PIX      *pixhs;  /* image of halftone seed, 150 ppi */
-PIX      *pixm;   /* image of mask of components, 150 ppi */
-PIX      *pixhm1; /* image of halftone mask, 150 ppi */
-PIX      *pixhm2; /* image of halftone mask, 300 ppi */
-PIX      *pixht;  /* image of halftone components, 150 ppi */
-PIX      *pixnht; /* image without halftone components, 150 ppi */
-PIX      *pixi;   /* inverted image, 150 ppi */
-PIX      *pixvws; /* image of vertical whitespace, 150 ppi */
-PIX      *pixm1;  /* image of closed textlines, 150 ppi */
-PIX      *pixm2;  /* image of refined text line mask, 150 ppi */
-PIX      *pixm3;  /* image of refined text line mask, 300 ppi */
-PIX      *pixb1;  /* image of text block mask, 150 ppi */
-PIX      *pixb2;  /* image of text block mask, 300 ppi */
-PIX      *pixnon; /* image of non-text or halftone, 150 ppi */
-PIX      *pix1, *pix2, *pix3;
-PIXA     *pixa;
-PIXCMAP  *cmap;
-PTAA     *ptaa;
-l_int32   ht_flag = 0;
-l_int32   ws_flag = 0;
-l_int32   text_flag = 0;
-l_int32   block_flag = 0;
+char         buf[256];
+l_int32      zero;
+BOXA        *boxatm, *boxahm;
+PIX         *pixr;   /* image reduced to 150 ppi */
+PIX         *pixhs;  /* image of halftone seed, 150 ppi */
+PIX         *pixm;   /* image of mask of components, 150 ppi */
+PIX         *pixhm1; /* image of halftone mask, 150 ppi */
+PIX         *pixhm2; /* image of halftone mask, 300 ppi */
+PIX         *pixht;  /* image of halftone components, 150 ppi */
+PIX         *pixnht; /* image without halftone components, 150 ppi */
+PIX         *pixi;   /* inverted image, 150 ppi */
+PIX         *pixvws; /* image of vertical whitespace, 150 ppi */
+PIX         *pixm1;  /* image of closed textlines, 150 ppi */
+PIX         *pixm2;  /* image of refined text line mask, 150 ppi */
+PIX         *pixm3;  /* image of refined text line mask, 300 ppi */
+PIX         *pixb1;  /* image of text block mask, 150 ppi */
+PIX         *pixb2;  /* image of text block mask, 300 ppi */
+PIX         *pixnon; /* image of non-text or halftone, 150 ppi */
+PIX         *pix1, *pix2, *pix3, *pix4;
+PIXA        *pixa;
+PIXCMAP     *cmap;
+PTAA        *ptaa;
+l_int32      ht_flag = 0;
+l_int32      ws_flag = 0;
+l_int32      text_flag = 0;
+l_int32      block_flag = 0;
+
+    PROCNAME("DoPageSegmentation");
 
     if (which == 1)
         ht_flag = 1;
@@ -116,7 +114,7 @@ l_int32   block_flag = 0;
     else if (which == 4)
         block_flag = 1;
     else
-        return ERROR_INT("invalid parameter: not in [1...4]", __func__, 1);
+        return ERROR_INT("invalid parameter: not in [1...4]", procName, 1);
 
     pixa = pixaCreate(0);
     lept_mkdir("lept/livre");
@@ -161,9 +159,9 @@ l_int32   block_flag = 0;
     if (which == 1) pixWrite("/tmp/lept/livre/text.150.png", pixnht, IFF_PNG);
     pixZero(pixht, &zero);
     if (zero)
-        lept_stderr("No halftone parts found\n");
+        fprintf(stderr, "No halftone parts found\n");
     else
-        lept_stderr("Halftone parts found\n");
+        fprintf(stderr, "Halftone parts found\n");
 
         /* Get bit-inverted image */
     pixi = pixInvert(NULL, pixnht);
@@ -273,10 +271,8 @@ l_int32   block_flag = 0;
         /* Write out b.b. for text line mask and halftone mask components */
     boxatm = pixConnComp(pixm3, NULL, 4);
     boxahm = pixConnComp(pixhm2, NULL, 8);
-    if (which == 1) {
-        boxaWrite("/tmp/lept/livre/textmask.boxa", boxatm);
-        boxaWrite("/tmp/lept/livre/htmask.boxa", boxahm);
-    }
+    if (which == 1) boxaWrite("/tmp/lept/livre/textmask.boxa", boxatm);
+    if (which == 1) boxaWrite("/tmp/lept/livre/htmask.boxa", boxahm);
 
     pix1 = pixaDisplayTiledAndScaled(pixa, 8, 250, 4, 0, 25, 2);
     pixDisplay(pix1, 0, 375 * (which - 1));

@@ -73,7 +73,7 @@
 /* --------------------------------------------------------------- *
  *                    Image file format types                      *
  * --------------------------------------------------------------- */
-/*
+/* 
  *  The IFF_DEFAULT flag is used to write the file out in the
  *  same (input) file format that the pix was read from.  If the pix
  *  was not read from file, the input format field will be
@@ -87,7 +87,7 @@
  *  file formats before IFF_DEFAULT will remain invariant.
  */
 
-/*! Image Formats */
+/*! Image file format types */
 enum {
     IFF_UNKNOWN        = 0,
     IFF_BMP            = 1,
@@ -106,22 +106,16 @@ enum {
     IFF_JP2            = 14,
     IFF_WEBP           = 15,
     IFF_LPDF           = 16,
-    IFF_TIFF_JPEG      = 17,
-    IFF_DEFAULT        = 18,
-    IFF_SPIX           = 19
+    IFF_DEFAULT        = 17,
+    IFF_SPIX           = 18
 };
-
-/* Convenient macro for checking requested tiff output */
-#define  L_FORMAT_IS_TIFF(f)  ((f) == IFF_TIFF || (f) == IFF_TIFF_PACKBITS || \
-                               (f) == IFF_TIFF_RLE || (f) == IFF_TIFF_G3 || \
-                               (f) == IFF_TIFF_G4 || (f) == IFF_TIFF_LZW || \
-                               (f) == IFF_TIFF_ZIP || (f) == IFF_TIFF_JPEG)
 
 
 /* --------------------------------------------------------------- *
  *                         Format header ids                       *
  * --------------------------------------------------------------- */
-/*! Header Ids */
+
+/*! Format header ids */
 enum {
     BMP_ID             = 0x4d42,     /*!< BM - for bitmaps    */
     TIFF_BIGEND_ID     = 0x4d4d,     /*!< MM - for 'motorola' */
@@ -132,28 +126,19 @@ enum {
 /* --------------------------------------------------------------- *
  *                Hinting bit flags in jpeg reader                 *
  * --------------------------------------------------------------- */
-/*! Jpeg Hints */
-/* The default behavior is now to fail on data corruption. */
-enum {
-    L_JPEG_READ_LUMINANCE = 1,    /*!< only want luminance data; no chroma */
-    L_JPEG_CONTINUE_WITH_BAD_DATA = 2  /*!< return possibly damaged pix */
-};
 
-
-/* --------------------------------------------------------------- *
- *                            Jp2k codecs                          *
- * --------------------------------------------------------------- */
-/*! Jp2k Codecs */
+/*! Hinting bit flags in jpeg reader */
 enum {
-    L_J2K_CODEC = 1,    /*!< codestream                 */
-    L_JP2_CODEC = 2     /*!< file format with 'ihdr'    */
+    L_JPEG_READ_LUMINANCE = 1,   /*!< only want luminance data; no chroma */
+    L_JPEG_FAIL_ON_BAD_DATA = 2  /*!< don't return possibly damaged pix */
 };
 
 
 /* --------------------------------------------------------------- *
  *                    Pdf formatted encoding types                 *
  * --------------------------------------------------------------- */
-/*! Pdf Encoding */
+
+/*! Pdf formatted encoding types */
 enum {
     L_DEFAULT_ENCODE  = 0,  /*!< use default encoding based on image        */
     L_JPEG_ENCODE     = 1,  /*!< use dct encoding: 8 and 32 bpp, no cmap    */
@@ -166,7 +151,7 @@ enum {
 /* --------------------------------------------------------------- *
  *                    Compressed image data                        *
  * --------------------------------------------------------------- */
-/*
+/* 
  *  In use, either datacomp or data85 will be produced, depending
  *  on whether the data needs to be ascii85 encoded.  PostScript
  *  requires ascii85 encoding; pdf does not.
@@ -203,7 +188,8 @@ typedef struct L_Compressed_Data  L_COMP_DATA;
 /* ------------------------------------------------------------------------- *
  *                           Pdf multi image flags                           *
  * ------------------------------------------------------------------------- */
-/*! Pdf MultiImage */
+
+/*! Pdf multi image flags */
 enum {
     L_FIRST_IMAGE   = 1,    /*!< first image to be used                      */
     L_NEXT_IMAGE    = 2,    /*!< intermediate image; not first or last       */
@@ -214,7 +200,7 @@ enum {
 /* ------------------------------------------------------------------------- *
  *                     Intermediate pdf generation data                      *
  * ------------------------------------------------------------------------- */
-/*
+/* 
  *  This accumulates data for generating a pdf of a single page consisting
  *  of an arbitrary number of images.
  *
@@ -246,5 +232,6 @@ struct L_Pdf_Data
     l_int32            xrefloc;      /*!< location of xref                    */
 };
 typedef struct L_Pdf_Data  L_PDF_DATA;
+
 
 #endif  /* LEPTONICA_IMAGEIO_H */

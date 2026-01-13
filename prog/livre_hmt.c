@@ -33,16 +33,12 @@
  *    (1) The Sel is displayed with the hit and miss elements in color.
  *
  *    (2) We produce several 4 bpp colormapped renditions,
- *        with the matched pattern either highlighted or removed.
+ *        with the matched pattern either hightlighted or removed.
  *
  *    (3) For figures in the Document Image Applications chapter:
  *           fig 7:  livre_hmt 1 8
  *           fig 8:  livre_hmt 2 4
  */
-
-#ifdef HAVE_CONFIG_H
-#include <config_auto.h>
-#endif  /* HAVE_CONFIG_H */
 
 #include "allheaders.h"
 
@@ -60,29 +56,29 @@ static const char *patname[3] = {
 int main(int    argc,
          char **argv)
 {
-l_int32  patno, reduction, width, cols, cx, cy;
-PIX     *pixs, *pixt, *pix, *pixr, *pixp, *pixsel, *pixhmt;
-PIX     *pixd1, *pixd2, *pixd3, *pixd;
-PIXA    *pixa;
-SEL     *selhm;
+l_int32      patno, reduction, width, cols, cx, cy;
+PIX         *pixs, *pixt, *pix, *pixr, *pixp, *pixsel, *pixhmt;
+PIX         *pixd1, *pixd2, *pixd3, *pixd;
+PIXA        *pixa;
+SEL         *selhm;
+static char  mainName[] = "livre_hmt";
 
     if (argc != 3)
-        return ERROR_INT(" Syntax:  livre_hmt pattern reduction", __func__, 1);
+        return ERROR_INT(" Syntax:  livre_hmt pattern reduction", mainName, 1);
     patno = atoi(argv[1]);
     reduction = atoi(argv[2]);
 
-    setLeptDebugOK(1);
     lept_mkdir("lept/livre");
     if ((pixs = pixRead(patname[patno])) == NULL)
-        return ERROR_INT("pixs not made", __func__, 1);
+        return ERROR_INT("pixs not made", mainName, 1);
     if (reduction != 4 && reduction != 8 && reduction != 16)
-        return ERROR_INT("reduction not 4, 8 or 16", __func__, 1);
+        return ERROR_INT("reduction not 4, 8 or 16", mainName, 1);
 
     if (reduction == 4)
         pixt = pixReduceRankBinaryCascade(pixs, 4, 4, 0, 0);
     else if (reduction == 8)
         pixt = pixReduceRankBinaryCascade(pixs, 4, 4, 2, 0);
-    else  /* reduction == 16 */
+    else if (reduction == 16)
         pixt = pixReduceRankBinaryCascade(pixs, 4, 4, 2, 2);
 
         /* Make a hit-miss sel */
@@ -90,7 +86,7 @@ SEL     *selhm;
         selhm = pixGenerateSelBoundary(pixt, 2, 2, 20, 30, 1, 1, 0, 0, &pixp);
     else if (reduction == 8)
         selhm = pixGenerateSelBoundary(pixt, 1, 2, 6, 12, 1, 1, 0, 0, &pixp);
-    else  /* reduction == 16 */
+    else if (reduction == 16)
         selhm = pixGenerateSelBoundary(pixt, 1, 1, 4, 8, 0, 0, 0, 0, &pixp);
 
         /* Display the sel */
@@ -104,12 +100,12 @@ SEL     *selhm;
         pixr = pixClone(pix);
     else if (reduction == 8)
         pixr = pixReduceRankBinaryCascade(pix, 2, 0, 0, 0);
-    else  /* reduction == 16 */
+    else if (reduction == 16)
         pixr = pixReduceRankBinaryCascade(pix, 2, 2, 0, 0);
 
     startTimer();
     pixhmt = pixHMT(NULL, pixr, selhm);
-    lept_stderr("Time to find patterns = %7.3f\n", stopTimer());
+    fprintf(stderr, "Time to find patterns = %7.3f\n", stopTimer());
 
         /* Color each instance at full res */
     selGetParameters(selhm, NULL, NULL, &cy, &cx);

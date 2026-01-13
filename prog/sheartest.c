@@ -32,10 +32,6 @@
  *     where angle is expressed in degrees
  */
 
-#ifdef HAVE_CONFIG_H
-#include <config_auto.h>
-#endif  /* HAVE_CONFIG_H */
-
 #include "allheaders.h"
 
 #define   NTIMES   10
@@ -43,16 +39,15 @@
 int main(int    argc,
          char **argv)
 {
-char      *filein, *fileout;
-l_int32    i, w, h, liney, linex, same;
-l_float32  angle, deg2rad;
-PIX       *pixt1, *pixt2, *pixs, *pixd;
+char        *filein, *fileout;
+l_int32      i, w, h, liney, linex, same;
+l_float32    angle, deg2rad;
+PIX         *pixt1, *pixt2, *pixs, *pixd;
+static char  mainName[] = "sheartest";
 
     if (argc != 4)
         return ERROR_INT(" Syntax:  sheartest filein angle fileout",
-                         __func__, 1);
-
-    setLeptDebugOK(1);
+                         mainName, 1);
 
         /* Compare in-place H shear with H shear to a new pix */
     pixt1 = pixRead("marge.jpg");
@@ -61,9 +56,9 @@ PIX       *pixt1, *pixt2, *pixs, *pixd;
     pixHShearIP(pixt1, (l_int32)(0.3 * h), 0.17, L_BRING_IN_WHITE);
     pixEqual(pixt1, pixt2, &same);
     if (same)
-        lept_stderr("Correct for H shear\n");
+        fprintf(stderr, "Correct for H shear\n");
     else
-        lept_stderr("Error for H shear\n");
+        fprintf(stderr, "Error for H shear\n");
     pixDestroy(&pixt1);
     pixDestroy(&pixt2);
 
@@ -74,9 +69,9 @@ PIX       *pixt1, *pixt2, *pixs, *pixd;
     pixVShearIP(pixt1, (l_int32)(0.3 * w), 0.17, L_BRING_IN_WHITE);
     pixEqual(pixt1, pixt2, &same);
     if (same)
-        lept_stderr("Correct for V shear\n");
+        fprintf(stderr, "Correct for V shear\n");
     else
-        lept_stderr("Error for V shear\n");
+        fprintf(stderr, "Error for V shear\n");
     pixDestroy(&pixt1);
     pixDestroy(&pixt2);
 
@@ -86,7 +81,7 @@ PIX       *pixt1, *pixt2, *pixs, *pixd;
     deg2rad = 3.1415926535 / 180.;
 
     if ((pixs = pixRead(filein)) == NULL)
-        return ERROR_INT("pix not made", __func__, 1);
+        return ERROR_INT("pix not made", mainName, 1);
 
     pixGetDimensions(pixs, &w, &h, NULL);
 

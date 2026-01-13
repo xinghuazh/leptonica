@@ -32,10 +32,6 @@
  *       - global linear color mapping and extraction of color magnitude
  */
 
-#ifdef HAVE_CONFIG_H
-#include <config_auto.h>
-#endif  /* HAVE_CONFIG_H */
-
 #include "allheaders.h"
 
 int main(int    argc,
@@ -52,11 +48,6 @@ PIX          *pixr, *pixg, *pixb;  /* for color content extraction */
 PIXA         *pixa, *pixat;
 PIXCMAP      *cmap;
 L_REGPARAMS  *rp;
-
-#if !defined(HAVE_LIBPNG)
-    L_ERROR("This test requires libpng to run.\n", "colorspace_reg");
-    exit(77);
-#endif
 
     if (regTestSetup(argc, argv, &rp))
         return 1;
@@ -138,7 +129,7 @@ L_REGPARAMS  *rp;
         pix0 = pixGlobalNormRGB(NULL, pixs, rwhite, gwhite, bwhite, 255);
         pixaAddPix(pixat, pix0, L_INSERT);
         pix1 = pixColorMagnitude(pixs, rwhite, gwhite, bwhite,
-                                 L_AVE_MAX_DIFF_2);
+                                  L_MAX_DIFF_FROM_AVERAGE_2);
         for (j = 0; j < 6; j++) {
             pix2 = pixThresholdToBinary(pix1, 30 + 10 * j);
             pixInvert(pix2, pix2);
@@ -149,7 +140,8 @@ L_REGPARAMS  *rp;
             pixDestroy(&pix2);
         }
         pixDestroy(&pix1);
-        pix1 = pixColorMagnitude(pixs, rwhite, gwhite, bwhite, L_INTERMED_DIFF);
+        pix1 = pixColorMagnitude(pixs, rwhite, gwhite, bwhite,
+                                  L_MAX_MIN_DIFF_FROM_2);
         for (j = 0; j < 6; j++) {
             pix2 = pixThresholdToBinary(pix1, 30 + 10 * j);
             pixInvert(pix2, pix2);
@@ -169,7 +161,7 @@ L_REGPARAMS  *rp;
                          "white point space for red", "amount of color");
     for (j = 0; j < 6; j++) {
         na = numaaGetNuma(naa1, j, L_CLONE);
-        snprintf(label, sizeof(label), "thresh %d", 30 + 10 * j);
+        sprintf(label, "thresh %d", 30 + 10 * j);
         gplotAddPlot(gplot1, naseq, na, GPLOT_LINES, label);
         numaDestroy(&na);
         na = numaaGetNuma(naa2, j, L_CLONE);

@@ -30,10 +30,6 @@
  *     Tests gray thresholding to 1, 2 and 4 bpp, with and without colormaps
  */
 
-#ifdef HAVE_CONFIG_H
-#include <config_auto.h>
-#endif  /* HAVE_CONFIG_H */
-
 #include "allheaders.h"
 
 static const l_int32  THRESHOLD = 130;
@@ -45,7 +41,7 @@ int main(int    argc,
          char **argv)
 {
 const char   *str;
-l_int32       index, w, h;
+l_int32       equal, index, w, h;
 BOX          *box;
 PIX          *pixs, *pix1, *pix2, *pix3, *pix4, *pix5, *pix6;
 PIXA         *pixa;
@@ -126,10 +122,9 @@ L_REGPARAMS  *rp;
 
         /* Optional display */
     if (rp->display) {
-        lept_mkdir("lept/gquant");
         pix1 = pixaDisplayTiled(pixa, 2000, 0, 20);
         pixDisplay(pix1, 100, 100);
-        pixWrite("/tmp/lept/gquant/mosaic1.png", pix1, IFF_PNG);
+        pixWrite("/tmp/lept/mosaic1.png", pix1, IFF_PNG);
         pixDestroy(&pix1);
     }
     pixaDestroy(&pixa);
@@ -211,7 +206,7 @@ L_REGPARAMS  *rp;
     if (rp->display) {
         pix1 = pixaDisplayTiled(pixa, 2000, 0, 20);
         pixDisplay(pix1, 200, 100);
-        pixWrite("/tmp/lept/gquant/mosaic2.png", pix1, IFF_PNG);
+        pixWrite("/tmp/lept/mosaic2.png", pix1, IFF_PNG);
         pixDestroy(&pix1);
     }
     pixaDestroy(&pixa);
@@ -309,7 +304,7 @@ L_REGPARAMS  *rp;
     if (rp->display) {
         pix1 = pixaDisplayTiled(pixa, 2000, 0, 20);
         pixDisplay(pix1, 300, 100);
-        pixWrite("/tmp/lept/gquant/mosaic3.png", pix1, IFF_PNG);
+        pixWrite("/tmp/lept/mosaic3.png", pix1, IFF_PNG);
         pixDestroy(&pix1);
     }
     pixaDestroy(&pixa);
@@ -368,7 +363,7 @@ L_REGPARAMS  *rp;
     if (rp->display) {
         pix1 = pixaDisplayTiled(pixa, 2000, 0, 20);
         pixDisplay(pix1, 400, 100);
-        pixWrite("/tmp/lept/gquant/mosaic4.png", pix1, IFF_PNG);
+        pixWrite("/tmp/lept/mosaic4.png", pix1, IFF_PNG);
         pixDestroy(&pix1);
     }
     pixaDestroy(&pixa);
@@ -378,16 +373,16 @@ L_REGPARAMS  *rp;
         pixs = pixRead("test8.jpg");
         startTimer();
         pix1 = pixScaleGray2xLIThresh(pixs, THRESHOLD);
-        lept_stderr(" time for scale/dither = %7.3f sec\n", stopTimer());
-        pixWrite("/tmp/lept/gquant/upscale1.png", pix1, IFF_PNG);
+        fprintf(stderr, " time for scale/dither = %7.3f sec\n", stopTimer());
+        pixWrite("/tmp/lept/upscale1.png", pix1, IFF_PNG);
         pixDisplay(pix1, 0, 500);
         pixDestroy(&pix1);
 
             /* Upscale 4x and threshold to 1 bpp */
         startTimer();
         pix1 = pixScaleGray4xLIThresh(pixs, THRESHOLD);
-        lept_stderr(" time for scale/dither = %7.3f sec\n", stopTimer());
-        pixWrite("/tmp/lept/gquant/upscale2.png", pix1, IFF_PNG);
+        fprintf(stderr, " time for scale/dither = %7.3f sec\n", stopTimer());
+        pixWrite("/tmp/lept/upscale2.png", pix1, IFF_PNG);
         pixDisplay(pix1, 700, 500);
         pixDestroy(&pix1);
         pixDestroy(&pixs);

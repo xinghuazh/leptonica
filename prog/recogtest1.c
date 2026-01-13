@@ -33,38 +33,36 @@
  *     An example of greedy splitting of touching characters is given.
  */
 
-#ifdef HAVE_CONFIG_H
-#include <config_auto.h>
-#endif  /* HAVE_CONFIG_H */
-
 #include "string.h"
 #include "allheaders.h"
 
 static const l_int32 scaledw = 0;
 static const l_int32 scaledh = 40;
 
-static const l_float32  MinScore[] = {0.6f, 0.7f, 0.9f};
-static const l_int32  MinTarget[] = {4, 5, 4};
-static const l_int32  MinSize[] = {3, 2, 3};
-
 l_int32 main(int    argc,
              char **argv)
 {
-l_int32   i, linew, same;
-BOXA     *boxat;
-PIX      *pixd, *pix1, *pix2, *pixdb;
-PIXA     *pixa1, *pixa2, *pixa3;
-L_RECOG  *recog1, *recog2;
+l_int32    i, j, n, index, w, h, linew, same;
+l_float32  score;
+char      *fname, *strchar;
+char       buf[256];
+BOX       *box;
+BOXA      *boxat;
+NUMA      *na1;
+PIX       *pixs, *pixd, *pix1, *pix2, *pixdb;
+PIXA      *pixa1, *pixa2, *pixa3, *pixa4;
+L_RECOG   *recog1, *recog2;
+SARRAY    *sa, *satext;
 
     if (argc != 1) {
-        lept_stderr(" Syntax: recogtest1\n");
+        fprintf(stderr, " Syntax: recogtest1\n");
         return 1;
     }
 
-    setLeptDebugOK(1);
-    lept_mkdir("lept/digits");
     recog1 = NULL;
     recog2 = NULL;
+
+    lept_mkdir("lept/digits");
 
 #if 0
     linew = 5;  /* for lines */
@@ -83,13 +81,13 @@ L_RECOG  *recog1, *recog2;
 #endif
 
 #if 1
-    lept_stderr("Print Stats 1\n");
+    fprintf(stderr, "Print Stats 1\n");
     recogShowContent(stderr, recog1, 1, 1);
 #endif
 
 #if 1
-    lept_stderr("AverageSamples\n");
-    recogAverageSamples(recog1, 1);
+    fprintf(stderr, "AverageSamples\n");
+    recogAverageSamples(&recog1, 1);
     recogShowAverageTemplates(recog1);
     pix1 = pixaGetPix(recog1->pixadb_ave, 0, L_CLONE);
     pixWrite("/tmp/lept/digits/unscaled_ave.png", pix1, IFF_PNG);
@@ -100,7 +98,7 @@ L_RECOG  *recog1, *recog2;
 #endif
 
 #if 1
-    recogDebugAverages(recog1, 0);
+    recogDebugAverages(&recog1, 0);
     recogShowMatchesInRange(recog1, recog1->pixa_tr, 0.65, 1.0, 0);
     pixWrite("/tmp/lept/digits/match_ave1.png", recog1->pixdb_range, IFF_PNG);
     recogShowMatchesInRange(recog1, recog1->pixa_tr, 0.0, 1.0, 0);
@@ -108,7 +106,7 @@ L_RECOG  *recog1, *recog2;
 #endif
 
 #if 1
-    lept_stderr("Print stats 2\n");
+    fprintf(stderr, "Print stats 2\n");
     recogShowContent(stderr, recog1, 2, 1);
     recogWrite("/tmp/lept/digits/rec1.rec", recog1);
     recog2 = recogRead("/tmp/lept/digits/rec1.rec");
@@ -117,7 +115,7 @@ L_RECOG  *recog1, *recog2;
     filesAreIdentical("/tmp/lept/digits/rec1.rec",
                       "/tmp/lept/digits/rec2.rec", &same);
     if (!same)
-        lept_stderr("Error in serialization!\n");
+        fprintf(stderr, "Error in serialization!\n");
     recogDestroy(&recog2);
 #endif
 
@@ -127,7 +125,10 @@ L_RECOG  *recog1, *recog2;
          *  0.8, 0.2 : remove many based on matching; remove some based on
          *             requiring retention of 20% of templates in each class
          *  0.9, 0.01 : remove most based on matching; saved 1 in each class */
-    lept_stderr("Remove outliers\n");
+    fprintf(stderr, "Remove outliers\n");
+    static const l_float32  MinScore[] = {0.6, 0.7, 0.9};
+    static const l_int32  MinTarget[] = {4, 5, 4};
+    static const l_int32  MinSize[] = {3, 2, 3};
     pixa2 = recogExtractPixa(recog1);
     for (i = 0; i < 3; i++) {
         pixa3 = pixaRemoveOutliers1(pixa2, MinScore[i], MinTarget[i],
@@ -143,11 +144,11 @@ L_RECOG  *recog1, *recog2;
 
 #if 1
         /* Split touching characters */
-    lept_stderr("Split touching\n");
+    fprintf(stderr, "Split touching\n");
     pixd = pixRead("recog/digits/page.590.png");  /* 590 or 306 */
     recogIdentifyMultiple(recog1, pixd, 0, 0, &boxat, &pixa2, &pixdb, 1);
     pixDisplay(pixdb, 800, 800);
-    boxaWriteStderr(boxat);
+    boxaWriteStream(stderr, boxat);
     pix1 = pixaDisplay(pixa2, 0, 0);
     pixDisplay(pix1, 1200, 800);
     pixDestroy(&pixdb);
@@ -158,12 +159,12 @@ L_RECOG  *recog1, *recog2;
 #endif
 
 #if 1
-    lept_stderr("Reading new training set and computing averages\n");
-    lept_stderr("Print stats 3\n");
+    fprintf(stderr, "Reading new training set and computing averages\n");
+    fprintf(stderr, "Print stats 3\n");
     pixa1 = pixaRead("recog/sets/train03.pa");
     recog2 = recogCreateFromPixa(pixa1, 0, 40, 0, 128, 1);
     recogShowContent(stderr, recog2, 3, 1);
-    recogDebugAverages(recog2, 3);
+    recogDebugAverages(&recog2, 3);
     pixWrite("/tmp/lept/digits/averages.png", recog2->pixdb_ave, IFF_PNG);
     recogShowAverageTemplates(recog2);
     pixaDestroy(&pixa1);

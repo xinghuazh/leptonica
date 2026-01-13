@@ -135,12 +135,12 @@
  *      When you are only applying some function to each element
  *      in a list, you can go either forwards or backwards.
  *      To run through a list forwards, use:
- * \code
+ *
  *          for (elem = head; elem; elem = nextelem) {
  *              nextelem = elem->next;   (in case we destroy elem)
  *              <do something with elem->data>
  *          }
- * \endcode
+ *
  *      To run through a list backwards, find the tail and use:
  *
  *          for (elem = tail; elem; elem = prevelem) {
@@ -151,7 +151,7 @@
  *      Even though these patterns are very simple, they are so common
  *      that we've provided macros for them in list.h.  Using the
  *      macros, this becomes:
- * \code
+ *
  *          L_BEGIN_LIST_FORWARD(head, elem)
  *              <do something with elem->data>
  *          L_END_LIST
@@ -159,7 +159,7 @@
  *          L_BEGIN_LIST_REVERSE(tail, elem)
  *              <do something with elem->data>
  *          L_END_LIST
- * \endcode
+ *
  *      Note again that with macros, the application programmer does
  *      not need to refer explicitly to next and prev fields.  Also,
  *      in the reverse case, note that we do not explicitly
@@ -169,23 +169,23 @@
  *
  *      Some special cases are simpler.  For example, when
  *      removing all items from the head of the list, you can use
- * \code
+ *
  *          while (head) {
  *              obj = listRemoveFromHead(&head);
  *              <do something with obj>
  *          }
- * \endcode
+ *
  *      Removing successive elements from the tail is equally simple:
- * \code
+ *
  *          while (tail) {
  *              obj = listRemoveFromTail(&head, &tail);
  *              <do something with obj>
  *          }
- * \endcode
+ *
  *      When removing an arbitrary element from a list, use
- * \code
+ *
  *              obj = listRemoveElement(&head, elem);
- * \endcode
+ *
  *      All the listRemove*() functions hand you the object,
  *      destroy the list cell to which it was attached, and
  *      reset the list pointers if necessary.
@@ -210,12 +210,9 @@
  * </pre>
  */
 
-#ifdef HAVE_CONFIG_H
-#include <config_auto.h>
-#endif  /* HAVE_CONFIG_H */
-
 #include <string.h>
 #include "allheaders.h"
+
 
 /*---------------------------------------------------------------------*
  *                    Inserting and removing elements                  *
@@ -223,7 +220,7 @@
 /*!
  * \brief   listDestroy()
  *
- * \param[in,out]   phead   head of list; will be set to null before returning
+ * \param[in,out]   phead   to be nulled; head of list
  * \return  void
  *
  * <pre>
@@ -240,8 +237,10 @@ listDestroy(DLLIST  **phead)
 {
 DLLIST  *elem, *next, *head;
 
+    PROCNAME("listDestroy");
+
     if (phead == NULL) {
-        L_WARNING("ptr address is null!\n", __func__);
+        L_WARNING("ptr address is null!\n", procName);
         return;
     }
 
@@ -250,43 +249,48 @@ DLLIST  *elem, *next, *head;
 
     for (elem = head; elem; elem = next) {
         if (elem->data)
-            L_WARNING("list data ptr is not null\n", __func__);
+            L_WARNING("list data ptr is not null\n", procName);
         next = elem->next;
         LEPT_FREE(elem);
     }
     *phead = NULL;
+    return;
 }
 
 
 /*!
  * \brief   listAddToHead()
  *
- * \param[in,out]   phead    [optional] input head
- * \param[in]       data     void* ptr, to be added
+ * \param[in,out]   phead  [optional] input head
+ * \param[in]    data  void* ptr, to be added
  * \return  0 if OK; 1 on error
  *
  * <pre>
  * Notes:
- *      (1) This makes a new cell, attaches %data, and adds the
+ *      (1) This makes a new cell, attaches the data, and adds the
  *          cell to the head of the list.
  *      (2) When consing from NULL, be sure to initialize head to NULL
  *          before calling this function.
  * </pre>
  */
-l_ok
+l_int32
 listAddToHead(DLLIST  **phead,
               void     *data)
 {
 DLLIST  *cell, *head;
 
+    PROCNAME("listAddToHead");
+
     if (!phead)
-        return ERROR_INT("&head not defined", __func__, 1);
+        return ERROR_INT("&head not defined", procName, 1);
     head = *phead;
     if (!data)
-        return ERROR_INT("data not defined", __func__, 1);
+        return ERROR_INT("data not defined", procName, 1);
 
-    cell = (DLLIST *)LEPT_CALLOC(1, sizeof(DLLIST));
+    if ((cell = (DLLIST *)LEPT_CALLOC(1, sizeof(DLLIST))) == NULL)
+        return ERROR_INT("cell not made", procName, 1);
     cell->data = data;
+
     if (!head) {  /* start the list; initialize the ptrs */
         cell->prev = NULL;
         cell->next = NULL;
@@ -303,14 +307,14 @@ DLLIST  *cell, *head;
 /*!
  * \brief   listAddToTail()
  *
- * \param[in,out]   phead    [may be updated], can be NULL
- * \param[in,out]   ptail    [updated], can be NULL
- * \param[in]       data     void* ptr, to be hung on tail cons cell
+ * \param[in,out]   phead  [may be updated], can be NULL
+ * \param[in,out]   ptail  [updated], can be NULL
+ * \param[in]    data  void* ptr, to be hung on tail cons cell
  * \return  0 if OK; 1 on error
  *
  * <pre>
  * Notes:
- *      (1) This makes a new cell, attaches %data, and adds the
+ *      (1) This makes a new cell, attaches the data, and adds the
  *          cell to the tail of the list.
  *      (2) &head is input to allow the list to be "cons'd" up from NULL.
  *      (3) &tail is input to allow the tail to be updated
@@ -323,23 +327,27 @@ DLLIST  *cell, *head;
  *               will be found and updated.
  * </pre>
  */
-l_ok
+l_int32
 listAddToTail(DLLIST  **phead,
               DLLIST  **ptail,
               void     *data)
 {
 DLLIST  *cell, *head, *tail;
 
+    PROCNAME("listAddToTail");
+
     if (!phead)
-        return ERROR_INT("&head not defined", __func__, 1);
+        return ERROR_INT("&head not defined", procName, 1);
     head = *phead;
     if (!ptail)
-        return ERROR_INT("&tail not defined", __func__, 1);
+        return ERROR_INT("&tail not defined", procName, 1);
     if (!data)
-        return ERROR_INT("data not defined", __func__, 1);
+        return ERROR_INT("data not defined", procName, 1);
 
-    cell = (DLLIST *)LEPT_CALLOC(1, sizeof(DLLIST));
+    if ((cell = (DLLIST *)LEPT_CALLOC(1, sizeof(DLLIST))) == NULL)
+        return ERROR_INT("cell not made", procName, 1);
     cell->data = data;
+
     if (!head) {  /*   Start the list and initialize the ptrs.  *ptail
                    *   should also have been initialized to NULL */
         cell->prev = NULL;
@@ -362,10 +370,10 @@ DLLIST  *cell, *head, *tail;
 /*!
  * \brief   listInsertBefore()
  *
- * \param[in,out]   phead    [optional] input head
- * \param[in]       elem     list element to be inserted in front of;
- *                           must be NULL if head is NULL
- * \param[in]       data     void* address, to be added
+ * \param[in,out]   phead  [optional] input head
+ * \param[in]     elem  list element to be inserted in front of;
+ *                      must be NULL if head is NULL
+ * \param[in]     data  void*  address, to be added
  * \return  0 if OK; 1 on error
  *
  * <pre>
@@ -374,32 +382,35 @@ DLLIST  *cell, *head, *tail;
  *          head and elem must be null.
  *      (2) If you are searching through a list, looking for a condition
  *          to add an element, you can do something like this:
- * \code
  *            L_BEGIN_LIST_FORWARD(head, elem)
  *                <identify an elem to insert before>
  *                listInsertBefore(&head, elem, data);
  *            L_END_LIST
- * \endcode
+ *
  * </pre>
  */
-l_ok
+l_int32
 listInsertBefore(DLLIST  **phead,
                  DLLIST   *elem,
                  void     *data)
 {
 DLLIST  *cell, *head;
 
+    PROCNAME("listInsertBefore");
+
     if (!phead)
-        return ERROR_INT("&head not defined", __func__, 1);
+        return ERROR_INT("&head not defined", procName, 1);
     head = *phead;
     if (!data)
-        return ERROR_INT("data not defined", __func__, 1);
+        return ERROR_INT("data not defined", procName, 1);
     if ((!head && elem) || (head && !elem))
-        return ERROR_INT("head and elem not consistent", __func__, 1);
+        return ERROR_INT("head and elem not consistent", procName, 1);
 
         /* New cell to insert */
-    cell = (DLLIST *)LEPT_CALLOC(1, sizeof(DLLIST));
+    if ((cell = (DLLIST *)LEPT_CALLOC(1, sizeof(DLLIST))) == NULL)
+        return ERROR_INT("cell not made", procName, 1);
     cell->data = data;
+
     if (!head) {  /* start the list; initialize the ptrs */
         cell->prev = NULL;
         cell->next = NULL;
@@ -422,10 +433,10 @@ DLLIST  *cell, *head;
 /*!
  * \brief   listInsertAfter()
  *
- * \param[in,out]   phead    [optional] input head
- * \param[in]       elem     list element to be inserted after;
- *                           must be NULL if head is NULL
- * \param[in]       data     void* ptr, to be added
+ * \param[in,out]   phead  [optional] input head
+ * \param[in]     elem  list element to be inserted after;
+ *                      must be NULL if head is NULL
+ * \param[in]     data  void*  ptr, to be added
  * \return  0 if OK; 1 on error
  *
  * <pre>
@@ -435,32 +446,34 @@ DLLIST  *cell, *head;
  *          in the call to allow "consing" up from NULL.
  *      (2) If you are searching through a list, looking for a condition
  *          to add an element, you can do something like this:
- * \code
  *            L_BEGIN_LIST_FORWARD(head, elem)
  *                <identify an elem to insert after>
  *                listInsertAfter(&head, elem, data);
  *            L_END_LIST
- * \endcode
  * </pre>
  */
-l_ok
+l_int32
 listInsertAfter(DLLIST  **phead,
                 DLLIST   *elem,
                 void     *data)
 {
 DLLIST  *cell, *head;
 
+    PROCNAME("listInsertAfter");
+
     if (!phead)
-        return ERROR_INT("&head not defined", __func__, 1);
+        return ERROR_INT("&head not defined", procName, 1);
     head = *phead;
     if (!data)
-        return ERROR_INT("data not defined", __func__, 1);
+        return ERROR_INT("data not defined", procName, 1);
     if ((!head && elem) || (head && !elem))
-        return ERROR_INT("head and elem not consistent", __func__, 1);
+        return ERROR_INT("head and elem not consistent", procName, 1);
 
         /* New cell to insert */
-    cell = (DLLIST *)LEPT_CALLOC(1, sizeof(DLLIST));
+    if ((cell = (DLLIST *)LEPT_CALLOC(1, sizeof(DLLIST))) == NULL)
+        return ERROR_INT("cell not made", procName, 1);
     cell->data = data;
+
     if (!head) {  /* start the list; initialize the ptrs */
         cell->prev = NULL;
         cell->next = NULL;
@@ -482,8 +495,8 @@ DLLIST  *cell, *head;
 /*!
  * \brief   listRemoveElement()
  *
- * \param[in,out]   phead    input head; can be changed
- * \param[in]       elem     list element to be removed
+ * \param[in,out]   phead [can be changed] input head
+ * \param[in]    elem list element to be removed
  * \return  data  void* struct on cell
  *
  * <pre>
@@ -501,19 +514,21 @@ listRemoveElement(DLLIST  **phead,
 void    *data;
 DLLIST  *head;
 
+    PROCNAME("listRemoveElement");
+
     if (!phead)
-        return (void *)ERROR_PTR("&head not defined", __func__, NULL);
+        return (void *)ERROR_PTR("&head not defined", procName, NULL);
     head = *phead;
     if (!head)
-        return (void *)ERROR_PTR("head not defined", __func__, NULL);
+        return (void *)ERROR_PTR("head not defined", procName, NULL);
     if (!elem)
-        return (void *)ERROR_PTR("elem not defined", __func__, NULL);
+        return (void *)ERROR_PTR("elem not defined", procName, NULL);
 
     data = elem->data;
 
     if (head->next == NULL) {  /* only one */
         if (elem != head)
-            return (void *)ERROR_PTR("elem must be head", __func__, NULL);
+            return (void *)ERROR_PTR("elem must be head", procName, NULL);
         *phead = NULL;
     } else if (head == elem) {   /* first one */
         elem->next->prev = NULL;
@@ -533,7 +548,7 @@ DLLIST  *head;
 /*!
  * \brief   listRemoveFromHead()
  *
- * \param[in,out]   phead     head of list; updated
+ * \param[in,out]   phead head of list [to be updated]
  * \return  data  void* struct on cell, or NULL on error
  *
  * <pre>
@@ -550,10 +565,12 @@ listRemoveFromHead(DLLIST  **phead)
 DLLIST  *head;
 void    *data;
 
+    PROCNAME("listRemoveFromHead");
+
     if (!phead)
-        return (void *)ERROR_PTR("&head not defined", __func__, NULL);
+        return (void *)ERROR_PTR("&head not defined", procName, NULL);
     if ((head = *phead) == NULL)
-        return (void *)ERROR_PTR("head not defined", __func__, NULL);
+        return (void *)ERROR_PTR("head not defined", procName, NULL);
 
     if (head->next == NULL) {  /* only one */
         *phead = NULL;
@@ -571,8 +588,8 @@ void    *data;
 /*!
  * \brief   listRemoveFromTail()
  *
- * \param[in,out]   phead    list head must NOT be NULL; may be changed
- * \param[in,out]   ptail    list tail may be NULL; always updated
+ * \param[in,out]   phead [may be changed], head must NOT be NULL
+ * \param[in,out]   ptail [always updated], tail may be NULL
  * \return  data  void* struct on cell or NULL on error
  *
  * <pre>
@@ -597,12 +614,14 @@ listRemoveFromTail(DLLIST  **phead,
 DLLIST  *head, *tail;
 void    *data;
 
+    PROCNAME("listRemoveFromTail");
+
     if (!phead)
-        return (void *)ERROR_PTR("&head not defined", __func__, NULL);
+        return (void *)ERROR_PTR("&head not defined", procName, NULL);
     if ((head = *phead) == NULL)
-        return (void *)ERROR_PTR("head not defined", __func__, NULL);
+        return (void *)ERROR_PTR("head not defined", procName, NULL);
     if (!ptail)
-        return (void *)ERROR_PTR("&tail not defined", __func__, NULL);
+        return (void *)ERROR_PTR("&tail not defined", procName, NULL);
     if ((tail = *ptail) == NULL)
         tail = listFindTail(head);
 
@@ -627,8 +646,8 @@ void    *data;
 /*!
  * \brief   listFindElement()
  *
- * \param[in]    head    list head
- * \param[in]    data    void* address, to be searched for
+ * \param[in]    head  list head
+ * \param[in]    data  void*  address, to be searched for
  * \return  cell  the containing cell, or NULL if not found or on error
  *
  * <pre>
@@ -648,10 +667,12 @@ listFindElement(DLLIST  *head,
 {
 DLLIST  *cell;
 
+    PROCNAME("listFindElement");
+
     if (!head)
-        return (DLLIST *)ERROR_PTR("head not defined", __func__, NULL);
+        return (DLLIST *)ERROR_PTR("head not defined", procName, NULL);
     if (!data)
-        return (DLLIST *)ERROR_PTR("data not defined", __func__, NULL);
+        return (DLLIST *)ERROR_PTR("data not defined", procName, NULL);
 
     for (cell = head; cell; cell = cell->next) {
         if (cell->data == data)
@@ -673,22 +694,24 @@ listFindTail(DLLIST  *head)
 {
 DLLIST  *cell;
 
+    PROCNAME("listFindTail");
+
     if (!head)
-        return (DLLIST *)ERROR_PTR("head not defined", __func__, NULL);
+        return (DLLIST *)ERROR_PTR("head not defined", procName, NULL);
 
     for (cell = head; cell; cell = cell->next) {
         if (cell->next == NULL)
             return cell;
     }
 
-    return (DLLIST *)ERROR_PTR("tail not found !!", __func__, NULL);
+    return (DLLIST *)ERROR_PTR("tail not found !!", procName, NULL);
 }
 
 
 /*!
  * \brief   listGetCount()
  *
- * \param[in]    head     of list
+ * \param[in]    head  of list
  * \return  number of elements; 0 if no list or on error
  */
 l_int32
@@ -697,8 +720,10 @@ listGetCount(DLLIST  *head)
 l_int32  count;
 DLLIST  *elem;
 
+    PROCNAME("listGetCount");
+
     if (!head)
-        return ERROR_INT("head not defined", __func__, 0);
+        return ERROR_INT("head not defined", procName, 0);
 
     count = 0;
     for (elem = head; elem; elem = elem->next)
@@ -711,7 +736,7 @@ DLLIST  *elem;
 /*!
  * \brief   listReverse()
  *
- * \param[in,out]   phead    list head; may be changed
+ * \param[in,out]   phead  [may be changed] list head
  * \return  0 if OK, 1 on error
  *
  * <pre>
@@ -719,16 +744,18 @@ DLLIST  *elem;
  *      (1) This reverses the list in-place.
  * </pre>
  */
-l_ok
+l_int32
 listReverse(DLLIST  **phead)
 {
 void    *obj;  /* whatever */
 DLLIST  *head, *rhead;
 
+    PROCNAME("listReverse");
+
     if (!phead)
-        return ERROR_INT("&head not defined", __func__, 1);
+        return ERROR_INT("&head not defined", procName, 1);
     if ((head = *phead) == NULL)
-        return ERROR_INT("head not defined", __func__, 1);
+        return ERROR_INT("head not defined", procName, 1);
 
     rhead = NULL;
     while (head) {
@@ -744,8 +771,8 @@ DLLIST  *head, *rhead;
 /*!
  * \brief   listJoin()
  *
- * \param[in,out]   phead1   head of first list; may be changed
- * \param[in,out]   phead2   head of second list; to be nulled
+ * \param[in,out]   phead1  [may be changed] head of first list
+ * \param[in,out]   phead2  to be nulled; head of second list
  * \return  0 if OK, 1 on error
  *
  * <pre>
@@ -754,17 +781,19 @@ DLLIST  *head, *rhead;
  *      (2) Both input ptrs must exist, though either can have the value NULL.
  * </pre>
  */
-l_ok
+l_int32
 listJoin(DLLIST  **phead1,
          DLLIST  **phead2)
 {
 void    *obj;
 DLLIST  *head1, *head2, *tail1;
 
+    PROCNAME("listJoin");
+
     if (!phead1)
-        return ERROR_INT("&head1 not defined", __func__, 1);
+        return ERROR_INT("&head1 not defined", procName, 1);
     if (!phead2)
-        return ERROR_INT("&head2 not defined", __func__, 1);
+        return ERROR_INT("&head2 not defined", procName, 1);
 
         /* If no list2, just return list1 unchanged */
     if ((head2 = *phead2) == NULL)

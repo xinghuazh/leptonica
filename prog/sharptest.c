@@ -34,31 +34,27 @@
  *      (2) Use fract in typical range (0.2 - 0.7)
  */
 
-#ifdef HAVE_CONFIG_H
-#include <config_auto.h>
-#endif  /* HAVE_CONFIG_H */
-
 #include "allheaders.h"
 
 int main(int    argc,
          char **argv)
 {
-PIX       *pixs, *pixd;
-l_int32    smooth;
-l_float32  fract;
-char      *filein, *fileout;
+PIX         *pixs, *pixd;
+l_int32      smooth;
+l_float32    fract;
+char        *filein, *fileout;
+static char  mainName[] = "sharptest";
 
     if (argc != 5)
         return ERROR_INT(" Syntax:  sharptest filein smooth fract fileout",
-                         __func__, 1);
+                         mainName, 1);
+
     filein = argv[1];
     smooth = atoi(argv[2]);
     fract = atof(argv[3]);
     fileout = argv[4];
-    setLeptDebugOK(1);
-
     if ((pixs = pixRead(filein)) == NULL)
-        return ERROR_INT("pixs not made", __func__, 1);
+        return ERROR_INT("pixs not made", mainName, 1);
 
     pixd = pixUnsharpMasking(pixs, smooth, fract);
     pixWrite(fileout, pixd, IFF_JFIF_JPEG);

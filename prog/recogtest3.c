@@ -56,10 +56,6 @@
  *     that is used to identify unknown (scaled) samples.
  */
 
-#ifdef HAVE_CONFIG_H
-#include <config_auto.h>
-#endif  /* HAVE_CONFIG_H */
-
 #include "string.h"
 #include "allheaders.h"
 
@@ -75,11 +71,10 @@ PIXA      *pixa1, *pixa2, *pixa3, *pixa4;
 L_RECOG   *recog1, *recog2, *recog3;
 
     if (argc != 1) {
-        lept_stderr(" Syntax: recogtest3\n");
+        fprintf(stderr, " Syntax: recogtest3\n");
         return 1;
     }
 
-    setLeptDebugOK(1);
     lept_mkdir("lept/recog");
 
         /* Read templates and split them into two sets.  Use one to
@@ -137,7 +132,7 @@ L_RECOG   *recog1, *recog2, *recog3;
     filesAreIdentical("/tmp/lept/recog/recog2.rec",
                       "/tmp/lept/recog/recog3.rec", &same);
     if (!same)
-        lept_stderr("Error in serialization!\n");
+        fprintf(stderr, "Error in serialization!\n");
     recogDestroy(&recog3);
 
         /* Remove outliers: method 1 */

@@ -62,9 +62,6 @@
  *      Setting a transparent alpha component over a white background
  *           PIX             *pixSetAlphaOverWhite()
  *
- *      Fading from the edge
- *           l_int32          pixLinearEdgeFade()
- *
  *  In blending operations a new pix is produced where typically
  *  a subset of pixels in src1 are changed by the set of pixels
  *  in src2, when src2 is located in a given position relative
@@ -144,14 +141,12 @@
  * </pre>
  */
 
-#ifdef HAVE_CONFIG_H
-#include <config_auto.h>
-#endif  /* HAVE_CONFIG_H */
 
 #include "allheaders.h"
 
 static l_int32 blendComponents(l_int32 a, l_int32 b, l_float32 fract);
 static l_int32 blendHardLightComponents(l_int32 a, l_int32 b, l_float32 fract);
+
 
 /*-------------------------------------------------------------*
  *         Blending two images that are not colormapped        *
@@ -159,12 +154,12 @@ static l_int32 blendHardLightComponents(l_int32 a, l_int32 b, l_float32 fract);
 /*!
  * \brief   pixBlend()
  *
- * \param[in]    pixs1    blendee
- * \param[in]    pixs2    blender; typ. smaller
- * \param[in]    x,y      origin [UL corner] of pixs2 relative to
- *                        the origin of pixs1; can be < 0
- * \param[in]    fract    blending fraction
- * \return  pixd blended image, or null on error
+ * \param[in]    pixs1 blendee
+ * \param[in]    pixs2 blender; typ. smaller
+ * \param[in]    x,y  origin [UL corner] of pixs2 relative to
+ *                    the origin of pixs1; can be < 0
+ * \param[in]    fract blending fraction
+ * \return  pixd blended image, or NULL on error
  *
  * <pre>
  * Notes:
@@ -183,17 +178,19 @@ l_int32    w1, h1, d1, d2;
 BOX       *box;
 PIX       *pixc, *pixt, *pixd;
 
+    PROCNAME("pixBlend");
+
     if (!pixs1)
-        return (PIX *)ERROR_PTR("pixs1 not defined", __func__, NULL);
+        return (PIX *)ERROR_PTR("pixs1 not defined", procName, NULL);
     if (!pixs2)
-        return (PIX *)ERROR_PTR("pixs2 not defined", __func__, NULL);
+        return (PIX *)ERROR_PTR("pixs2 not defined", procName, NULL);
 
         /* check relative depths */
     d1 = pixGetDepth(pixs1);
     d2 = pixGetDepth(pixs2);
     if (d1 == 1 && d2 > 1)
         return (PIX *)ERROR_PTR("mixing gray or color with 1 bpp",
-                                __func__, NULL);
+                                procName, NULL);
 
         /* remove colormap from pixs2 if necessary */
     pixt = pixRemoveColormap(pixs2, REMOVE_CMAP_BASED_ON_SRC);
@@ -210,7 +207,7 @@ PIX       *pixc, *pixt, *pixd;
     pixc = pixClipRectangle(pixt, box, NULL);
     boxDestroy(&box);
     if (!pixc) {
-        L_WARNING("box doesn't overlap pix\n", __func__);
+        L_WARNING("box doesn't overlap pix\n", procName);
         pixDestroy(&pixt);
         return NULL;
     }
@@ -236,15 +233,14 @@ PIX       *pixc, *pixt, *pixd;
 /*!
  * \brief   pixBlendMask()
  *
- * \param[in]    pixd    [optional]; either NULL or equal to pixs1 for in-place
- * \param[in]    pixs1   blendee, depth > 1
- * \param[in]    pixs2   blender, 1 bpp; typ. smaller in size than pixs1
- * \param[in]    x,y     origin [UL corner] of pixs2 relative to
- *                       the origin of pixs1; can be < 0
- * \param[in]    fract   blending fraction
- * \param[in]    type    L_BLEND_WITH_INVERSE, L_BLEND_TO_WHITE,
- *                       L_BLEND_TO_BLACK
- * \return  pixd if OK; null on error
+ * \param[in]    pixd [optional]; either NULL or equal to pixs1 for in-place
+ * \param[in]    pixs1 blendee, depth > 1
+ * \param[in]    pixs2 blender, 1 bpp; typ. smaller in size than pixs1
+ * \param[in]    x,y  origin [UL corner] of pixs2 relative to
+ *                    the origin of pixs1; can be < 0
+ * \param[in]    fract blending fraction
+ * \param[in]    type L_BLEND_WITH_INVERSE, L_BLEND_TO_WHITE, L_BLEND_TO_BLACK
+ * \return  pixd if OK; NULL on error
  *
  * <pre>
  * Notes:
@@ -274,26 +270,28 @@ l_uint32   pixval;
 l_uint32  *linec, *datac;
 PIX       *pixc, *pix1, *pix2;
 
+    PROCNAME("pixBlendMask");
+
     if (!pixs1)
-        return (PIX *)ERROR_PTR("pixs1 not defined", __func__, NULL);
+        return (PIX *)ERROR_PTR("pixs1 not defined", procName, NULL);
     if (!pixs2)
-        return (PIX *)ERROR_PTR("pixs2 not defined", __func__, NULL);
+        return (PIX *)ERROR_PTR("pixs2 not defined", procName, NULL);
     if (pixGetDepth(pixs1) == 1)
-        return (PIX *)ERROR_PTR("pixs1 is 1 bpp", __func__, NULL);
+        return (PIX *)ERROR_PTR("pixs1 is 1 bpp", procName, NULL);
     if (pixGetDepth(pixs2) != 1)
-        return (PIX *)ERROR_PTR("pixs2 not 1 bpp", __func__, NULL);
+        return (PIX *)ERROR_PTR("pixs2 not 1 bpp", procName, NULL);
     if (pixd == pixs1 && pixGetColormap(pixs1))
-        return (PIX *)ERROR_PTR("inplace; pixs1 has colormap", __func__, NULL);
+        return (PIX *)ERROR_PTR("inplace; pixs1 has colormap", procName, NULL);
     if (pixd && (pixd != pixs1))
-        return (PIX *)ERROR_PTR("pixd must be NULL or pixs1", __func__, NULL);
+        return (PIX *)ERROR_PTR("pixd must be NULL or pixs1", procName, NULL);
     if (fract < 0.0 || fract > 1.0) {
-        L_WARNING("fract must be in [0.0, 1.0]; setting to 0.5\n", __func__);
+        L_WARNING("fract must be in [0.0, 1.0]; setting to 0.5\n", procName);
         fract = 0.5;
     }
     if (type != L_BLEND_WITH_INVERSE && type != L_BLEND_TO_WHITE &&
         type != L_BLEND_TO_BLACK) {
         L_WARNING("invalid blend type; setting to L_BLEND_WITH_INVERSE\n",
-                  __func__);
+                  procName);
         type = L_BLEND_WITH_INVERSE;
     }
 
@@ -356,7 +354,7 @@ PIX       *pixc, *pix1, *pix2;
                         break;
                     default:
                         L_WARNING("d neither 8 nor 32 bpp; no blend\n",
-                                  __func__);
+                                  procName);
                     }
                 }
             }
@@ -392,7 +390,7 @@ PIX       *pixc, *pix1, *pix2;
                         break;
                     default:
                         L_WARNING("d neither 8 nor 32 bpp; no blend\n",
-                                  __func__);
+                                  procName);
                     }
                 }
             }
@@ -428,14 +426,14 @@ PIX       *pixc, *pix1, *pix2;
                         break;
                     default:
                         L_WARNING("d neither 8 nor 32 bpp; no blend\n",
-                                  __func__);
+                                  procName);
                     }
                 }
             }
         }
         break;
     default:
-        L_WARNING("invalid binary mask blend type\n", __func__);
+        L_WARNING("invalid binary mask blend type\n", procName);
         break;
     }
 
@@ -447,17 +445,15 @@ PIX       *pixc, *pix1, *pix2;
 /*!
  * \brief   pixBlendGray()
  *
- * \param[in]    pixd         [optional] either equal to pixs1 for in-place,
- *                            or NULL
- * \param[in]    pixs1        blendee, depth > 1
- * \param[in]    pixs2        blender, any depth; typically, the area of
- *                            pixs2 is smaller than pixs1
- * \param[in]    x,y          origin [UL corner] of pixs2 relative to
- *                            the origin of pixs1; can be < 0
- * \param[in]    fract        blending fraction
- * \param[in]    type         L_BLEND_GRAY, L_BLEND_GRAY_WITH_INVERSE
- * \param[in]    transparent  1 to use transparency; 0 otherwise
- * \param[in]    transpix     pixel grayval in pixs2 that is to be transparent
+ * \param[in]    pixd [optional]; either NULL or equal to pixs1 for in-place
+ * \param[in]    pixs1 blendee, depth > 1
+ * \param[in]    pixs2 blender, any depth; typ. smaller in size than pixs1
+ * \param[in]    x,y  origin [UL corner] of pixs2 relative to
+ *                    the origin of pixs1; can be < 0
+ * \param[in]    fract blending fraction
+ * \param[in]    type L_BLEND_GRAY, L_BLEND_GRAY_WITH_INVERSE
+ * \param[in]    transparent 1 to use transparency; 0 otherwise
+ * \param[in]    transpix pixel grayval in pixs2 that is to be transparent
  * \return  pixd if OK; pixs1 on error
  *
  * <pre>
@@ -503,22 +499,24 @@ l_uint32   val32;
 l_uint32  *linec, *lined, *datac, *datad;
 PIX       *pixc, *pix1, *pix2;
 
+    PROCNAME("pixBlendGray");
+
     if (!pixs1)
-        return (PIX *)ERROR_PTR("pixs1 not defined", __func__, pixd);
+        return (PIX *)ERROR_PTR("pixs1 not defined", procName, pixd);
     if (!pixs2)
-        return (PIX *)ERROR_PTR("pixs2 not defined", __func__, pixd);
+        return (PIX *)ERROR_PTR("pixs2 not defined", procName, pixd);
     if (pixGetDepth(pixs1) == 1)
-        return (PIX *)ERROR_PTR("pixs1 is 1 bpp", __func__, pixd);
+        return (PIX *)ERROR_PTR("pixs1 is 1 bpp", procName, pixd);
     if (pixd == pixs1 && pixGetColormap(pixs1))
-        return (PIX *)ERROR_PTR("can't do in-place with cmap", __func__, pixd);
+        return (PIX *)ERROR_PTR("can't do in-place with cmap", procName, pixd);
     if (pixd && (pixd != pixs1))
-        return (PIX *)ERROR_PTR("pixd must be NULL or pixs1", __func__, pixd);
+        return (PIX *)ERROR_PTR("pixd must be NULL or pixs1", procName, pixd);
     if (fract < 0.0 || fract > 1.0) {
-        L_WARNING("fract must be in [0.0, 1.0]; setting to 0.5\n", __func__);
+        L_WARNING("fract must be in [0.0, 1.0]; setting to 0.5\n", procName);
         fract = 0.5;
     }
     if (type != L_BLEND_GRAY && type != L_BLEND_GRAY_WITH_INVERSE) {
-        L_WARNING("invalid blend type; setting to L_BLEND_GRAY\n", __func__);
+        L_WARNING("invalid blend type; setting to L_BLEND_GRAY\n", procName);
         type = L_BLEND_GRAY;
     }
 
@@ -563,7 +561,8 @@ PIX       *pixc, *pix1, *pix2;
                 for (j = 0; j < wc; j++) {
                     if (j + x < 0  || j + x >= w) continue;
                     cval = GET_DATA_BYTE(linec, j);
-                    if (transparent == 0 || cval != transpix) {
+                    if (transparent == 0 ||
+                        (transparent != 0 && cval != transpix)) {
                         dval = GET_DATA_BYTE(lined, j + x);
                         ival = (l_int32)((1. - fract) * dval + fract * cval);
                         SET_DATA_BYTE(lined, j + x, ival);
@@ -574,7 +573,8 @@ PIX       *pixc, *pix1, *pix2;
                 for (j = 0; j < wc; j++) {
                     if (j + x < 0  || j + x >= w) continue;
                     cval = GET_DATA_BYTE(linec, j);
-                    if (transparent == 0 || cval != transpix) {
+                    if (transparent == 0 ||
+                        (transparent != 0 && cval != transpix)) {
                         val32 = *(lined + j + x);
                         extractRGBValues(val32, &irval, &igval, &ibval);
                         irval = (l_int32)((1. - fract) * irval + fract * cval);
@@ -610,7 +610,8 @@ PIX       *pixc, *pix1, *pix2;
                 for (j = 0; j < wc; j++) {
                     if (j + x < 0  || j + x >= w) continue;
                     cval = GET_DATA_BYTE(linec, j);
-                    if (transparent == 0 || cval != transpix) {
+                    if (transparent == 0 ||
+                        (transparent != 0 && cval != transpix)) {
                         ival = GET_DATA_BYTE(lined, j + x);
                         delta = (128 - ival) * (255 - cval) / 256;
                         ival += (l_int32)(fract * delta + 0.5);
@@ -623,7 +624,8 @@ PIX       *pixc, *pix1, *pix2;
                 for (j = 0; j < wc; j++) {
                     if (j + x < 0  || j + x >= w) continue;
                     cval = GET_DATA_BYTE(linec, j);
-                    if (transparent == 0 || cval != transpix) {
+                    if (transparent == 0 ||
+                        (transparent != 0 && cval != transpix)) {
                         val32 = *(lined + j + x);
                         extractRGBValues(val32, &irval, &igval, &ibval);
                         delta = (128 - irval) * (255 - cval) / 256;
@@ -651,13 +653,12 @@ PIX       *pixc, *pix1, *pix2;
 /*!
  * \brief   pixBlendGrayInverse()
  *
- * \param[in]    pixd     [optional] either equal to pixs1 for in-place, or NULL
- * \param[in]    pixd     [optional] either NULL or equal to pixs1 for in-place
- * \param[in]    pixs1    blendee, depth > 1
- * \param[in]    pixs2    blender, any depth; typ. smaller in size than pixs1
- * \param[in]    x,y      origin [UL corner] of pixs2 relative to
- *                        the origin of pixs1; can be < 0
- * \param[in]    fract    blending fraction
+ * \param[in]    pixd [optional]; either NULL or equal to pixs1 for in-place
+ * \param[in]    pixs1 blendee, depth > 1
+ * \param[in]    pixs2 blender, any depth; typ. smaller in size than pixs1
+ * \param[in]    x,y  origin [UL corner] of pixs2 relative to
+ *                    the origin of pixs1; can be < 0
+ * \param[in]    fract blending fraction
  * \return  pixd if OK; pixs1 on error
  *
  * <pre>
@@ -699,18 +700,20 @@ l_uint32   val32;
 l_uint32  *linec, *lined, *datac, *datad;
 PIX       *pixc, *pix1, *pix2;
 
+    PROCNAME("pixBlendGrayInverse");
+
     if (!pixs1)
-        return (PIX *)ERROR_PTR("pixs1 not defined", __func__, pixd);
+        return (PIX *)ERROR_PTR("pixs1 not defined", procName, pixd);
     if (!pixs2)
-        return (PIX *)ERROR_PTR("pixs2 not defined", __func__, pixd);
+        return (PIX *)ERROR_PTR("pixs2 not defined", procName, pixd);
     if (pixGetDepth(pixs1) == 1)
-        return (PIX *)ERROR_PTR("pixs1 is 1 bpp", __func__, pixd);
+        return (PIX *)ERROR_PTR("pixs1 is 1 bpp", procName, pixd);
     if (pixd == pixs1 && pixGetColormap(pixs1))
-        return (PIX *)ERROR_PTR("can't do in-place with cmap", __func__, pixd);
+        return (PIX *)ERROR_PTR("can't do in-place with cmap", procName, pixd);
     if (pixd && (pixd != pixs1))
-        return (PIX *)ERROR_PTR("pixd must be NULL or pixs1", __func__, pixd);
+        return (PIX *)ERROR_PTR("pixd must be NULL or pixs1", procName, pixd);
     if (fract < 0.0 || fract > 1.0) {
-        L_WARNING("fract must be in [0.0, 1.0]; setting to 0.5\n", __func__);
+        L_WARNING("fract must be in [0.0, 1.0]; setting to 0.5\n", procName);
         fract = 0.5;
     }
 
@@ -788,17 +791,15 @@ PIX       *pixc, *pix1, *pix2;
 /*!
  * \brief   pixBlendColor()
  *
- * \param[in]    pixd          [optional] either equal to pixs1 for in-place,
- *                             or NULL
- * \param[in]    pixs1         blendee; depth > 1
- * \param[in]    pixs2         blender, any depth; typically, the area of
- *                             pixs2 is smaller than pixs1
- * \param[in]    x,y           origin [UL corner] of pixs2 relative to
- *                             the origin of pixs1
- * \param[in]    fract         blending fraction
- * \param[in]    transparent   1 to use transparency; 0 otherwise
- * \param[in]    transpix      pixel color in pixs2 that is to be transparent
- * \return  pixd, or null on error
+ * \param[in]    pixd [optional]; either NULL or equal to pixs1 for in-place
+ * \param[in]    pixs1 blendee; depth > 1
+ * \param[in]    pixs2 blender, any depth;; typ. smaller in size than pixs1
+ * \param[in]    x,y  origin [UL corner] of pixs2 relative to
+ *                    the origin of pixs1
+ * \param[in]    fract blending fraction
+ * \param[in]    transparent 1 to use transparency; 0 otherwise
+ * \param[in]    transpix pixel color in pixs2 that is to be transparent
+ * \return  pixd, or NULL on error
  *
  * <pre>
  * Notes:
@@ -832,18 +833,20 @@ l_uint32   cval32, val32;
 l_uint32  *linec, *lined, *datac, *datad;
 PIX       *pixc;
 
+    PROCNAME("pixBlendColor");
+
     if (!pixs1)
-        return (PIX *)ERROR_PTR("pixs1 not defined", __func__, NULL);
+        return (PIX *)ERROR_PTR("pixs1 not defined", procName, NULL);
     if (!pixs2)
-        return (PIX *)ERROR_PTR("pixs2 not defined", __func__, NULL);
+        return (PIX *)ERROR_PTR("pixs2 not defined", procName, NULL);
     if (pixGetDepth(pixs1) == 1)
-        return (PIX *)ERROR_PTR("pixs1 is 1 bpp", __func__, NULL);
+        return (PIX *)ERROR_PTR("pixs1 is 1 bpp", procName, NULL);
     if (pixd == pixs1 && pixGetDepth(pixs1) != 32)
-        return (PIX *)ERROR_PTR("inplace; pixs1 not 32 bpp", __func__, NULL);
+        return (PIX *)ERROR_PTR("inplace; pixs1 not 32 bpp", procName, NULL);
     if (pixd && (pixd != pixs1))
-        return (PIX *)ERROR_PTR("pixd must be NULL or pixs1", __func__, NULL);
+        return (PIX *)ERROR_PTR("pixd must be NULL or pixs1", procName, NULL);
     if (fract < 0.0 || fract > 1.0) {
-        L_WARNING("fract must be in [0.0, 1.0]; setting to 0.5\n", __func__);
+        L_WARNING("fract must be in [0.0, 1.0]; setting to 0.5\n", procName);
         fract = 0.5;
     }
 
@@ -877,7 +880,8 @@ PIX       *pixc;
             if (j + x < 0  || j + x >= w) continue;
             cval32 = *(linec + j);
             if (transparent == 0 ||
-                ((cval32 & 0xffffff00) != (transpix & 0xffffff00))) {
+                (transparent != 0 &&
+                     ((cval32 & 0xffffff00) != (transpix & 0xffffff00)))) {
                 val32 = *(lined + j + x);
                 extractRGBValues(cval32, &rcval, &gcval, &bcval);
                 extractRGBValues(val32, &rval, &gval, &bval);
@@ -896,41 +900,35 @@ PIX       *pixc;
 
 
 /*
- * \brief    pixBlendColorByChannel()
+ *  pixBlendColorByChannel()
  *
- * \param[in]    pixd          [optional] either equal to pixs1 for in-place,
- *                             or NULL
- * \param[in]    pixs1         blendee; depth > 1
- * \param[in]    pixs2         blender, any depth; typically, the area of
- *                             pixs2 is smaller than pixs1
- * \param[in]    x,y           origin [UL corner] of pixs2 relative to
- *                             the origin of pixs1
- * \param[in]    rfract        blending fraction in red channel
- * \param[in]    gfract        blending fraction in green channel
- * \param[in]    bfract        blending fraction in blue channel
- * \param[in]    transparent   1 to use transparency; 0 otherwise
- * \param[in]    transpix      pixel color in pixs2 that is to be transparent
- * \return  pixd if OK; pixd on error
+ *      Input:  pixd (<optional>; either NULL or equal to pixs1 for in-place)
+ *              pixs1 (blendee; depth > 1)
+ *              pixs2 (blender, any depth; typ. smaller in size than pixs1)
+ *              x,y  (origin [UL corner] of pixs2 relative to
+ *                    the origin of pixs1)
+ *              rfract, gfract, bfract (blending fractions by channel)
+ *              transparent (1 to use transparency; 0 otherwise)
+ *              transpix (pixel color in pixs2 that is to be transparent)
+ *      Return: pixd if OK; pixs1 on error
  *
- * <pre>
- * Notes:
- *      (1) This generalizes pixBlendColor() in two ways:
- *          (a) The mixing fraction is specified per channel.
- *          (b) The mixing fraction may be < 0 or > 1, in which case,
- *              the min or max of two images are taken, respectively.
- *      (2) Specifically,
- *          for p = pixs1[i], c = pixs2[i], f = fract[i], i = 1, 2, 3:
- *              f < 0.0:          p --> min(p, c)
- *              0.0 <= f <= 1.0:  p --> (1 - f) * p + f * c
- *              f > 1.0:          p --> max(a, c)
- *          Special cases:
- *              f = 0:   p --> p
- *              f = 1:   p --> c
- *      (3) See usage notes in pixBlendColor()
- *      (4) pixBlendColor() would be equivalent to
- *            pixBlendColorChannel(..., fract, fract, fract, ...);
- *          at a small cost of efficiency.
- * </pre>
+ *  Notes:
+ *     (1) This generalizes pixBlendColor() in two ways:
+ *         (a) The mixing fraction is specified per channel.
+ *         (b) The mixing fraction may be < 0 or > 1, in which case,
+ *             the min or max of two images are taken, respectively.
+ *     (2) Specifically,
+ *         for p = pixs1[i], c = pixs2[i], f = fract[i], i = 1, 2, 3:
+ *             f < 0.0:          p --> min(p, c)
+ *             0.0 <= f <= 1.0:  p --> (1 - f) * p + f * c
+ *             f > 1.0:          p --> max(a, c)
+ *         Special cases:
+ *             f = 0:   p --> p
+ *             f = 1:   p --> c
+ *     (3) See usage notes in pixBlendColor()
+ *     (4) pixBlendColor() would be equivalent to
+ *           pixBlendColorChannel(..., fract, fract, fract, ...);
+ *         at a small cost of efficiency.
  */
 PIX *
 pixBlendColorByChannel(PIX       *pixd,
@@ -950,16 +948,18 @@ l_uint32   cval32, val32;
 l_uint32  *linec, *lined, *datac, *datad;
 PIX       *pixc;
 
+    PROCNAME("pixBlendColorByChannel");
+
     if (!pixs1)
-        return (PIX *)ERROR_PTR("pixs1 not defined", __func__, pixd);
+        return (PIX *)ERROR_PTR("pixs1 not defined", procName, pixd);
     if (!pixs2)
-        return (PIX *)ERROR_PTR("pixs2 not defined", __func__, pixd);
+        return (PIX *)ERROR_PTR("pixs2 not defined", procName, pixd);
     if (pixGetDepth(pixs1) == 1)
-        return (PIX *)ERROR_PTR("pixs1 is 1 bpp", __func__, pixd);
+        return (PIX *)ERROR_PTR("pixs1 is 1 bpp", procName, pixd);
     if (pixd == pixs1 && pixGetDepth(pixs1) != 32)
-        return (PIX *)ERROR_PTR("inplace; pixs1 not 32 bpp", __func__, pixd);
+        return (PIX *)ERROR_PTR("inplace; pixs1 not 32 bpp", procName, pixd);
     if (pixd && (pixd != pixs1))
-        return (PIX *)ERROR_PTR("pixd must be NULL or pixs1", __func__, pixd);
+        return (PIX *)ERROR_PTR("pixd must be NULL or pixs1", procName, pixd);
 
         /* If pixd != NULL, we know that it is equal to pixs1 and
          * that pixs1 is 32 bpp rgb, so that an in-place operation
@@ -985,7 +985,8 @@ PIX       *pixc;
             if (j + x < 0  || j + x >= w) continue;
             cval32 = *(linec + j);
             if (transparent == 0 ||
-                ((cval32 & 0xffffff00) != (transpix & 0xffffff00))) {
+                (transparent != 0 &&
+                     ((cval32 & 0xffffff00) != (transpix & 0xffffff00)))) {
                 val32 = *(lined + j + x);
                 extractRGBValues(cval32, &rcval, &gcval, &bcval);
                 extractRGBValues(val32, &rval, &gval, &bval);
@@ -1019,15 +1020,14 @@ blendComponents(l_int32    a,
 /*!
  * \brief   pixBlendGrayAdapt()
  *
- * \param[in]    pixd    [optional] either equal to pixs1 for in-place, or NULL
- * \param[in]    pixs1   blendee; depth > 1
- * \param[in]    pixs2   blender, any depth; typically, the area of
- *                       pixs2 is smaller than pixs1
- * \param[in]    x,y     origin [UL corner] of pixs2 relative to
- *                       the origin of pixs1; can be < 0
- * \param[in]    fract   blending fraction
- * \param[in]    shift   >= 0 but <= 128: shift of zero blend value from
- *                       median source; use -1 for default value;
+ * \param[in]    pixd [optional]; either NULL or equal to pixs1 for in-place
+ * \param[in]    pixs1 blendee, depth > 1
+ * \param[in]    pixs2 blender, any depth; typ. smaller in size than pixs1
+ * \param[in]    x,y  origin [UL corner] of pixs2 relative to
+ *                    the origin of pixs1; can be < 0
+ * \param[in]    fract blending fraction
+ * \param[in]    shift >= 0 but <= 128: shift of zero blend value from
+ *                     median source; use -1 for default value;
  * \return  pixd if OK; pixs1 on error
  *
  * <pre>
@@ -1077,23 +1077,25 @@ l_float32  fmedian, factor;
 BOX       *box, *boxt;
 PIX       *pixc, *pix1, *pix2;
 
+    PROCNAME("pixBlendGrayAdapt");
+
     if (!pixs1)
-        return (PIX *)ERROR_PTR("pixs1 not defined", __func__, pixd);
+        return (PIX *)ERROR_PTR("pixs1 not defined", procName, pixd);
     if (!pixs2)
-        return (PIX *)ERROR_PTR("pixs2 not defined", __func__, pixd);
+        return (PIX *)ERROR_PTR("pixs2 not defined", procName, pixd);
     if (pixGetDepth(pixs1) == 1)
-        return (PIX *)ERROR_PTR("pixs1 is 1 bpp", __func__, pixd);
+        return (PIX *)ERROR_PTR("pixs1 is 1 bpp", procName, pixd);
     if (pixd == pixs1 && pixGetColormap(pixs1))
-        return (PIX *)ERROR_PTR("can't do in-place with cmap", __func__, pixd);
+        return (PIX *)ERROR_PTR("can't do in-place with cmap", procName, pixd);
     if (pixd && (pixd != pixs1))
-        return (PIX *)ERROR_PTR("pixd must be NULL or pixs1", __func__, pixd);
+        return (PIX *)ERROR_PTR("pixd must be NULL or pixs1", procName, pixd);
     if (fract < 0.0 || fract > 1.0) {
-        L_WARNING("fract must be in [0.0, 1.0]; setting to 0.5\n", __func__);
+        L_WARNING("fract must be in [0.0, 1.0]; setting to 0.5\n", procName);
         fract = 0.5;
     }
     if (shift == -1) shift = 64;   /* default value */
     if (shift < 0 || shift > 127) {
-        L_WARNING("invalid shift; setting to 64\n", __func__);
+        L_WARNING("invalid shift; setting to 64\n", procName);
         shift = 64;
     }
 
@@ -1106,7 +1108,7 @@ PIX       *pixc, *pix1, *pix2;
     boxDestroy(&boxt);
     if (!overlap) {
         boxDestroy(&box);
-        return (PIX *)ERROR_PTR("no image overlap", __func__, pixd);
+        return (PIX *)ERROR_PTR("no image overlap", procName, pixd);
     }
 
         /* If pixd != NULL, we know that it is equal to pixs1 and
@@ -1216,11 +1218,11 @@ PIX       *pixc, *pix1, *pix2;
 /*!
  * \brief   pixFadeWithGray()
  *
- * \param[in]    pixs     colormapped or 8 bpp or 32 bpp
- * \param[in]    pixb     8 bpp blender
- * \param[in]    factor   multiplicative factor to apply to blender value
- * \param[in]    type     L_BLEND_TO_WHITE, L_BLEND_TO_BLACK
- * \return  pixd, or null on error
+ * \param[in]    pixs colormapped or 8 bpp or 32 bpp
+ * \param[in]    pixb 8 bpp blender
+ * \param[in]    factor multiplicative factor to apply to blender value
+ * \param[in]    type L_BLEND_TO_WHITE, L_BLEND_TO_BLACK
+ * \return  pixd, or NULL on error
  *
  * <pre>
  * Notes:
@@ -1228,7 +1230,7 @@ PIX       *pixc, *pix1, *pix2;
  *          need not be the same size.
  *      (2) Each pixel in pixb is multiplied by 'factor' divided by 255, and
  *          clipped to the range [0 ... 1].  This gives the fade fraction
- *          to be applied to pixs.  Fade either to white (L_BLEND_TO_WHITE)
+ *          to be appied to pixs.  Fade either to white (L_BLEND_TO_WHITE)
  *          or to black (L_BLEND_TO_BLACK).
  * </pre>
  */
@@ -1245,19 +1247,21 @@ l_uint32   val32, nval32;
 l_uint32  *lined, *datad, *lineb, *datab;
 PIX       *pixd;
 
+    PROCNAME("pixFadeWithGray");
+
     if (!pixs)
-        return (PIX *)ERROR_PTR("pixs not defined", __func__, NULL);
+        return (PIX *)ERROR_PTR("pixs not defined", procName, NULL);
     if (!pixb)
-        return (PIX *)ERROR_PTR("pixb not defined", __func__, NULL);
+        return (PIX *)ERROR_PTR("pixb not defined", procName, NULL);
     if (pixGetDepth(pixs) == 1)
-        return (PIX *)ERROR_PTR("pixs is 1 bpp", __func__, NULL);
+        return (PIX *)ERROR_PTR("pixs is 1 bpp", procName, NULL);
     pixGetDimensions(pixb, &wb, &hb, &db);
     if (db != 8)
-        return (PIX *)ERROR_PTR("pixb not 8 bpp", __func__, NULL);
+        return (PIX *)ERROR_PTR("pixb not 8 bpp", procName, NULL);
     if (factor < 0.0 || factor > 255.0)
-        return (PIX *)ERROR_PTR("factor not in [0.0...255.0]", __func__, NULL);
+        return (PIX *)ERROR_PTR("factor not in [0.0...255.0]", procName, NULL);
     if (type != L_BLEND_TO_WHITE && type != L_BLEND_TO_BLACK)
-        return (PIX *)ERROR_PTR("invalid fade type", __func__, NULL);
+        return (PIX *)ERROR_PTR("invalid fade type", procName, NULL);
 
         /* Remove colormap if it exists; otherwise copy */
     pixd = pixRemoveColormapGeneral(pixs, REMOVE_CMAP_BASED_ON_SRC, L_COPY);
@@ -1312,19 +1316,18 @@ PIX       *pixd;
 
 
 /*
- * \brief   pixBlendHardLight()
+ *  pixBlendHardLight()
  *
- * \param[in]   pixd    either NULL or equal to pixs1 for in-place
- * \param[in]   pixs1   blendee; depth > 1, may be cmapped
- * \param[in]   pixs2   blender, 8 or 32 bpp; may be colormapped;
- *                      typ. smaller in size than pixs1
- * \param[in]   x,y     origin [UL corner] of pixs2 relative to
- *                      the origin of pixs1
- * \param[in]   fract   blending fraction, or 'opacity factor'
- * \return   pixd if OK; pixs1 on error
+ *      Input:  pixd (<optional>; either NULL or equal to pixs1 for in-place)
+ *              pixs1 (blendee; depth > 1, may be cmapped)
+ *              pixs2 (blender, 8 or 32 bpp; may be colormapped;
+ *                     typ. smaller in size than pixs1)
+ *              x,y  (origin [UL corner] of pixs2 relative to
+ *                    the origin of pixs1)
+ *              fract (blending fraction, or 'opacity factor')
+ *      Return: pixd if OK; pixs1 on error
  *
- * <pre>
- * Notes:
+ *  Notes:
  *      (1) pixs2 must be 8 or 32 bpp; either may have a colormap.
  *      (2) Clipping of pixs2 to pixs1 is done in the inner pixel loop.
  *      (3) Only call in-place if pixs1 is not colormapped.
@@ -1344,7 +1347,6 @@ PIX       *pixd;
  *           http://www.pegtop.net/delphi/articles/blendmodes/hardlight.htm
  *           http://www.digitalartform.com/imageArithmetic.htm
  *      (10) This function was built by Paco Galanes.
- * </pre>
  */
 PIX *
 pixBlendHardLight(PIX       *pixd,
@@ -1360,25 +1362,27 @@ l_uint32   cval32, dval32;
 l_uint32  *linec, *lined, *datac, *datad;
 PIX       *pixc, *pixt;
 
+    PROCNAME("pixBlendHardLight");
+
     if (!pixs1)
-        return (PIX *)ERROR_PTR("pixs1 not defined", __func__, pixd);
+        return (PIX *)ERROR_PTR("pixs1 not defined", procName, pixd);
     if (!pixs2)
-        return (PIX *)ERROR_PTR("pixs2 not defined", __func__, pixd);
+        return (PIX *)ERROR_PTR("pixs2 not defined", procName, pixd);
     pixGetDimensions(pixs1, &w, &h, &d);
     pixGetDimensions(pixs2, &wc, &hc, &dc);
     if (d == 1)
-        return (PIX *)ERROR_PTR("pixs1 is 1 bpp", __func__, pixd);
+        return (PIX *)ERROR_PTR("pixs1 is 1 bpp", procName, pixd);
     if (dc != 8 && dc != 32)
-        return (PIX *)ERROR_PTR("pixs2 not 8 or 32 bpp", __func__, pixd);
+        return (PIX *)ERROR_PTR("pixs2 not 8 or 32 bpp", procName, pixd);
     if (pixd && (pixd != pixs1))
-        return (PIX *)ERROR_PTR("inplace and pixd != pixs1", __func__, pixd);
+        return (PIX *)ERROR_PTR("inplace and pixd != pixs1", procName, pixd);
     if (pixd == pixs1 && pixGetColormap(pixs1))
-        return (PIX *)ERROR_PTR("inplace and pixs1 cmapped", __func__, pixd);
+        return (PIX *)ERROR_PTR("inplace and pixs1 cmapped", procName, pixd);
     if (pixd && d != 8 && d != 32)
-        return (PIX *)ERROR_PTR("inplace and not 8 or 32 bpp", __func__, pixd);
+        return (PIX *)ERROR_PTR("inplace and not 8 or 32 bpp", procName, pixd);
 
     if (fract < 0.0 || fract > 1.0) {
-        L_WARNING("fract must be in [0.0, 1.0]; setting to 0.5\n", __func__);
+        L_WARNING("fract must be in [0.0, 1.0]; setting to 0.5\n", procName);
         fract = 0.5;
     }
 
@@ -1416,7 +1420,7 @@ PIX       *pixc, *pixt;
         !(d == 32 && dc == 8) &&
         !(d == 32 && dc == 32)) {
         pixDestroy(&pixc);
-        return (PIX *)ERROR_PTR("bad! -- invalid depth combo!", __func__, pixd);
+        return (PIX *)ERROR_PTR("bad! -- invalid depth combo!", procName, pixd);
     }
 
     wpld = pixGetWpl(pixd);
@@ -1463,15 +1467,13 @@ PIX       *pixc, *pixt;
 
 
 /*
- * \brief   blendHardLightComponents()
+ *  blendHardLightComponents()
+ *      Input:  a (8 bpp blendee component)
+ *              b (8 bpp blender component)
+ *              fract (fraction of blending; use 1.0 for usual definition)
+ *      Return: blended 8 bpp component
  *
- * \param[in]   a        8 bpp blendee component
- * \param[in]   b        8 bpp blender component
- * \param[in]   fract    fraction of blending; use 1.0 for usual definition
- * \return   blended 8 bpp component
- *
- * <pre>
- * Notes:
+ *  Notes:
  *
  *    The basic logic for this blending is:
  *      b < 0.5:
@@ -1507,7 +1509,6 @@ PIX       *pixc, *pixt;
  *    away from 0.5.
  *    As you can see, there are a nearly infinite number of different
  *    blending formulas that can be conjured up.
- * </pre>
  */
 static l_int32 blendHardLightComponents(l_int32    a,
                                         l_int32    b,
@@ -1529,10 +1530,10 @@ static l_int32 blendHardLightComponents(l_int32    a,
 /*!
  * \brief   pixBlendCmap()
  *
- * \param[in]    pixs     2, 4 or 8 bpp, with colormap
- * \param[in]    pixb     colormapped blender
- * \param[in]    x, y     UL corner of blender relative to pixs
- * \param[in]    sindex   colormap index of pixels in pixs to be changed
+ * \param[in]    pixs 2, 4 or 8 bpp, with colormap
+ * \param[in]    pixb colormapped blender
+ * \param[in]    x, y UL corner of blender relative to pixs
+ * \param[in]    sindex colormap index of pixels in pixs to be changed
  * \return  0 if OK, 1 on error
  *
  * <pre>
@@ -1553,7 +1554,7 @@ static l_int32 blendHardLightComponents(l_int32    a,
  *          for sindex.
  * </pre>
  */
-l_ok
+l_int32
 pixBlendCmap(PIX     *pixs,
              PIX     *pixb,
              l_int32  x,
@@ -1568,19 +1569,21 @@ l_uint32   pval;
 l_uint32  *lines, *datas;
 PIXCMAP   *cmaps, *cmapb, *cmapsc;
 
+    PROCNAME("pixBlendCmap");
+
     if (!pixs)
-        return ERROR_INT("pixs not defined", __func__, 1);
+        return ERROR_INT("pixs not defined", procName, 1);
     if (!pixb)
-        return ERROR_INT("pixb not defined", __func__, 1);
+        return ERROR_INT("pixb not defined", procName, 1);
     if ((cmaps = pixGetColormap(pixs)) == NULL)
-        return ERROR_INT("no colormap in pixs", __func__, 1);
+        return ERROR_INT("no colormap in pixs", procName, 1);
     if ((cmapb = pixGetColormap(pixb)) == NULL)
-        return ERROR_INT("no colormap in pixb", __func__, 1);
+        return ERROR_INT("no colormap in pixb", procName, 1);
     ncb = pixcmapGetCount(cmapb);
 
     pixGetDimensions(pixs, &w, &h, &d);
     if (d != 2 && d != 4 && d != 8)
-        return ERROR_INT("depth not in {2,4,8}", __func__, 1);
+        return ERROR_INT("depth not in {2,4,8}", procName, 1);
 
         /* Make a copy of cmaps; we'll add to this if necessary
          * and substitute at the end if we found there was enough room
@@ -1594,7 +1597,7 @@ PIXCMAP   *cmaps, *cmapb, *cmapsc;
         if (pixcmapGetIndex(cmapsc, rval, gval, bval, &index)) { /* not found */
             if (pixcmapAddColor(cmapsc, rval, gval, bval)) {
                 pixcmapDestroy(&cmapsc);
-                return ERROR_INT("not enough room in cmaps", __func__, 1);
+                return ERROR_INT("not enough room in cmaps", procName, 1);
             }
             lut[i] = pixcmapGetCount(cmapsc) - 1;
             nadded++;
@@ -1642,7 +1645,7 @@ PIXCMAP   *cmaps, *cmapb, *cmapsc;
                 }
                 break;
             default:
-                return ERROR_INT("depth not in {2,4,8}", __func__, 1);
+                return ERROR_INT("depth not in {2,4,8}", procName, 1);
             }
         }
     }
@@ -1657,12 +1660,12 @@ PIXCMAP   *cmaps, *cmapb, *cmapsc;
 /*!
  * \brief   pixBlendWithGrayMask()
  *
- * \param[in]    pixs1   8 bpp gray, rgb, rgba or colormapped
- * \param[in]    pixs2   8 bpp gray, rgb, rgba or colormapped
- * \param[in]    pixg    [optional] 8 bpp gray, for transparency of pixs2;
- *                       can be null
- * \param[in]    x, y    UL corner of pixs2 and pixg with respect to pixs1
- * \return  pixd blended image, or null on error
+ * \param[in]    pixs1 8 bpp gray, rgb, rgba or colormapped
+ * \param[in]    pixs2 8 bpp gray, rgb, rgba or colormapped
+ * \param[in]    pixg [optional] 8 bpp gray, for transparency of pixs2;
+ *                    can be null
+ * \param[in]    x, y UL corner of pixs2 and pixg with respect to pixs1
+ * \return  pixd blended image, or NULL on error
  *
  * <pre>
  * Notes:
@@ -1703,17 +1706,19 @@ l_uint32  *datad, *datas, *datag, *lined, *lines, *lineg;
 l_float32  fract;
 PIX       *pixr1, *pixr2, *pix1, *pix2, *pixg2, *pixd;
 
+    PROCNAME("pixBlendWithGrayMask");
+
     if (!pixs1)
-        return (PIX *)ERROR_PTR("pixs1 not defined", __func__, NULL);
+        return (PIX *)ERROR_PTR("pixs1 not defined", procName, NULL);
     if (!pixs2)
-        return (PIX *)ERROR_PTR("pixs2 not defined", __func__, NULL);
+        return (PIX *)ERROR_PTR("pixs2 not defined", procName, NULL);
     pixGetDimensions(pixs1, &w1, &h1, &d1);
     pixGetDimensions(pixs2, &w2, &h2, &d2);
     if (d1 == 1 || d2 == 1)
-        return (PIX *)ERROR_PTR("pixs1 or pixs2 is 1 bpp", __func__, NULL);
+        return (PIX *)ERROR_PTR("pixs1 or pixs2 is 1 bpp", procName, NULL);
     if (pixg) {
         if (pixGetDepth(pixg) != 8)
-            return (PIX *)ERROR_PTR("pixg not 8 bpp", __func__, NULL);
+            return (PIX *)ERROR_PTR("pixg not 8 bpp", procName, NULL);
         pixGetDimensions(pixg, &wg, &hg, NULL);
         wmin = L_MIN(w2, wg);
         hmin = L_MIN(h2, hg);
@@ -1721,7 +1726,7 @@ PIX       *pixr1, *pixr2, *pix1, *pix2, *pixg2, *pixd;
     } else {  /* use the alpha component of pixs2 */
         spp = pixGetSpp(pixs2);
         if (d2 != 32 || spp != 4)
-            return (PIX *)ERROR_PTR("no alpha; pixs2 not rgba", __func__, NULL);
+            return (PIX *)ERROR_PTR("no alpha; pixs2 not rgba", procName, NULL);
         wmin = w2;
         hmin = h2;
         pixg2 = pixGetRGBComponent(pixs2, L_ALPHA_CHANNEL);
@@ -1750,19 +1755,19 @@ PIX       *pixr1, *pixr2, *pix1, *pix2, *pixg2, *pixd;
     pixDestroy(&pixr1);
     pixDestroy(&pixr2);
 
-        /* Output a copy of pix1 to avoid side-effecting input pixs1 */
-    pixd = pixCopy(NULL, pix1);
-    pixDestroy(&pix1);
-
         /* Sanity check: both either 8 or 32 bpp */
-    d1 = pixGetDepth(pixd);
+    d1 = pixGetDepth(pix1);
     d2 = pixGetDepth(pix2);
-    if (!pixd || d1 != d2 || (d1 != 8 && d1 != 32)) {
-        pixDestroy(&pixd);
+    if (d1 != d2 || (d1 != 8 && d1 != 32)) {
+        pixDestroy(&pix1);
         pixDestroy(&pix2);
         pixDestroy(&pixg2);
-        return (PIX *)ERROR_PTR("depths not regularized! bad!", __func__, NULL);
+        return (PIX *)ERROR_PTR("depths not regularized! bad!", procName, NULL);
     }
+
+        /* Start with a copy of pix1 */
+    pixd = pixCopy(NULL, pix1);
+    pixDestroy(&pix1);
 
         /* Blend pix2 onto pixd, using pixg2.
          * Let the normalized pixel value of pixg2 be f = pixval / 255,
@@ -1818,11 +1823,11 @@ PIX       *pixr1, *pixr2, *pix1, *pix2, *pixg2, *pixd;
 /*!
  * \brief   pixBlendBackgroundToColor()
  *
- * \param[in]    pixd    can be NULL or pixs
- * \param[in]    pixs    32 bpp rgb
- * \param[in]    box     region for blending; can be NULL)
- * \param[in]    color   32 bit color in 0xrrggbb00 format
- * \param[in]    gamma, minval, maxval    args for grayscale TRC mapping
+ * \param[in]    pixd can be NULL or pixs
+ * \param[in]    pixs 32 bpp rgb
+ * \param[in]    box region for blending; can be NULL)
+ * \param[in]    color 32 bit color in 0xrrggbb00 format
+ * \param[in]    gamma, minval, maxval args for grayscale TRC mapping
  * \return  pixd always
  *
  * <pre>
@@ -1853,12 +1858,14 @@ l_int32  x, y, w, h;
 BOX     *boxt;
 PIX     *pixt, *pixc, *pixr, *pixg;
 
+    PROCNAME("pixBlendBackgroundToColor");
+
     if (!pixs)
-        return (PIX *)ERROR_PTR("pixs not defined", __func__, pixd);
+        return (PIX *)ERROR_PTR("pixs not defined", procName, pixd);
     if (pixGetDepth(pixs) != 32)
-        return (PIX *)ERROR_PTR("pixs not 32 bpp", __func__, pixd);
+        return (PIX *)ERROR_PTR("pixs not 32 bpp", procName, pixd);
     if (pixd && (pixd != pixs))
-        return (PIX *)ERROR_PTR("pixd neither null nor pixs", __func__, pixd);
+        return (PIX *)ERROR_PTR("pixd neither null nor pixs", procName, pixd);
 
         /* Extract the (optionally cropped) region, pixr, and generate
          * an identically sized pixc with the uniform color. */
@@ -1902,10 +1909,10 @@ PIX     *pixt, *pixc, *pixr, *pixg;
 /*!
  * \brief   pixMultiplyByColor()
  *
- * \param[in]    pixd    can be NULL or pixs
- * \param[in]    pixs    32 bpp rgb
- * \param[in]    box     region for filtering; can be NULL)
- * \param[in]    color   32 bit color in 0xrrggbb00 format
+ * \param[in]    pixd can be NULL or pixs
+ * \param[in]    pixs 32 bpp rgb
+ * \param[in]    box region for filtering; can be NULL)
+ * \param[in]    color 32 bit color in 0xrrggbb00 format
  * \return  pixd always
  *
  * <pre>
@@ -1930,12 +1937,14 @@ l_float32  frval, fgval, fbval;
 l_uint32  *data, *line;
 PIX       *pixt;
 
+    PROCNAME("pixMultiplyByColor");
+
     if (!pixs)
-        return (PIX *)ERROR_PTR("pixs not defined", __func__, pixd);
+        return (PIX *)ERROR_PTR("pixs not defined", procName, pixd);
     if (pixGetDepth(pixs) != 32)
-        return (PIX *)ERROR_PTR("pixs not 32 bpp", __func__, pixd);
+        return (PIX *)ERROR_PTR("pixs not 32 bpp", procName, pixd);
     if (pixd && (pixd != pixs))
-        return (PIX *)ERROR_PTR("pixd neither null nor pixs", __func__, pixd);
+        return (PIX *)ERROR_PTR("pixd neither null nor pixs", procName, pixd);
 
     if (!pixd)
         pixd = pixCopy(NULL, pixs);
@@ -1979,10 +1988,10 @@ PIX       *pixt;
 /*!
  * \brief   pixAlphaBlendUniform()
  *
- * \param[in]    pixs    32 bpp rgba, with alpha
- * \param[in]    color   32 bit color in 0xrrggbb00 format
+ * \param[in]    pixs 32 bpp rgba, with alpha
+ * \param[in]    color 32 bit color in 0xrrggbb00 format
  * \return  pixd 32 bpp rgb: pixs blended over uniform color %color,
- *                    a clone of pixs if no alpha, and null on error
+ *                    a clone of pixs if no alpha, and NULL on error
  *
  * <pre>
  * Notes:
@@ -2000,12 +2009,14 @@ pixAlphaBlendUniform(PIX      *pixs,
 {
 PIX  *pixt, *pixd;
 
+    PROCNAME("pixAlphaBlendUniform");
+
     if (!pixs)
-        return (PIX *)ERROR_PTR("pixs not defined", __func__, NULL);
+        return (PIX *)ERROR_PTR("pixs not defined", procName, NULL);
     if (pixGetDepth(pixs) != 32)
-        return (PIX *)ERROR_PTR("pixs not 32 bpp", __func__, NULL);
+        return (PIX *)ERROR_PTR("pixs not 32 bpp", procName, NULL);
     if (pixGetSpp(pixs) != 4) {
-        L_WARNING("no alpha channel; returning clone\n", __func__);
+        L_WARNING("no alpha channel; returning clone\n", procName);
         return pixClone(pixs);
     }
 
@@ -2025,10 +2036,10 @@ PIX  *pixt, *pixd;
 /*!
  * \brief   pixAddAlphaToBlend()
  *
- * \param[in]    pixs     any depth
- * \param[in]    fract    fade fraction in the alpha component
- * \param[in]    invert   1 to photometrically invert pixs
- * \return  pixd 32 bpp with alpha, or null on error
+ * \param[in]    pixs any depth
+ * \param[in]    fract fade fraction in the alpha component
+ * \param[in]    invert 1 to photometrically invert pixs
+ * \return  pixd 32 bpp with alpha, or NULL on error
  *
  * <pre>
  * Notes:
@@ -2052,10 +2063,12 @@ pixAddAlphaToBlend(PIX       *pixs,
 {
 PIX  *pixd, *pix1, *pix2;
 
+    PROCNAME("pixAddAlphaToBlend");
+
     if (!pixs)
-        return (PIX *)ERROR_PTR("pixs not defined", __func__, NULL);
+        return (PIX *)ERROR_PTR("pixs not defined", procName, NULL);
     if (fract < 0.0 || fract > 1.0)
-        return (PIX *)ERROR_PTR("invalid fract", __func__, NULL);
+        return (PIX *)ERROR_PTR("invalid fract", procName, NULL);
 
         /* Convert to 32 bpp */
     if (pixGetColormap(pixs))
@@ -2086,9 +2099,9 @@ PIX  *pixd, *pix1, *pix2;
 /*!
  * \brief   pixSetAlphaOverWhite()
  *
- * \param[in]    pixs    colormapped or 32 bpp rgb; no alpha
+ * \param[in]    pixs colormapped or 32 bpp rgb; no alpha
  * \return  pixd new pix with meaningful alpha component,
- *                   or null on error
+ *                   or NULL on error
  *
  * <pre>
  * Notes:
@@ -2107,10 +2120,12 @@ pixSetAlphaOverWhite(PIX  *pixs)
 {
 PIX  *pixd, *pix1, *pix2, *pix3, *pix4;
 
+    PROCNAME("pixSetAlphaOverWhite");
+
     if (!pixs)
-        return (PIX *)ERROR_PTR("pixs not defined", __func__, NULL);
+        return (PIX *)ERROR_PTR("pixs not defined", procName, NULL);
     if (!(pixGetDepth(pixs) == 32 || pixGetColormap(pixs)))
-        return (PIX *)ERROR_PTR("pixs not 32 bpp or cmapped", __func__, NULL);
+        return (PIX *)ERROR_PTR("pixs not 32 bpp or cmapped", procName, NULL);
 
         /* Remove colormap if it exists; otherwise copy */
     pixd = pixRemoveColormapGeneral(pixs, REMOVE_CMAP_TO_FULL_COLOR, L_COPY);
@@ -2137,125 +2152,4 @@ PIX  *pixd, *pix1, *pix2, *pix3, *pix4;
     pixDestroy(&pix3);
     pixDestroy(&pix4);
     return pixd;
-}
-
-
-/*---------------------------------------------------------------------*
- *                          Fading from the edge                       *
- *---------------------------------------------------------------------*/
-/*!
- * \brief   pixLinearEdgeFade()
- *
- * \param[in]    pixs       8 or 32 bpp; no colormap
- * \param[in]    dir        L_FROM_LEFT, L_FROM_RIGHT, L_FROM_TOP, L_FROM_BOT
- * \param[in]    fadeto     L_BLEND_TO_WHITE, L_BLEND_TO_BLACK
- * \param[in]    distfract  fraction of width or height over which fading occurs
- * \param[in]    maxfade    fraction of fading at the edge, <= 1.0
- * \return  0 if OK, 1 on error
- *
- * <pre>
- * Notes:
- *      (1) In-place operation.
- *      (2) Maximum fading fraction %maxfade occurs at the edge of the image,
- *          and the fraction goes to 0 at the fractional distance %distfract
- *          from the edge.  %maxfade must be in [0, 1].
- *      (3) %distrfact must be in [0, 1], and typically it would be <= 0.5.
- * </pre>
- */
-l_ok
-pixLinearEdgeFade(PIX       *pixs,
-                  l_int32    dir,
-                  l_int32    fadeto,
-                  l_float32  distfract,
-                  l_float32  maxfade)
-{
-l_int32    i, j, w, h, d, wpl, xmin, ymin, range, val, rval, gval, bval;
-l_float32  slope, limit, del;
-l_uint32  *data, *line;
-
-    if (!pixs)
-        return ERROR_INT("pixs not defined", __func__, 1);
-    if (pixGetColormap(pixs) != NULL)
-        return ERROR_INT("pixs has a colormap", __func__, 1);
-    pixGetDimensions(pixs, &w, &h, &d);
-    if (d != 8 && d != 32)
-        return ERROR_INT("pixs not 8 or 32 bpp", __func__, 1);
-    if (dir != L_FROM_LEFT && dir != L_FROM_RIGHT &&
-        dir != L_FROM_TOP && dir != L_FROM_BOT)
-        return ERROR_INT("invalid fade direction from edge", __func__, 1);
-    if (fadeto != L_BLEND_TO_WHITE && fadeto != L_BLEND_TO_BLACK)
-        return ERROR_INT("invalid fadeto photometry", __func__, 1);
-    if (maxfade <= 0) return 0;
-    if (maxfade > 1.0)
-        return ERROR_INT("invalid maxfade", __func__, 1);
-    if (distfract <= 0 || distfract * L_MIN(w, h) < 1.0) {
-        L_INFO("distfract is too small\n", __func__);
-        return 0;
-    }
-    if (distfract > 1.0)
-        return ERROR_INT("invalid distfract", __func__, 1);
-
-        /* Set up parameters */
-    if (dir == L_FROM_LEFT) {
-        range = (l_int32)(distfract * w);
-        xmin = 0;
-        slope = maxfade / (l_float32)range;
-    } else if (dir == L_FROM_RIGHT) {
-        range = (l_int32)(distfract * w);
-        xmin = w - range;
-        slope = maxfade / (l_float32)range;
-    } else if (dir == L_FROM_TOP) {
-        range = (l_int32)(distfract * h);
-        ymin = 0;
-        slope = maxfade / (l_float32)range;
-    } else {  /* dir == L_FROM_BOT */
-        range = (l_int32)(distfract * h);
-        ymin = h - range;
-        slope = maxfade / (l_float32)range;
-    }
-
-    limit = (fadeto == L_BLEND_TO_WHITE) ? 255.0 : 0.0;
-    data = pixGetData(pixs);
-    wpl = pixGetWpl(pixs);
-    if (dir == L_FROM_LEFT || dir == L_FROM_RIGHT) {
-        for (j = 0; j < range; j++) {
-            del = (dir == L_FROM_LEFT) ? maxfade - slope * j
-                                       : maxfade - slope * (range - j);
-            for (i = 0; i < h; i++) {
-                line = data + i * wpl;
-                if (d == 8) {
-                    val = GET_DATA_BYTE(line, xmin + j);
-                    val += (limit - val) * del + 0.5;
-                    SET_DATA_BYTE(line, xmin + j, val);
-                } else {  /* rgb */
-                    extractRGBValues(*(line + xmin + j), &rval, &gval, &bval);
-                    rval += (limit - rval) * del + 0.5;
-                    gval += (limit - gval) * del + 0.5;
-                    bval += (limit - bval) * del + 0.5;
-                    composeRGBPixel(rval, gval, bval, line + xmin + j);
-                }
-            }
-        }
-    } else {  /* dir == L_FROM_TOP || L_FROM_BOT */
-        for (i = 0; i < range; i++) {
-            del = (dir == L_FROM_TOP) ? maxfade - slope * i
-                                      : maxfade - slope * (range - i);
-            line = data + (ymin + i) * wpl;
-            for (j = 0; j < w; j++) {
-                if (d == 8) {
-                    val = GET_DATA_BYTE(line, j);
-                    val += (limit - val) * del + 0.5;
-                    SET_DATA_BYTE(line, j, val);
-                } else {  /* rgb */
-                    extractRGBValues(*(line + j), &rval, &gval, &bval);
-                    rval += (limit - rval) * del + 0.5;
-                    gval += (limit - gval) * del + 0.5;
-                    bval += (limit - bval) * del + 0.5;
-                    composeRGBPixel(rval, gval, bval, line + j);
-                }
-            }
-        }
-    }
-
-    return 0;
 }

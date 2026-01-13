@@ -37,10 +37,6 @@
  *
  */
 
-#ifdef HAVE_CONFIG_H
-#include <config_auto.h>
-#endif  /* HAVE_CONFIG_H */
-
 #include "allheaders.h"
 
     /* Input variables */
@@ -55,25 +51,28 @@ static const l_int32  MAX_WORD_HEIGHT = 100;
 int main(int    argc,
          char **argv)
 {
-char      filename[BUF_SIZE];
-char     *dirin, *rootname, *fname;
-l_int32   i, j, w, h, firstpage, npages, nfiles, ncomp;
-l_int32   index, ival, rval, gval, bval;
-BOX      *box;
-BOXA     *boxa;
-BOXAA    *baa;
-NUMA     *nai;
-NUMAA    *naa;
-SARRAY   *safiles;
-PIX      *pixs, *pix1, *pix2, *pixd;
-PIXCMAP  *cmap;
+char         filename[BUF_SIZE];
+char        *dirin, *rootname, *fname;
+l_int32      i, j, w, h, firstpage, npages, nfiles, ncomp;
+l_int32      index, ival, rval, gval, bval;
+BOX         *box;
+BOXA        *boxa;
+BOXAA       *baa;
+NUMA        *nai;
+NUMAA       *naa;
+SARRAY      *safiles;
+PIX         *pixs, *pixt1, *pixt2, *pixd;
+PIXCMAP     *cmap;
+static char  mainName[] = "wordsinorder";
 
     if (argc != 3 && argc != 5)
         return ERROR_INT(
             " Syntax: wordsinorder dirin rootname [firstpage, npages]",
-            __func__, 1);
+            mainName, 1);
+
     dirin = argv[1];
     rootname = argv[2];
+
     if (argc == 3) {
         firstpage = 0;
         npages = 0;
@@ -82,7 +81,6 @@ PIXCMAP  *cmap;
         firstpage = atoi(argv[3]);
         npages = atoi(argv[4]);
     }
-    setLeptDebugOK(1);
 
         /* Compute the word bounding boxes at 2x reduction, along with
          * the textlines that they are in. */
@@ -93,29 +91,27 @@ PIXCMAP  *cmap;
     for (i = 0; i < nfiles; i++) {
         fname = sarrayGetString(safiles, i, L_NOCOPY);
         if ((pixs = pixRead(fname)) == NULL) {
-            L_WARNING("image file %d not read\n", __func__, i);
+            L_WARNING("image file %d not read\n", mainName, i);
             continue;
         }
-        pix1 = pixReduceRankBinary2(pixs, 1, NULL);
-        pixGetWordBoxesInTextlines(pix1, MIN_WORD_WIDTH, MIN_WORD_HEIGHT,
+        pixGetWordBoxesInTextlines(pixs, 2, MIN_WORD_WIDTH, MIN_WORD_HEIGHT,
                                    MAX_WORD_WIDTH, MAX_WORD_HEIGHT,
                                    &boxa, &nai);
         boxaaAddBoxa(baa, boxa, L_INSERT);
         numaaAddNuma(naa, nai, L_INSERT);
-        pixDestroy(&pix1);
 
 #if  RENDER_PAGES
             /* Show the results on a 2x reduced image, where each
              * word is outlined and the color of the box depends on the
              * computed textline. */
-        pix1 = pixReduceRankBinary2(pixs, 2, NULL);
-        pixGetDimensions(pix1, &w, &h, NULL);
+        pixt1 = pixReduceRankBinary2(pixs, 2, NULL);
+        pixGetDimensions(pixt1, &w, &h, NULL);
         pixd = pixCreate(w, h, 8);
         cmap = pixcmapCreateRandom(8, 1, 1);  /* first color is black */
         pixSetColormap(pixd, cmap);
 
-        pix2 = pixUnpackBinary(pix1, 8, 1);
-        pixRasterop(pixd, 0, 0, w, h, PIX_SRC | PIX_DST, pix2, 0, 0);
+        pixt2 = pixUnpackBinary(pixt1, 8, 1);
+        pixRasterop(pixd, 0, 0, w, h, PIX_SRC | PIX_DST, pixt2, 0, 0);
         ncomp = boxaGetCount(boxa);
         for (j = 0; j < ncomp; j++) {
             box = boxaGetBox(boxa, j, L_CLONE);
@@ -127,10 +123,10 @@ PIXCMAP  *cmap;
         }
 
         snprintf(filename, BUF_SIZE, "%s.%05d", rootname, i);
-        lept_stderr("filename: %s\n", filename);
+        fprintf(stderr, "filename: %s\n", filename);
         pixWrite(filename, pixd, IFF_PNG);
-        pixDestroy(&pix1);
-        pixDestroy(&pix2);
+        pixDestroy(&pixt1);
+        pixDestroy(&pixt2);
         pixDestroy(&pixs);
         pixDestroy(&pixd);
 #endif  /* RENDER_PAGES */

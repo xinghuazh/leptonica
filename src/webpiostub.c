@@ -33,65 +33,65 @@
  */
 
 #ifdef HAVE_CONFIG_H
-#include <config_auto.h>
+#include "config_auto.h"
 #endif  /* HAVE_CONFIG_H */
 
 #include "allheaders.h"
 
 /* --------------------------------------------*/
-#if  !HAVE_LIBWEBP   /* defined in environ.h   */
+#if  !HAVE_LIBWEBP   /* defined in environ.h */
 /* --------------------------------------------*/
 
 PIX * pixReadStreamWebP(FILE *fp)
 {
-    return (PIX * )ERROR_PTR("function not present", __func__, NULL);
+    return (PIX * )ERROR_PTR("function not present", "pixReadStreamWebP", NULL);
 }
 
 /* ----------------------------------------------------------------------*/
 
 PIX * pixReadMemWebP(const l_uint8 *filedata, size_t filesize)
 {
-    return (PIX * )ERROR_PTR("function not present", __func__, NULL);
+    return (PIX * )ERROR_PTR("function not present", "pixReadMemWebP", NULL);
 }
 
 /* ----------------------------------------------------------------------*/
 
-l_ok readHeaderWebP(const char *filename, l_int32 *pw, l_int32 *ph,
+l_int32 readHeaderWebP(const char *filename, l_int32 *pw, l_int32 *ph,
                        l_int32 *pspp)
 {
-    return ERROR_INT("function not present", __func__, 1);
+    return ERROR_INT("function not present", "readHeaderWebP", 1);
 }
 
 /* ----------------------------------------------------------------------*/
 
-l_ok readHeaderMemWebP(const l_uint8 *data, size_t size,
+l_int32 readHeaderMemWebP(const l_uint8 *data, size_t size,
                           l_int32 *pw, l_int32 *ph, l_int32 *pspp)
 {
-    return ERROR_INT("function not present", __func__, 1);
+    return ERROR_INT("function not present", "readHeaderMemWebP", 1);
 }
 
 /* ----------------------------------------------------------------------*/
 
-l_ok pixWriteWebP(const char *filename, PIX *pixs, l_int32 quality,
+l_int32 pixWriteWebP(const char *filename, PIX *pixs, l_int32 quality,
                      l_int32 lossless)
 {
-    return ERROR_INT("function not present", __func__, 1);
+    return ERROR_INT("function not present", "pixWriteWebP", 1);
 }
 
 /* ----------------------------------------------------------------------*/
 
-l_ok pixWriteStreamWebP(FILE *fp, PIX *pixs, l_int32 quality,
+l_int32 pixWriteStreamWebP(FILE *fp, PIX *pixs, l_int32 quality,
                            l_int32 lossless)
 {
-    return ERROR_INT("function not present", __func__, 1);
+    return ERROR_INT("function not present", "pixWriteStreamWebP", 1);
 }
 
 /* ----------------------------------------------------------------------*/
 
-l_ok pixWriteMemWebP(l_uint8 **pencdata, size_t *pencsize, PIX *pixs,
+l_int32 pixWriteMemWebP(l_uint8 **pencdata, size_t *pencsize, PIX *pixs,
                         l_int32 quality, l_int32 lossless)
 {
-    return ERROR_INT("function not present", __func__, 1);
+    return ERROR_INT("function not present", "pixWriteMemWebP", 1);
 }
 
 /* --------------------------------------------*/

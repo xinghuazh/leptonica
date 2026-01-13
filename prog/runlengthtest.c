@@ -31,22 +31,18 @@
  *    Set 2 tests the 3-component (rgb) dynamic range transform.
  */
 
-#ifdef HAVE_CONFIG_H
-#include <config_auto.h>
-#endif  /* HAVE_CONFIG_H */
-
 #include "allheaders.h"
 
 int main(int    argc,
          char **argv)
 {
-l_float32  avediff, rmsdiff;
-PIX       *pix1, *pix2, *pix3, *pix4, *pix5, *pix6, *pix7;
+l_float32    avediff, rmsdiff;
+PIX         *pix1, *pix2, *pix3, *pix4, *pix5, *pix6, *pix7;
+static char  mainName[] = "runlengthtest";
 
     if (argc != 1)
-        return ERROR_INT(" Syntax:  runlengthtest", __func__, 1);
+        return ERROR_INT(" Syntax:  runlengthtest", mainName, 1);
 
-    setLeptDebugOK(1);
     lept_mkdir("lept/run");
 
         /* Set 1 */
@@ -58,7 +54,7 @@ PIX       *pix1, *pix2, *pix3, *pix4, *pix5, *pix6, *pix7;
     pix5 = pixMaxDynamicRange(pix4, L_LOG_SCALE);
     pix6 = pixMinOrMax(NULL, pix2, pix3, L_CHOOSE_MAX);
     pix7 = pixMaxDynamicRange(pix6, L_LOG_SCALE);
-    lept_stderr("Time for set 1: %7.3f sec\n", stopTimer());
+    fprintf(stderr, "Time for set 1: %7.3f sec\n", stopTimer());
     pixDisplay(pix2, 0, 0);
     pixDisplay(pix3, 600, 0);
     pixDisplay(pix4, 1200, 0);
@@ -86,10 +82,10 @@ PIX       *pix1, *pix2, *pix3, *pix4, *pix5, *pix6, *pix7;
     pix2 = pixRead("/tmp/lept/run/junk24.jpg");
     pixCompareGrayOrRGB(pix1, pix2, L_COMPARE_ABS_DIFF, GPLOT_PNG,
                         NULL, &avediff, &rmsdiff, &pix3);
-    lept_stderr("Ave diff = %6.3f, RMS diff = %6.3f\n", avediff, rmsdiff);
+    fprintf(stderr, "Ave diff = %6.3f, RMS diff = %6.3f\n", avediff, rmsdiff);
     pix4 = pixMaxDynamicRangeRGB(pix3, L_LINEAR_SCALE);
     pix5 = pixMaxDynamicRangeRGB(pix3, L_LOG_SCALE);
-    lept_stderr("Time for set 2: %7.3f sec\n", stopTimer());
+    fprintf(stderr, "Time for set 2: %7.3f sec\n", stopTimer());
     pixDisplay(pix4, 0, 800);
     pixDisplay(pix5, 1000, 800);
     pixWrite("/tmp/lept/run/linear.png", pix4, IFF_PNG);

@@ -48,7 +48,7 @@
  */
 
 #ifdef HAVE_CONFIG_H
-#include <config_auto.h>
+#include "config_auto.h"
 #endif  /* HAVE_CONFIG_H */
 
 #include "allheaders.h"
@@ -70,9 +70,9 @@ static const l_int32  ZLIB_COMPRESSION_LEVEL = 6;
 /*!
  * \brief   zlibCompress()
  *
- * \param[in]    datain    byte buffer with input data
- * \param[in]    nin       number of bytes of input data
- * \param[out]   pnout     number of bytes of output data
+ * \param[in]    datain byte buffer with input data
+ * \param[in]    nin    number of bytes of input data
+ * \param[out]   pnout  number of bytes of output data
  * \return  dataout compressed data, or NULL on error
  *
  * <pre>
@@ -89,9 +89,9 @@ static const l_int32  ZLIB_COMPRESSION_LEVEL = 6;
  * </pre>
  */
 l_uint8 *
-zlibCompress(const l_uint8  *datain,
-             size_t          nin,
-             size_t         *pnout)
+zlibCompress(l_uint8  *datain,
+             size_t    nin,
+             size_t   *pnout)
 {
 l_uint8    *dataout;
 l_int32     status, success;
@@ -101,8 +101,10 @@ l_uint8    *bufferin, *bufferout;
 L_BBUFFER  *bbin, *bbout;
 z_stream    z;
 
+    PROCNAME("zlibCompress");
+
     if (!datain)
-        return (l_uint8 *)ERROR_PTR("datain not defined", __func__, NULL);
+        return (l_uint8 *)ERROR_PTR("datain not defined", procName, NULL);
 
         /* Set up fixed size buffers used in z_stream */
     bufferin = (l_uint8 *)LEPT_CALLOC(L_BUF_SIZE, sizeof(l_uint8));
@@ -114,7 +116,7 @@ z_stream    z;
 
     success = TRUE;
     if (!bufferin || !bufferout || !bbin || !bbout) {
-        L_ERROR("calloc fail for buffer\n", __func__);
+        L_ERROR("calloc fail for buffer\n", procName);
         success = FALSE;
         goto cleanup_arrays;
     }
@@ -122,38 +124,38 @@ z_stream    z;
     z.zalloc = (alloc_func)0;
     z.zfree = (free_func)0;
     z.opaque = (voidpf)0;
+
     z.next_in = bufferin;
     z.avail_in = 0;
     z.next_out = bufferout;
     z.avail_out = L_BUF_SIZE;
 
     status = deflateInit(&z, ZLIB_COMPRESSION_LEVEL);
-    if (status != Z_OK) {
-        L_ERROR("deflateInit failed\n", __func__);
-        success = FALSE;
-        goto cleanup_arrays;
-    }
+    if (status != Z_OK)
+      return (l_uint8 *)ERROR_PTR("deflateInit failed", procName, NULL);
 
     do {
         if (z.avail_in == 0) {
             z.next_in = bufferin;
             bbufferWrite(bbin, bufferin, L_BUF_SIZE, &nbytes);
 #if DEBUG
-            lept_stderr(" wrote %zu bytes to bufferin\n", nbytes);
+            fprintf(stderr, " wrote %lu bytes to bufferin\n",
+                    (unsigned long)nbytes);
 #endif  /* DEBUG */
             z.avail_in = nbytes;
         }
         flush = (bbin->n) ? Z_SYNC_FLUSH : Z_FINISH;
         status = deflate(&z, flush);
 #if DEBUG
-        lept_stderr(" status is %d, bytesleft = %u, totalout = %zu\n",
+        fprintf(stderr, " status is %d, bytesleft = %u, totalout = %lu\n",
                   status, z.avail_out, z.total_out);
 #endif  /* DEBUG */
         nbytes = L_BUF_SIZE - z.avail_out;
         if (nbytes) {
             bbufferRead(bbout, bufferout, nbytes);
 #if DEBUG
-            lept_stderr(" read %zu bytes from bufferout\n", nbytes);
+            fprintf(stderr, " read %lu bytes from bufferout\n",
+                    (unsigned long)nbytes);
 #endif  /* DEBUG */
         }
         z.next_out = bufferout;
@@ -179,9 +181,9 @@ cleanup_arrays:
 /*!
  * \brief   zlibUncompress()
  *
- * \param[in]    datain    byte buffer with compressed input data
- * \param[in]    nin       number of bytes of input data
- * \param[out]   pnout     number of bytes of output data
+ * \param[in]    datain byte buffer with compressed input data
+ * \param[in]    nin    number of bytes of input data
+ * \param[out]   pnout  number of bytes of output data
  * \return  dataout uncompressed data, or NULL on error
  *
  * <pre>
@@ -190,9 +192,9 @@ cleanup_arrays:
  * </pre>
  */
 l_uint8 *
-zlibUncompress(const l_uint8  *datain,
-               size_t          nin,
-               size_t         *pnout)
+zlibUncompress(l_uint8  *datain,
+               size_t    nin,
+               size_t   *pnout)
 {
 l_uint8    *dataout;
 l_uint8    *bufferin, *bufferout;
@@ -201,8 +203,10 @@ size_t      nbytes;
 L_BBUFFER  *bbin, *bbout;
 z_stream    z;
 
+    PROCNAME("zlibUncompress");
+
     if (!datain)
-        return (l_uint8 *)ERROR_PTR("datain not defined", __func__, NULL);
+        return (l_uint8 *)ERROR_PTR("datain not defined", procName, NULL);
 
         /* Set up fixed size buffers used in z_stream */
     bufferin = (l_uint8 *)LEPT_CALLOC(L_BUF_SIZE, sizeof(l_uint8));
@@ -214,47 +218,37 @@ z_stream    z;
 
     success = TRUE;
     if (!bufferin || !bufferout || !bbin || !bbout) {
-        L_ERROR("calloc fail for buffer\n", __func__);
+        L_ERROR("calloc fail for buffer\n", procName);
         success = FALSE;
         goto cleanup_arrays;
     }
 
     z.zalloc = (alloc_func)0;
     z.zfree = (free_func)0;
+
     z.next_in = bufferin;
     z.avail_in = 0;
     z.next_out = bufferout;
     z.avail_out = L_BUF_SIZE;
 
-    status = inflateInit(&z);
-    if (status != Z_OK) {
-        L_ERROR("inflateInit fail for buffer\n", __func__);
-        success = FALSE;
-        goto cleanup_arrays;
-    }
+    inflateInit(&z);
 
     for ( ; ; ) {
         if (z.avail_in == 0) {
             z.next_in = bufferin;
             bbufferWrite(bbin, bufferin, L_BUF_SIZE, &nbytes);
-#if DEBUG
-            lept_stderr(" wrote %d bytes to bufferin\n", nbytes);
-#endif  /* DEBUG */
+/*            fprintf(stderr, " wrote %d bytes to bufferin\n", nbytes); */
             z.avail_in = nbytes;
         }
         if (z.avail_in == 0)
             break;
         status = inflate(&z, Z_SYNC_FLUSH);
-#if DEBUG
-        lept_stderr(" status is %d, bytesleft = %d, totalout = %d\n",
-                status, z.avail_out, z.total_out);
-#endif  /* DEBUG */
+/*        fprintf(stderr, " status is %d, bytesleft = %d, totalout = %d\n",
+                  status, z.avail_out, z.total_out); */
         nbytes = L_BUF_SIZE - z.avail_out;
         if (nbytes) {
             bbufferRead(bbout, bufferout, nbytes);
-#if DEBUG
-            lept_stderr(" read %d bytes from bufferout\n", nbytes);
-#endif  /* DEBUG */
+/*            fprintf(stderr, " read %d bytes from bufferout\n", nbytes); */
         }
         z.next_out = bufferout;
         z.avail_out = L_BUF_SIZE;

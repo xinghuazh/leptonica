@@ -84,10 +84,6 @@
  * </pre>
  */
 
-#ifdef HAVE_CONFIG_H
-#include <config_auto.h>
-#endif  /* HAVE_CONFIG_H */
-
 #include <math.h>
 #include "allheaders.h"
 
@@ -114,7 +110,7 @@ static void blocksumLow(l_uint32 *datad, l_int32 w, l_int32 h, l_int32 wpl,
 /*!
  * \brief   pixBlockconv()
  *
- * \param[in]    pix      8 or 32 bpp; or 2, 4 or 8 bpp with colormap
+ * \param[in]    pix 8 or 32 bpp; or 2, 4 or 8 bpp with colormap
  * \param[in]    wc, hc   half width/height of convolution kernel
  * \return  pixd, or NULL on error
  *
@@ -122,10 +118,9 @@ static void blocksumLow(l_uint32 *datad, l_int32 w, l_int32 h, l_int32 wpl,
  * Notes:
  *      (1) The full width and height of the convolution kernel
  *          are (2 * wc + 1) and (2 * hc + 1)
- *      (2) Returns a copy if either wc or hc are 0
+ *      (2) Returns a copy if both wc and hc are 0
  *      (3) Require that w >= 2 * wc + 1 and h >= 2 * hc + 1,
- *          where (w,h) are the dimensions of pixs.  Attempt to
- *          reduce the kernel size if necessary.
+ *          where (w,h) are the dimensions of pixs.
  * </pre>
  */
 PIX  *
@@ -136,23 +131,25 @@ pixBlockconv(PIX     *pix,
 l_int32  w, h, d;
 PIX     *pixs, *pixd, *pixr, *pixrc, *pixg, *pixgc, *pixb, *pixbc;
 
+    PROCNAME("pixBlockconv");
+
     if (!pix)
-        return (PIX *)ERROR_PTR("pix not defined", __func__, NULL);
-    if (wc <= 0 || hc <= 0)
-        return pixCopy(NULL, pix);
+        return (PIX *)ERROR_PTR("pix not defined", procName, NULL);
+    if (wc < 0) wc = 0;
+    if (hc < 0) hc = 0;
     pixGetDimensions(pix, &w, &h, &d);
     if (w < 2 * wc + 1 || h < 2 * hc + 1) {
-        L_WARNING("kernel too large: wc = %d, hc = %d, w = %d, h = %d; "
-                  "reducing!\n", __func__, wc, hc, w, h);
         wc = L_MIN(wc, (w - 1) / 2);
         hc = L_MIN(hc, (h - 1) / 2);
+        L_WARNING("kernel too large; reducing!\n", procName);
+        L_INFO("wc = %d, hc = %d\n", procName, wc, hc);
     }
-    if (wc == 0 || hc == 0)   /* no-op */
+    if (wc == 0 && hc == 0)   /* no-op */
         return pixCopy(NULL, pix);
 
         /* Remove colormap if necessary */
     if ((d == 2 || d == 4 || d == 8) && pixGetColormap(pix)) {
-        L_WARNING("pix has colormap; removing\n", __func__);
+        L_WARNING("pix has colormap; removing\n", procName);
         pixs = pixRemoveColormap(pix, REMOVE_CMAP_BASED_ON_SRC);
         d = pixGetDepth(pixs);
     } else {
@@ -161,7 +158,7 @@ PIX     *pixs, *pixd, *pixr, *pixrc, *pixg, *pixgc, *pixb, *pixbc;
 
     if (d != 8 && d != 32) {
         pixDestroy(&pixs);
-        return (PIX *)ERROR_PTR("depth not 8 or 32 bpp", __func__, NULL);
+        return (PIX *)ERROR_PTR("depth not 8 or 32 bpp", procName, NULL);
     }
 
     if (d == 8) {
@@ -204,10 +201,9 @@ PIX     *pixs, *pixd, *pixr, *pixrc, *pixg, *pixgc, *pixb, *pixbc;
  *          returning; otherwise, just use the input accum pix.
  *      (2) The full width and height of the convolution kernel
  *          are (2 * wc + 1) and (2 * hc + 1).
- *      (3) Returns a copy if either wc or hc are 0
+ *      (3) Returns a copy if both wc and hc are 0.
  *      (4) Require that w >= 2 * wc + 1 and h >= 2 * hc + 1,
- *          where (w,h) are the dimensions of pixs.  Attempt to
- *          reduce the kernel size if necessary.
+ *          where (w,h) are the dimensions of pixs.
  * </pre>
  */
 PIX *
@@ -220,42 +216,43 @@ l_int32    w, h, d, wpl, wpla;
 l_uint32  *datad, *dataa;
 PIX       *pixd, *pixt;
 
+    PROCNAME("pixBlockconvGray");
+
     if (!pixs)
-        return (PIX *)ERROR_PTR("pixs not defined", __func__, NULL);
+        return (PIX *)ERROR_PTR("pixs not defined", procName, NULL);
     pixGetDimensions(pixs, &w, &h, &d);
     if (d != 8)
-        return (PIX *)ERROR_PTR("pixs not 8 bpp", __func__, NULL);
-    if (wc <= 0 || hc <= 0)   /* no-op */
-        return pixCopy(NULL, pixs);
+        return (PIX *)ERROR_PTR("pixs not 8 bpp", procName, NULL);
+    if (wc < 0) wc = 0;
+    if (hc < 0) hc = 0;
     if (w < 2 * wc + 1 || h < 2 * hc + 1) {
-        L_WARNING("kernel too large: wc = %d, hc = %d, w = %d, h = %d; "
-                  "reducing!\n", __func__, wc, hc, w, h);
         wc = L_MIN(wc, (w - 1) / 2);
         hc = L_MIN(hc, (h - 1) / 2);
+        L_WARNING("kernel too large; reducing!\n", procName);
+        L_INFO("wc = %d, hc = %d\n", procName, wc, hc);
     }
-    if (wc == 0 || hc == 0)
+    if (wc == 0 && hc == 0)   /* no-op */
         return pixCopy(NULL, pixs);
 
     if (pixacc) {
         if (pixGetDepth(pixacc) == 32) {
             pixt = pixClone(pixacc);
         } else {
-            L_WARNING("pixacc not 32 bpp; making new one\n", __func__);
+            L_WARNING("pixacc not 32 bpp; making new one\n", procName);
             if ((pixt = pixBlockconvAccum(pixs)) == NULL)
-                return (PIX *)ERROR_PTR("pixt not made", __func__, NULL);
+                return (PIX *)ERROR_PTR("pixt not made", procName, NULL);
         }
     } else {
         if ((pixt = pixBlockconvAccum(pixs)) == NULL)
-            return (PIX *)ERROR_PTR("pixt not made", __func__, NULL);
+            return (PIX *)ERROR_PTR("pixt not made", procName, NULL);
     }
 
     if ((pixd = pixCreateTemplate(pixs)) == NULL) {
         pixDestroy(&pixt);
-        return (PIX *)ERROR_PTR("pixd not made", __func__, NULL);
+        return (PIX *)ERROR_PTR("pixd not made", procName, NULL);
     }
 
-    pixSetPadBits(pixt, 0);
-    wpl = pixGetWpl(pixd);
+    wpl = pixGetWpl(pixs);
     wpla = pixGetWpl(pixt);
     datad = pixGetData(pixd);
     dataa = pixGetData(pixt);
@@ -269,12 +266,12 @@ PIX       *pixd, *pixt;
 /*!
  * \brief   blockconvLow()
  *
- * \param[in]    data      data of input image, to be convolved
+ * \param[in]    data   data of input image, to be convolved
  * \param[in]    w, h, wpl
- * \param[in]    dataa     data of 32 bpp accumulator
- * \param[in]    wpla      accumulator
- * \param[in]    wc        convolution "half-width"
- * \param[in]    hc        convolution "half-height"
+ * \param[in]    dataa    data of 32 bpp accumulator
+ * \param[in]    wpla     accumulator
+ * \param[in]    wc      convolution "half-width"
+ * \param[in]    hc      convolution "half-height"
  * \return  void
  *
  * <pre>
@@ -296,7 +293,7 @@ PIX       *pixd, *pixt;
  *          for the first wc + 1 and last wc columns in the intermediate
  *          lines.
  *      (5) The caller should verify that wc < w and hc < h.
- *          Failing either condition, illegal reads and writes can occur.
+ *          Under those conditions, illegal reads and writes can occur.
  *      (6) Implementation note: to get the same results in the interior
  *          between this function and pixConvolve(), it is necessary to
  *          add 0.5 for roundoff in the main loop that runs over all pixels.
@@ -329,15 +326,17 @@ l_float32  norm, normh, normw;
 l_uint32   val;
 l_uint32  *linemina, *linemaxa, *line;
 
+    PROCNAME("blockconvLow");
+
     wmwc = w - wc;
     hmhc = h - hc;
     if (wmwc <= 0 || hmhc <= 0) {
-        L_ERROR("wc >= w || hc >= h\n", __func__);
+        L_ERROR("wc >= w || hc >=h\n", procName);
         return;
     }
     fwc = 2 * wc + 1;
     fhc = 2 * hc + 1;
-    norm = 1.0 / ((l_float32)(fwc) * fhc);
+    norm = 1. / (fwc * fhc);
 
         /*------------------------------------------------------------*
          *  Compute, using b.c. only to set limits on the accum image *
@@ -362,12 +361,12 @@ l_uint32  *linemina, *linemaxa, *line;
          *             Fix normalization for boundary pixels          *
          *------------------------------------------------------------*/
     for (i = 0; i <= hc; i++) {    /* first hc + 1 lines */
-        hn = L_MAX(1, hc + i);
-        normh = (l_float32)fhc / (l_float32)hn;   /* >= 1 */
+        hn = hc + i;
+        normh = (l_float32)fhc / (l_float32)hn;   /* > 1 */
         line = data + wpl * i;
         for (j = 0; j <= wc; j++) {
-            wn = L_MAX(1, wc + j);
-            normw = (l_float32)fwc / (l_float32)wn;   /* >= 1 */
+            wn = wc + j;
+            normw = (l_float32)fwc / (l_float32)wn;   /* > 1 */
             val = GET_DATA_BYTE(line, j);
             val = (l_uint8)L_MIN(val * normh * normw, 255);
             SET_DATA_BYTE(line, j, val);
@@ -428,6 +427,8 @@ l_uint32  *linemina, *linemaxa, *line;
             SET_DATA_BYTE(line, j, val);
         }
     }
+
+    return;
 }
 
 
@@ -437,7 +438,7 @@ l_uint32  *linemina, *linemaxa, *line;
 /*!
  * \brief   pixBlockconvAccum()
  *
- * \param[in]    pixs    1, 8 or 32 bpp
+ * \param[in]    pixs 1, 8 or 32 bpp
  * \return  accum pix 32 bpp, or NULL on error.
  *
  * <pre>
@@ -457,14 +458,16 @@ l_int32    w, h, d, wpls, wpld;
 l_uint32  *datas, *datad;
 PIX       *pixd;
 
+    PROCNAME("pixBlockconvAccum");
+
     if (!pixs)
-        return (PIX *)ERROR_PTR("pixs not defined", __func__, NULL);
+        return (PIX *)ERROR_PTR("pixs not defined", procName, NULL);
 
     pixGetDimensions(pixs, &w, &h, &d);
     if (d != 1 && d != 8 && d != 32)
-        return (PIX *)ERROR_PTR("pixs not 1, 8 or 32 bpp", __func__, NULL);
+        return (PIX *)ERROR_PTR("pixs not 1, 8 or 32 bpp", procName, NULL);
     if ((pixd = pixCreate(w, h, 32)) == NULL)
-        return (PIX *)ERROR_PTR("pixd not made", __func__, NULL);
+        return (PIX *)ERROR_PTR("pixd not made", procName, NULL);
 
     datas = pixGetData(pixs);
     datad = pixGetData(pixd);
@@ -477,24 +480,22 @@ PIX       *pixd;
 
 
 /*
- * \brief   blockconvAccumLow()
+ *  blockconvAccumLow()
  *
- * \param[in]    datad         32 bpp dest
- * \param[in]    w, h, wpld    of 32 bpp dest
- * \param[in]    datas         1, 8 or 32 bpp src
- * \param[in]    d             bpp of src
- * \param[in]    wpls          of src
- * \return   void
+ *      Input:  datad  (32 bpp dest)
+ *              w, h, wpld (of 32 bpp dest)
+ *              datas (1, 8 or 32 bpp src)
+ *              d (bpp of src)
+ *              wpls (of src)
+ *      Return: void
  *
- * <pre>
- * Notes:
+ *  Notes:
  *      (1) The general recursion relation is
  *             a(i,j) = v(i,j) + a(i-1, j) + a(i, j-1) - a(i-1, j-1)
  *          For the first line, this reduces to the special case
  *             a(0,j) = v(0,j) + a(0, j-1), j > 0
  *          For the first column, the special case is
  *             a(i,0) = v(i,0) + a(i-1, 0), i > 0
- * </pre>
  */
 static void
 blockconvAccumLow(l_uint32  *datad,
@@ -509,6 +510,8 @@ l_uint8    val;
 l_int32    i, j;
 l_uint32   val32;
 l_uint32  *lines, *lined, *linedp;
+
+    PROCNAME("blockconvAccumLow");
 
     lines = datas;
     lined = datad;
@@ -583,8 +586,10 @@ l_uint32  *lines, *lined, *linedp;
             }
         }
     } else {
-        L_ERROR("depth not 1, 8 or 32 bpp\n", __func__);
+        L_ERROR("depth not 1, 8 or 32 bpp\n", procName);
     }
+
+    return;
 }
 
 
@@ -594,7 +599,7 @@ l_uint32  *lines, *lined, *linedp;
 /*!
  * \brief   pixBlockconvGrayUnnormalized()
  *
- * \param[in]    pixs     8 bpp
+ * \param[in]    pixs 8 bpp
  * \param[in]    wc, hc   half width/height of convolution kernel
  * \return  pix 32 bpp; containing the convolution without normalizing
  *                   for the window size, or NULL on error
@@ -604,9 +609,8 @@ l_uint32  *lines, *lined, *linedp;
  *      (1) The full width and height of the convolution kernel
  *          are (2 * wc + 1) and (2 * hc + 1).
  *      (2) Require that w >= 2 * wc + 1 and h >= 2 * hc + 1,
- *          where (w,h) are the dimensions of pixs.  Attempt to
- *          reduce the kernel size if necessary.
- *      (3) Returns a copy if either wc or hc are 0.
+ *          where (w,h) are the dimensions of pixs.
+ *      (3) Returns a copy if both wc and hc are 0.
  *      (3) Adds mirrored border to avoid treating the boundary pixels
  *          specially.  Note that we add wc + 1 pixels to the left
  *          and wc to the right.  The added width is 2 * wc + 1 pixels,
@@ -637,31 +641,33 @@ l_int32    i, j, w, h, d, wpla, wpld, jmax;
 l_uint32  *linemina, *linemaxa, *lined, *dataa, *datad;
 PIX       *pixsb, *pixacc, *pixd;
 
+    PROCNAME("pixBlockconvGrayUnnormalized");
+
     if (!pixs)
-        return (PIX *)ERROR_PTR("pixs not defined", __func__, NULL);
+        return (PIX *)ERROR_PTR("pixs not defined", procName, NULL);
     pixGetDimensions(pixs, &w, &h, &d);
     if (d != 8)
-        return (PIX *)ERROR_PTR("pixs not 8 bpp", __func__, NULL);
-    if (wc <= 0 || hc <= 0)  /* no-op */
-        return pixCopy(NULL, pixs);
+        return (PIX *)ERROR_PTR("pixs not 8 bpp", procName, NULL);
+    if (wc < 0) wc = 0;
+    if (hc < 0) hc = 0;
     if (w < 2 * wc + 1 || h < 2 * hc + 1) {
-        L_WARNING("kernel too large: wc = %d, hc = %d, w = %d, h = %d; "
-                  "reducing!\n", __func__, wc, hc, w, h);
         wc = L_MIN(wc, (w - 1) / 2);
         hc = L_MIN(hc, (h - 1) / 2);
+        L_WARNING("kernel too large; reducing!\n", procName);
+        L_INFO("wc = %d, hc = %d\n", procName, wc, hc);
     }
-    if (wc == 0 || hc == 0)
+    if (wc == 0 && hc == 0)   /* no-op */
         return pixCopy(NULL, pixs);
 
     if ((pixsb = pixAddMirroredBorder(pixs, wc + 1, wc, hc + 1, hc)) == NULL)
-        return (PIX *)ERROR_PTR("pixsb not made", __func__, NULL);
+        return (PIX *)ERROR_PTR("pixsb not made", procName, NULL);
     pixacc = pixBlockconvAccum(pixsb);
     pixDestroy(&pixsb);
     if (!pixacc)
-        return (PIX *)ERROR_PTR("pixacc not made", __func__, NULL);
+        return (PIX *)ERROR_PTR("pixacc not made", procName, NULL);
     if ((pixd = pixCreate(w, h, 32)) == NULL) {
         pixDestroy(&pixacc);
-        return (PIX *)ERROR_PTR("pixd not made", __func__, NULL);
+        return (PIX *)ERROR_PTR("pixd not made", procName, NULL);
     }
 
     wpla = pixGetWpl(pixacc);
@@ -690,19 +696,18 @@ PIX       *pixsb, *pixacc, *pixd;
 /*!
  * \brief   pixBlockconvTiled()
  *
- * \param[in]    pix      8 or 32 bpp; or 2, 4 or 8 bpp with colormap
+ * \param[in]    pix 8 or 32 bpp; or 2, 4 or 8 bpp with colormap
  * \param[in]    wc, hc   half width/height of convolution kernel
- * \param[in]    nx, ny   subdivision into tiles
+ * \param[in]    nx, ny  subdivision into tiles
  * \return  pixd, or NULL on error
  *
  * <pre>
  * Notes:
  *      (1) The full width and height of the convolution kernel
  *          are (2 * wc + 1) and (2 * hc + 1)
- *      (2) Returns a copy if either wc or hc are 0.
+ *      (2) Returns a copy if both wc and hc are 0
  *      (3) Require that w >= 2 * wc + 1 and h >= 2 * hc + 1,
- *          where (w,h) are the dimensions of pixs.  Attempt to
- *          reduce the kernel size if necessary.
+ *          where (w,h) are the dimensions of pixs.
  *      (4) For nx == ny == 1, this defaults to pixBlockconv(), which
  *          is typically about twice as fast, and gives nearly
  *          identical results as pixBlockconvGrayTile().
@@ -730,21 +735,23 @@ PIX        *pixs, *pixd, *pixc, *pixt;
 PIX        *pixr, *pixrc, *pixg, *pixgc, *pixb, *pixbc;
 PIXTILING  *pt;
 
+    PROCNAME("pixBlockconvTiled");
+
     if (!pix)
-        return (PIX *)ERROR_PTR("pix not defined", __func__, NULL);
-    if (wc <= 0 || hc <= 0)   /* no-op */
+        return (PIX *)ERROR_PTR("pix not defined", procName, NULL);
+    if (wc < 0) wc = 0;
+    if (hc < 0) hc = 0;
+    pixGetDimensions(pix, &w, &h, &d);
+    if (w < 2 * wc + 3 || h < 2 * hc + 3) {
+        wc = L_MAX(0, L_MIN(wc, (w - 3) / 2));
+        hc = L_MAX(0, L_MIN(hc, (h - 3) / 2));
+        L_WARNING("kernel too large; reducing!\n", procName);
+        L_INFO("wc = %d, hc = %d\n", procName, wc, hc);
+    }
+    if (wc == 0 && hc == 0)   /* no-op */
         return pixCopy(NULL, pix);
     if (nx <= 1 && ny <= 1)
         return pixBlockconv(pix, wc, hc);
-    pixGetDimensions(pix, &w, &h, &d);
-    if (w < 2 * wc + 3 || h < 2 * hc + 3) {
-        L_WARNING("kernel too large: wc = %d, hc = %d, w = %d, h = %d; "
-                  "reducing!\n", __func__, wc, hc, w, h);
-        wc = L_MIN(wc, (w - 1) / 2);
-        hc = L_MIN(hc, (h - 1) / 2);
-    }
-    if (wc == 0 || hc == 0)
-        return pixCopy(NULL, pix);
 
         /* Test to see if the tiles are too small.  The required
          * condition is that the tile dimensions must be at least
@@ -753,16 +760,16 @@ PIXTILING  *pt;
     yrat = h / ny;
     if (xrat < wc + 2) {
         nx = w / (wc + 2);
-        L_WARNING("tile width too small; nx reduced to %d\n", __func__, nx);
+        L_WARNING("tile width too small; nx reduced to %d\n", procName, nx);
     }
     if (yrat < hc + 2) {
         ny = h / (hc + 2);
-        L_WARNING("tile height too small; ny reduced to %d\n", __func__, ny);
+        L_WARNING("tile height too small; ny reduced to %d\n", procName, ny);
     }
 
         /* Remove colormap if necessary */
     if ((d == 2 || d == 4 || d == 8) && pixGetColormap(pix)) {
-        L_WARNING("pix has colormap; removing\n", __func__);
+        L_WARNING("pix has colormap; removing\n", procName);
         pixs = pixRemoveColormap(pix, REMOVE_CMAP_BASED_ON_SRC);
         d = pixGetDepth(pixs);
     } else {
@@ -771,7 +778,7 @@ PIXTILING  *pt;
 
     if (d != 8 && d != 32) {
         pixDestroy(&pixs);
-        return (PIX *)ERROR_PTR("depth not 8 or 32 bpp", __func__, NULL);
+        return (PIX *)ERROR_PTR("depth not 8 or 32 bpp", procName, NULL);
     }
 
        /* Note that the overlaps in the width and height that
@@ -783,7 +790,7 @@ PIXTILING  *pt;
         * pixBlockconvGrayTile(). */
     if ((pixd = pixCreateTemplate(pixs)) == NULL) {
         pixDestroy(&pixs);
-        return (PIX *)ERROR_PTR("pixd not made", __func__, NULL);
+        return (PIX *)ERROR_PTR("pixd not made", procName, NULL);
     }
     pt = pixTilingCreate(pixs, nx, ny, 0, 0, wc + 2, hc + 2);
     for (i = 0; i < ny; i++) {
@@ -824,8 +831,8 @@ PIXTILING  *pt;
 /*!
  * \brief   pixBlockconvGrayTile()
  *
- * \param[in]    pixs     8 bpp gray
- * \param[in]    pixacc   32 bpp accum pix
+ * \param[in]    pixs 8 bpp gray
+ * \param[in]    pixacc 32 bpp accum pix
  * \param[in]    wc, hc   half width/height of convolution kernel
  * \return  pixd, or NULL on error
  *
@@ -837,10 +844,9 @@ PIXTILING  *pt;
  *          left and right, and with (hc + 1) pixels on top and bottom.
  *          The returned pix has these stripped off; they are only used
  *          for computation.
- *      (3) Returns a copy if either wc or hc are 0.
- *      (4) Require that w > 2 * wc + 3 and h > 2 * hc + 3,
- *          where (w,h) are the dimensions of pixs.  Attempt to
- *          reduce the kernel size if necessary.
+ *      (3) Returns a copy if both wc and hc are 0
+ *      (4) Require that w > 2 * wc + 1 and h > 2 * hc + 1,
+ *          where (w,h) are the dimensions of pixs.
  * </pre>
  */
 PIX *
@@ -855,20 +861,22 @@ l_uint32   val;
 l_uint32  *datat, *datad, *lined, *linemint, *linemaxt;
 PIX       *pixt, *pixd;
 
+    PROCNAME("pixBlockconvGrayTile");
+
     if (!pixs)
-        return (PIX *)ERROR_PTR("pix not defined", __func__, NULL);
+        return (PIX *)ERROR_PTR("pix not defined", procName, NULL);
     pixGetDimensions(pixs, &w, &h, &d);
     if (d != 8)
-        return (PIX *)ERROR_PTR("pixs not 8 bpp", __func__, NULL);
-    if (wc <= 0 || hc <= 0)  /* no-op */
-        return pixCopy(NULL, pixs);
+        return (PIX *)ERROR_PTR("pixs not 8 bpp", procName, NULL);
+    if (wc < 0) wc = 0;
+    if (hc < 0) hc = 0;
     if (w < 2 * wc + 3 || h < 2 * hc + 3) {
-        L_WARNING("kernel too large: wc = %d, hc = %d, w = %d, h = %d; "
-                  "reducing!\n", __func__, wc, hc, w, h);
-        wc = L_MIN(wc, (w - 1) / 2);
-        hc = L_MIN(hc, (h - 1) / 2);
+        wc = L_MAX(0, L_MIN(wc, (w - 3) / 2));
+        hc = L_MAX(0, L_MIN(hc, (h - 3) / 2));
+        L_WARNING("kernel too large; reducing!\n", procName);
+        L_INFO("wc = %d, hc = %d\n", procName, wc, hc);
     }
-    if (wc == 0 || hc == 0)
+    if (wc == 0 && hc == 0)
         return pixCopy(NULL, pixs);
     wd = w - 2 * wc;
     hd = h - 2 * hc;
@@ -877,18 +885,18 @@ PIX       *pixt, *pixd;
         if (pixGetDepth(pixacc) == 32) {
             pixt = pixClone(pixacc);
         } else {
-            L_WARNING("pixacc not 32 bpp; making new one\n", __func__);
+            L_WARNING("pixacc not 32 bpp; making new one\n", procName);
             if ((pixt = pixBlockconvAccum(pixs)) == NULL)
-                return (PIX *)ERROR_PTR("pixt not made", __func__, NULL);
+                return (PIX *)ERROR_PTR("pixt not made", procName, NULL);
         }
     } else {
         if ((pixt = pixBlockconvAccum(pixs)) == NULL)
-            return (PIX *)ERROR_PTR("pixt not made", __func__, NULL);
+            return (PIX *)ERROR_PTR("pixt not made", procName, NULL);
     }
 
     if ((pixd = pixCreateTemplate(pixs)) == NULL) {
         pixDestroy(&pixt);
-        return (PIX *)ERROR_PTR("pixd not made", __func__, NULL);
+        return (PIX *)ERROR_PTR("pixd not made", procName, NULL);
     }
     datat = pixGetData(pixt);
     wplt = pixGetWpl(pixt);
@@ -932,15 +940,15 @@ PIX       *pixt, *pixd;
 /*!
  * \brief   pixWindowedStats()
  *
- * \param[in]    pixs        8 bpp grayscale
- * \param[in]    wc, hc      half width/height of convolution kernel
- * \param[in]    hasborder   use 1 if it already has (wc + 1 border pixels
- *                           on left and right, and hc + 1 on top and bottom;
- *                           use 0 to add kernel-dependent border)
- * \param[out]   ppixm       [optional] 8 bpp mean value in window
- * \param[out]   ppixms      [optional] 32 bpp mean square value in window
- * \param[out]   pfpixv      [optional] float variance in window
- * \param[out]   pfpixrv     [optional] float rms deviation from the mean
+ * \param[in]    pixs 8 bpp grayscale
+ * \param[in]    wc, hc   half width/height of convolution kernel
+ * \param[in]    hasborder use 1 if it already has (wc + 1 border pixels
+ *                          on left and right, and hc + 1 on top and bottom;
+ *                          use 0 to add kernel-dependent border)
+ * \param[out]   ppixm [optional] 8 bpp mean value in window
+ * \param[out]   ppixms [optional] 32 bpp mean square value in window
+ * \param[out]   pfpixv [optional] float variance in window
+ * \param[out]   pfpixrv [optional] float rms deviation from the mean
  * \return  0 if OK, 1 on error
  *
  * <pre>
@@ -968,7 +976,7 @@ PIX       *pixt, *pixd;
  *          of the size of the convolution kernel.
  * </pre>
  */
-l_ok
+l_int32
 pixWindowedStats(PIX     *pixs,
                  l_int32  wc,
                  l_int32  hc,
@@ -980,16 +988,18 @@ pixWindowedStats(PIX     *pixs,
 {
 PIX  *pixb, *pixm, *pixms;
 
+    PROCNAME("pixWindowedStats");
+
     if (!ppixm && !ppixms && !pfpixv && !pfpixrv)
-        return ERROR_INT("no output requested", __func__, 1);
+        return ERROR_INT("no output requested", procName, 1);
     if (ppixm) *ppixm = NULL;
     if (ppixms) *ppixms = NULL;
     if (pfpixv) *pfpixv = NULL;
     if (pfpixrv) *pfpixrv = NULL;
     if (!pixs || pixGetDepth(pixs) != 8)
-        return ERROR_INT("pixs not defined or not 8 bpp", __func__, 1);
+        return ERROR_INT("pixs not defined or not 8 bpp", procName, 1);
     if (wc < 2 || hc < 2)
-        return ERROR_INT("wc and hc not >= 2", __func__, 1);
+        return ERROR_INT("wc and hc not >= 2", procName, 1);
 
         /* Add border if requested */
     if (!hasborder)
@@ -1023,13 +1033,13 @@ PIX  *pixb, *pixm, *pixms;
 /*!
  * \brief   pixWindowedMean()
  *
- * \param[in]    pixs        8 or 32 bpp grayscale
- * \param[in]    wc, hc      half width/height of convolution kernel
- * \param[in]    hasborder   use 1 if it already has (wc + 1 border pixels
- *                           on left and right, and hc + 1 on top and bottom;
- *                           use 0 to add kernel-dependent border)
- * \param[in]    normflag    1 for normalization to get average in window;
- *                           0 for the sum in the window (un-normalized)
+ * \param[in]    pixs      8 or 32 bpp grayscale
+ * \param[in]    wc, hc    half width/height of convolution kernel
+ * \param[in]    hasborder use 1 if it already has (wc + 1 border pixels
+ *                          on left and right, and hc + 1 on top and bottom;
+ *                          use 0 to add kernel-dependent border)
+ * \param[in]    normflag  1 for normalization to get average in window;
+ *                         0 for the sum in the window (un-normalized)
  * \return  pixd 8 or 32 bpp, average over kernel window
  *
  * <pre>
@@ -1064,13 +1074,15 @@ l_uint32  *datac, *datad, *linec1, *linec2, *lined;
 l_float32  norm;
 PIX       *pixb, *pixc, *pixd;
 
+    PROCNAME("pixWindowedMean");
+
     if (!pixs)
-        return (PIX *)ERROR_PTR("pixs not defined", __func__, NULL);
+        return (PIX *)ERROR_PTR("pixs not defined", procName, NULL);
     d = pixGetDepth(pixs);
     if (d != 8 && d != 32)
-        return (PIX *)ERROR_PTR("pixs not 8 or 32 bpp", __func__, NULL);
+        return (PIX *)ERROR_PTR("pixs not 8 or 32 bpp", procName, NULL);
     if (wc < 2 || hc < 2)
-        return (PIX *)ERROR_PTR("wc and hc not >= 2", __func__, NULL);
+        return (PIX *)ERROR_PTR("wc and hc not >= 2", procName, NULL);
 
     pixb = pixc = pixd = NULL;
 
@@ -1082,7 +1094,7 @@ PIX       *pixb, *pixc, *pixd;
 
         /* Make the accumulator pix from pixb */
     if ((pixc = pixBlockconvAccum(pixb)) == NULL) {
-        L_ERROR("pixc not made\n", __func__);
+        L_ERROR("pixc not made\n", procName);
         goto cleanup;
     }
     wplc = pixGetWpl(pixc);
@@ -1094,11 +1106,11 @@ PIX       *pixb, *pixc, *pixd;
     wd = w - 2 * (wc + 1);
     hd = h - 2 * (hc + 1);
     if (wd < 2 || hd < 2) {
-        L_ERROR("w or h is too small for the kernel\n", __func__);
+        L_ERROR("w or h is too small for the kernel\n", procName);
         goto cleanup;
     }
     if ((pixd = pixCreate(wd, hd, d)) == NULL) {
-        L_ERROR("pixd not made\n", __func__);
+        L_ERROR("pixd not made\n", procName);
         goto cleanup;
     }
     wpld = pixGetWpl(pixd);
@@ -1108,7 +1120,7 @@ PIX       *pixb, *pixc, *pixd;
     hincr = 2 * hc + 1;
     norm = 1.0;  /* use this for sum-in-window */
     if (normflag)
-        norm = 1.0 / ((l_float32)(wincr) * hincr);
+        norm = 1.0 / (wincr * hincr);
     for (i = 0; i < hd; i++) {
         linec1 = datac + i * wplc;
         linec2 = datac + (i + hincr) * wplc;
@@ -1135,13 +1147,13 @@ cleanup:
 /*!
  * \brief   pixWindowedMeanSquare()
  *
- * \param[in]    pixs        8 bpp grayscale
- * \param[in]    wc, hc      half width/height of convolution kernel
- * \param[in]    hasborder   use 1 if it already has (wc + 1 border pixels
- *                           on left and right, and hc + 1 on top and bottom;
- *                           use 0 to add kernel-dependent border)
- * \return  pixd    32 bpp, average over rectangular window of
- *                  width = 2 * wc + 1 and height = 2 * hc + 1
+ * \param[in]    pixs      8 bpp grayscale
+ * \param[in]    wc, hc    half width/height of convolution kernel
+ * \param[in]    hasborder use 1 if it already has (wc + 1 border pixels
+ *                          on left and right, and hc + 1 on top and bottom;
+ *                          use 0 to add kernel-dependent border)
+ * \return  pixd 32 bpp, average over rectangular window of
+ *                    width = 2 * wc + 1 and height = 2 * hc + 1
  *
  * <pre>
  * Notes:
@@ -1181,10 +1193,12 @@ l_float64  *data, *line1, *line2;
 DPIX       *dpix;
 PIX        *pixb, *pixd;
 
+    PROCNAME("pixWindowedMeanSquare");
+
     if (!pixs || (pixGetDepth(pixs) != 8))
-        return (PIX *)ERROR_PTR("pixs undefined or not 8 bpp", __func__, NULL);
+        return (PIX *)ERROR_PTR("pixs undefined or not 8 bpp", procName, NULL);
     if (wc < 2 || hc < 2)
-        return (PIX *)ERROR_PTR("wc and hc not >= 2", __func__, NULL);
+        return (PIX *)ERROR_PTR("wc and hc not >= 2", procName, NULL);
 
     pixd = NULL;
 
@@ -1195,7 +1209,7 @@ PIX        *pixb, *pixd;
         pixb = pixClone(pixs);
 
     if ((dpix = pixMeanSquareAccum(pixb)) == NULL) {
-        L_ERROR("dpix not made\n", __func__);
+        L_ERROR("dpix not made\n", procName);
         goto cleanup;
     }
     wpl = dpixGetWpl(dpix);
@@ -1207,11 +1221,11 @@ PIX        *pixb, *pixd;
     wd = w - 2 * (wc + 1);
     hd = h - 2 * (hc + 1);
     if (wd < 2 || hd < 2) {
-        L_ERROR("w or h too small for kernel\n", __func__);
+        L_ERROR("w or h too small for kernel\n", procName);
         goto cleanup;
     }
     if ((pixd = pixCreate(wd, hd, 32)) == NULL) {
-        L_ERROR("pixd not made\n", __func__);
+        L_ERROR("pixd not made\n", procName);
         goto cleanup;
     }
     wpld = pixGetWpl(pixd);
@@ -1219,14 +1233,14 @@ PIX        *pixb, *pixd;
 
     wincr = 2 * wc + 1;
     hincr = 2 * hc + 1;
-    norm = 1.0 / ((l_float32)(wincr) * hincr);
+    norm = 1.0 / (wincr * hincr);
     for (i = 0; i < hd; i++) {
         line1 = data + i * wpl;
         line2 = data + (i + hincr) * wpl;
         lined = datad + i * wpld;
         for (j = 0; j < wd; j++) {
             val = line2[j + wincr] - line2[j] - line1[j + wincr] + line1[j];
-            ival = (l_uint32)(norm * val + 0.5);  /* to round up */
+            ival = (l_uint32)(norm * val);
             lined[j] = ival;
         }
     }
@@ -1241,11 +1255,11 @@ cleanup:
 /*!
  * \brief   pixWindowedVariance()
  *
- * \param[in]    pixm      mean over window; 8 or 32 bpp grayscale
- * \param[in]    pixms     mean square over window; 32 bpp
- * \param[out]   pfpixv    [optional] float variance -- the ms deviation
- *                         from the mean
- * \param[out]   pfpixrv   [optional] float rms deviation from the mean
+ * \param[in]    pixm mean over window; 8 or 32 bpp grayscale
+ * \param[in]    pixms mean square over window; 32 bpp
+ * \param[out]   pfpixv [optional] float variance -- the ms deviation
+ *                      from the mean
+ * \param[out]   pfpixrv [optional] float rms deviation from the mean
  * \return  0 if OK, 1 on error
  *
  * <pre>
@@ -1262,7 +1276,7 @@ cleanup:
  *            ~ for rms deviation, simply convert the output fpix to pix,
  * </pre>
  */
-l_ok
+l_int32
 pixWindowedVariance(PIX    *pixm,
                     PIX    *pixms,
                     FPIX  **pfpixv,
@@ -1271,21 +1285,23 @@ pixWindowedVariance(PIX    *pixm,
 l_int32     i, j, w, h, ws, hs, ds, wplm, wplms, wplv, wplrv, valm, valms;
 l_float32   var;
 l_uint32   *linem, *linems, *datam, *datams;
-l_float32  *linev = NULL, *linerv = NULL, *datav = NULL, *datarv = NULL;
+l_float32  *linev, *linerv, *datav, *datarv;
 FPIX       *fpixv, *fpixrv;  /* variance and square root of variance */
 
+    PROCNAME("pixWindowedVariance");
+
     if (!pfpixv && !pfpixrv)
-        return ERROR_INT("no output requested", __func__, 1);
+        return ERROR_INT("no output requested", procName, 1);
     if (pfpixv) *pfpixv = NULL;
     if (pfpixrv) *pfpixrv = NULL;
     if (!pixm || pixGetDepth(pixm) != 8)
-        return ERROR_INT("pixm undefined or not 8 bpp", __func__, 1);
+        return ERROR_INT("pixm undefined or not 8 bpp", procName, 1);
     if (!pixms || pixGetDepth(pixms) != 32)
-        return ERROR_INT("pixms undefined or not 32 bpp", __func__, 1);
+        return ERROR_INT("pixms undefined or not 32 bpp", procName, 1);
     pixGetDimensions(pixm, &w, &h, NULL);
     pixGetDimensions(pixms, &ws, &hs, &ds);
     if (w != ws || h != hs)
-        return ERROR_INT("pixm and pixms sizes differ", __func__, 1);
+        return ERROR_INT("pixm and pixms sizes differ", procName, 1);
 
     if (pfpixv) {
         fpixv = fpixCreate(w, h);
@@ -1332,8 +1348,8 @@ FPIX       *fpixv, *fpixrv;  /* variance and square root of variance */
 /*!
  * \brief   pixMeanSquareAccum()
  *
- * \param[in]    pixs    8 bpp grayscale
- * \return  dpix   64 bit array, or NULL on error
+ * \param[in]    pixs 8 bpp grayscale
+ * \return  dpix 64 bit array, or NULL on error
  *
  * <pre>
  * Notes:
@@ -1357,11 +1373,14 @@ l_uint32   *datas, *lines;
 l_float64  *data, *line, *linep;
 DPIX       *dpix;
 
+    PROCNAME("pixMeanSquareAccum");
+
+
     if (!pixs || (pixGetDepth(pixs) != 8))
-        return (DPIX *)ERROR_PTR("pixs undefined or not 8 bpp", __func__, NULL);
+        return (DPIX *)ERROR_PTR("pixs undefined or not 8 bpp", procName, NULL);
     pixGetDimensions(pixs, &w, &h, NULL);
     if ((dpix = dpixCreate(w, h)) ==  NULL)
-        return (DPIX *)ERROR_PTR("dpix not made", __func__, NULL);
+        return (DPIX *)ERROR_PTR("dpix not made", procName, NULL);
 
     datas = pixGetData(pixs);
     wpls = pixGetWpl(pixs);
@@ -1373,9 +1392,9 @@ DPIX       *dpix;
     for (j = 0; j < w; j++) {   /* first line */
         val = GET_DATA_BYTE(lines, j);
         if (j == 0)
-            line[0] = (l_float64)(val) * val;
+            line[0] = val * val;
         else
-            line[j] = line[j - 1] + (l_float64)(val) * val;
+            line[j] = line[j - 1] + val * val;
     }
 
         /* Do the other lines */
@@ -1386,10 +1405,9 @@ DPIX       *dpix;
         for (j = 0; j < w; j++) {
             val = GET_DATA_BYTE(lines, j);
             if (j == 0)
-                line[0] = linep[0] + (l_float64)(val) * val;
+                line[0] = linep[0] + val * val;
             else
-                line[j] = line[j - 1] + linep[j] - linep[j - 1]
-                        + (l_float64)(val) * val;
+                line[j] = line[j - 1] + linep[j] - linep[j - 1] + val * val;
         }
     }
 
@@ -1403,10 +1421,10 @@ DPIX       *dpix;
 /*!
  * \brief   pixBlockrank()
  *
- * \param[in]    pixs     1 bpp
- * \param[in]    pixacc   pix [optional] 32 bpp
- * \param[in]    wc, hc   half width/height of block sum/rank kernel
- * \param[in]    rank     between 0.0 and 1.0; 0.5 is median filter
+ * \param[in]    pixs    1 bpp
+ * \param[in]    pixacc  pix [optional] 32 bpp
+ * \param[in]    wc, hc  half width/height of block sum/rank kernel
+ * \param[in]    rank    between 0.0 and 1.0; 0.5 is median filter
  * \return  pixd 1 bpp
  *
  * <pre>
@@ -1424,8 +1442,7 @@ DPIX       *dpix;
  *      (4) If both wc and hc are 0, returns a copy unless rank == 0.0,
  *          in which case this returns an all-ones image.
  *      (5) Require that w >= 2 * wc + 1 and h >= 2 * hc + 1,
- *          where (w,h) are the dimensions of pixs.  Attempt to
- *          reduce the kernel size if necessary.
+ *          where (w,h) are the dimensions of pixs.
  * </pre>
  */
 PIX *
@@ -1438,13 +1455,15 @@ pixBlockrank(PIX       *pixs,
 l_int32  w, h, d, thresh;
 PIX     *pixt, *pixd;
 
+    PROCNAME("pixBlockrank");
+
     if (!pixs)
-        return (PIX *)ERROR_PTR("pixs not defined", __func__, NULL);
+        return (PIX *)ERROR_PTR("pixs not defined", procName, NULL);
     pixGetDimensions(pixs, &w, &h, &d);
     if (d != 1)
-        return (PIX *)ERROR_PTR("pixs not 1 bpp", __func__, NULL);
+        return (PIX *)ERROR_PTR("pixs not 1 bpp", procName, NULL);
     if (rank < 0.0 || rank > 1.0)
-        return (PIX *)ERROR_PTR("rank must be in [0.0, 1.0]", __func__, NULL);
+        return (PIX *)ERROR_PTR("rank must be in [0.0, 1.0]", procName, NULL);
 
     if (rank == 0.0) {
         pixd = pixCreateTemplate(pixs);
@@ -1452,19 +1471,19 @@ PIX     *pixt, *pixd;
         return pixd;
     }
 
-    if (wc <= 0 || hc <= 0)
-        return pixCopy(NULL, pixs);
+    if (wc < 0) wc = 0;
+    if (hc < 0) hc = 0;
     if (w < 2 * wc + 1 || h < 2 * hc + 1) {
-        L_WARNING("kernel too large: wc = %d, hc = %d, w = %d, h = %d; "
-                  "reducing!\n", __func__, wc, hc, w, h);
         wc = L_MIN(wc, (w - 1) / 2);
         hc = L_MIN(hc, (h - 1) / 2);
+        L_WARNING("kernel too large; reducing!\n", procName);
+        L_INFO("wc = %d, hc = %d\n", procName, wc, hc);
     }
-    if (wc == 0 || hc == 0)
+    if (wc == 0 && hc == 0)
         return pixCopy(NULL, pixs);
 
     if ((pixt = pixBlocksum(pixs, pixacc, wc, hc)) == NULL)
-        return (PIX *)ERROR_PTR("pixt not made", __func__, NULL);
+        return (PIX *)ERROR_PTR("pixt not made", procName, NULL);
 
         /* 1 bpp block rank filter output.
          * Must invert because threshold gives 1 for values < thresh,
@@ -1495,8 +1514,7 @@ PIX     *pixt, *pixd;
  *          8 bpp result, gives a nice anti-aliased, and somewhat
  *          darkened, result on text.
  *      (4) Require that w >= 2 * wc + 1 and h >= 2 * hc + 1,
- *          where (w,h) are the dimensions of pixs.  Attempt to
- *          reduce the kernel size if necessary.
+ *          where (w,h) are the dimensions of pixs.
  *      (5) Returns in each dest pixel the sum of all src pixels
  *          that are within a block of size of the kernel, centered
  *          on the dest pixel.  This sum is the number of src ON
@@ -1519,35 +1537,37 @@ l_int32    w, h, d, wplt, wpld;
 l_uint32  *datat, *datad;
 PIX       *pixt, *pixd;
 
+    PROCNAME("pixBlocksum");
+
     if (!pixs)
-        return (PIX *)ERROR_PTR("pixs not defined", __func__, NULL);
+        return (PIX *)ERROR_PTR("pixs not defined", procName, NULL);
     pixGetDimensions(pixs, &w, &h, &d);
     if (d != 1)
-        return (PIX *)ERROR_PTR("pixs not 1 bpp", __func__, NULL);
-    if (wc <= 0 || hc <= 0)
-        return pixCopy(NULL, pixs);
+        return (PIX *)ERROR_PTR("pixs not 1 bpp", procName, NULL);
+    if (wc < 0) wc = 0;
+    if (hc < 0) hc = 0;
     if (w < 2 * wc + 1 || h < 2 * hc + 1) {
-        L_WARNING("kernel too large: wc = %d, hc = %d, w = %d, h = %d; "
-                  "reducing!\n", __func__, wc, hc, w, h);
         wc = L_MIN(wc, (w - 1) / 2);
         hc = L_MIN(hc, (h - 1) / 2);
+        L_WARNING("kernel too large; reducing!\n", procName);
+        L_INFO("wc = %d, hc = %d\n", procName, wc, hc);
     }
-    if (wc == 0 || hc == 0)
+    if (wc == 0 && hc == 0)
         return pixCopy(NULL, pixs);
 
     if (pixacc) {
         if (pixGetDepth(pixacc) != 32)
-            return (PIX *)ERROR_PTR("pixacc not 32 bpp", __func__, NULL);
+            return (PIX *)ERROR_PTR("pixacc not 32 bpp", procName, NULL);
         pixt = pixClone(pixacc);
     } else {
         if ((pixt = pixBlockconvAccum(pixs)) == NULL)
-            return (PIX *)ERROR_PTR("pixt not made", __func__, NULL);
+            return (PIX *)ERROR_PTR("pixt not made", procName, NULL);
     }
 
         /* 8 bpp block sum output */
     if ((pixd = pixCreate(w, h, 8)) == NULL) {
         pixDestroy(&pixt);
-        return (PIX *)ERROR_PTR("pixd not made", __func__, NULL);
+        return (PIX *)ERROR_PTR("pixd not made", procName, NULL);
     }
     pixCopyResolution(pixd, pixs);
 
@@ -1565,11 +1585,11 @@ PIX       *pixt, *pixd;
 /*!
  * \brief   blocksumLow()
  *
- * \param[in]    datad        of 8 bpp dest
- * \param[in]    w, h, wpl    of 8 bpp dest
- * \param[in]    dataa        of 32 bpp accum
- * \param[in]    wpla         of 32 bpp accum
- * \param[in]    wc, hc       convolution "half-width" and "half-height"
+ * \param[in]    datad  of 8 bpp dest
+ * \param[in]    w, h, wpl  of 8 bpp dest
+ * \param[in]    dataa of 32 bpp accum
+ * \param[in]    wpla  of 32 bpp accum
+ * \param[in]    wc, hc  convolution "half-width" and "half-height"
  * \return  void
  *
  * <pre>
@@ -1610,15 +1630,17 @@ l_float32  norm, normh, normw;
 l_uint32   val;
 l_uint32  *linemina, *linemaxa, *lined;
 
+    PROCNAME("blocksumLow");
+
     wmwc = w - wc;
     hmhc = h - hc;
     if (wmwc <= 0 || hmhc <= 0) {
-        L_ERROR("wc >= w || hc >=h\n", __func__);
+        L_ERROR("wc >= w || hc >=h\n", procName);
         return;
     }
     fwc = 2 * wc + 1;
     fhc = 2 * hc + 1;
-    norm = 255. / ((l_float32)(fwc) * fhc);
+    norm = 255. / (fwc * fhc);
 
         /*------------------------------------------------------------*
          *  Compute, using b.c. only to set limits on the accum image *
@@ -1709,6 +1731,8 @@ l_uint32  *linemina, *linemaxa, *lined;
             SET_DATA_BYTE(lined, j, val);
         }
     }
+
+    return;
 }
 
 
@@ -1718,9 +1742,9 @@ l_uint32  *linemina, *linemaxa, *lined;
 /*!
  * \brief   pixCensusTransform()
  *
- * \param[in]    pixs       8 bpp
- * \param[in]    halfsize   of square over which neighbors are averaged
- * \param[in]    pixacc     [optional] 32 bpp pix
+ * \param[in]    pixs     8 bpp
+ * \param[in]    halfsize of square over which neighbors are averaged
+ * \param[in]    pixacc   pix [optional] 32 bpp
  * \return  pixd 1 bpp
  *
  * <pre>
@@ -1753,24 +1777,26 @@ l_int32    vals, valv;
 l_uint32  *datas, *datav, *datad, *lines, *linev, *lined;
 PIX       *pixav, *pixd;
 
+    PROCNAME("pixCensusTransform");
+
     if (!pixs)
-        return (PIX *)ERROR_PTR("pixs not defined", __func__, NULL);
+        return (PIX *)ERROR_PTR("pixs not defined", procName, NULL);
     if (pixGetDepth(pixs) != 8)
-        return (PIX *)ERROR_PTR("pixs not 8 bpp", __func__, NULL);
+        return (PIX *)ERROR_PTR("pixs not 8 bpp", procName, NULL);
     if (halfsize < 1)
-        return (PIX *)ERROR_PTR("halfsize must be >= 1", __func__, NULL);
+        return (PIX *)ERROR_PTR("halfsize must be >= 1", procName, NULL);
 
         /* Get the average of each pixel with its neighbors */
     if ((pixav = pixBlockconvGray(pixs, pixacc, halfsize, halfsize))
           == NULL)
-        return (PIX *)ERROR_PTR("pixav not made", __func__, NULL);
+        return (PIX *)ERROR_PTR("pixav not made", procName, NULL);
 
         /* Subtract the pixel from the average, and then compare
          * the pixel value with the remaining average */
     pixGetDimensions(pixs, &w, &h, NULL);
     if ((pixd = pixCreate(w, h, 1)) == NULL) {
         pixDestroy(&pixav);
-        return (PIX *)ERROR_PTR("pixd not made", __func__, NULL);
+        return (PIX *)ERROR_PTR("pixd not made", procName, NULL);
     }
     datas = pixGetData(pixs);
     datav = pixGetData(pixav);
@@ -1801,10 +1827,10 @@ PIX       *pixav, *pixd;
 /*!
  * \brief   pixConvolve()
  *
- * \param[in]    pixs       8, 16, 32 bpp; no colormap
- * \param[in]    kel        kernel
- * \param[in]    outdepth   of pixd: 8, 16 or 32
- * \param[in]    normflag   1 to normalize kernel to unit sum; 0 otherwise
+ * \param[in]    pixs      8, 16, 32 bpp; no colormap
+ * \param[in]    kel       kernel
+ * \param[in]    outdepth  of pixd: 8, 16 or 32
+ * \param[in]    normflag  1 to normalize kernel to unit sum; 0 otherwise
  * \return  pixd 8, 16 or 32 bpp
  *
  * <pre>
@@ -1854,15 +1880,17 @@ l_float32  sum;
 L_KERNEL  *keli, *keln;
 PIX       *pixt, *pixd;
 
+    PROCNAME("pixConvolve");
+
     if (!pixs)
-        return (PIX *)ERROR_PTR("pixs not defined", __func__, NULL);
+        return (PIX *)ERROR_PTR("pixs not defined", procName, NULL);
     if (pixGetColormap(pixs))
-        return (PIX *)ERROR_PTR("pixs has colormap", __func__, NULL);
+        return (PIX *)ERROR_PTR("pixs has colormap", procName, NULL);
     pixGetDimensions(pixs, &w, &h, &d);
     if (d != 8 && d != 16 && d != 32)
-        return (PIX *)ERROR_PTR("pixs not 8, 16, or 32 bpp", __func__, NULL);
+        return (PIX *)ERROR_PTR("pixs not 8, 16, or 32 bpp", procName, NULL);
     if (!kel)
-        return (PIX *)ERROR_PTR("kel not defined", __func__, NULL);
+        return (PIX *)ERROR_PTR("kel not defined", procName, NULL);
 
     pixd = NULL;
 
@@ -1874,7 +1902,7 @@ PIX       *pixt, *pixd;
         keln = kernelCopy(keli);
 
     if ((pixt = pixAddMirroredBorder(pixs, cx, sx - cx, cy, sy - cy)) == NULL) {
-        L_ERROR("pixt not made\n", __func__);
+        L_ERROR("pixt not made\n", procName);
         goto cleanup;
     }
 
@@ -1929,12 +1957,12 @@ cleanup:
 /*!
  * \brief   pixConvolveSep()
  *
- * \param[in]    pixs       8, 16, 32 bpp; no colormap
- * \param[in]    kelx       x-dependent kernel
- * \param[in]    kely       y-dependent kernel
- * \param[in]    outdepth   of pixd: 8, 16 or 32
- * \param[in]    normflag   1 to normalize kernel to unit sum; 0 otherwise
- * \return  pixd    8, 16 or 32 bpp
+ * \param[in]    pixs 8, 16, 32 bpp; no colormap
+ * \param[in]    kelx x-dependent kernel
+ * \param[in]    kely y-dependent kernel
+ * \param[in]    outdepth of pixd: 8, 16 or 32
+ * \param[in]    normflag 1 to normalize kernel to unit sum; 0 otherwise
+ * \return  pixd 8, 16 or 32 bpp
  *
  * <pre>
  * Notes:
@@ -1980,21 +2008,23 @@ l_int32    d, xfact, yfact;
 L_KERNEL  *kelxn, *kelyn;
 PIX       *pixt, *pixd;
 
+    PROCNAME("pixConvolveSep");
+
     if (!pixs)
-        return (PIX *)ERROR_PTR("pixs not defined", __func__, NULL);
+        return (PIX *)ERROR_PTR("pixs not defined", procName, NULL);
     d = pixGetDepth(pixs);
     if (d != 8 && d != 16 && d != 32)
-        return (PIX *)ERROR_PTR("pixs not 8, 16, or 32 bpp", __func__, NULL);
+        return (PIX *)ERROR_PTR("pixs not 8, 16, or 32 bpp", procName, NULL);
     if (!kelx)
-        return (PIX *)ERROR_PTR("kelx not defined", __func__, NULL);
+        return (PIX *)ERROR_PTR("kelx not defined", procName, NULL);
     if (!kely)
-        return (PIX *)ERROR_PTR("kely not defined", __func__, NULL);
+        return (PIX *)ERROR_PTR("kely not defined", procName, NULL);
 
     xfact = ConvolveSamplingFactX;
     yfact = ConvolveSamplingFactY;
     if (normflag) {
-        kelxn = kernelNormalize(kelx, 1000.0f);
-        kelyn = kernelNormalize(kely, 0.001f);
+        kelxn = kernelNormalize(kelx, 1000.0);
+        kelyn = kernelNormalize(kely, 0.001);
         l_setConvolveSampling(xfact, 1);
         pixt = pixConvolve(pixs, kelxn, 32, 0);
         l_setConvolveSampling(1, yfact);
@@ -2018,9 +2048,9 @@ PIX       *pixt, *pixd;
 /*!
  * \brief   pixConvolveRGB()
  *
- * \param[in]    pixs   32 bpp rgb
- * \param[in]    kel    kernel
- * \return  pixd   32 bpp rgb
+ * \param[in]    pixs 32 bpp rgb
+ * \param[in]    kel  kernel
+ * \return  pixd 32 bpp rgb
  *
  * <pre>
  * Notes:
@@ -2045,12 +2075,14 @@ pixConvolveRGB(PIX       *pixs,
 {
 PIX  *pixt, *pixr, *pixg, *pixb, *pixd;
 
+    PROCNAME("pixConvolveRGB");
+
     if (!pixs)
-        return (PIX *)ERROR_PTR("pixs not defined", __func__, NULL);
+        return (PIX *)ERROR_PTR("pixs not defined", procName, NULL);
     if (pixGetDepth(pixs) != 32)
-        return (PIX *)ERROR_PTR("pixs is not 32 bpp", __func__, NULL);
+        return (PIX *)ERROR_PTR("pixs is not 32 bpp", procName, NULL);
     if (!kel)
-        return (PIX *)ERROR_PTR("kel not defined", __func__, NULL);
+        return (PIX *)ERROR_PTR("kel not defined", procName, NULL);
 
     pixt = pixGetRGBComponent(pixs, COLOR_RED);
     pixr = pixConvolve(pixt, kel, 8, 1);
@@ -2073,9 +2105,9 @@ PIX  *pixt, *pixr, *pixg, *pixb, *pixd;
 /*!
  * \brief   pixConvolveRGBSep()
  *
- * \param[in]    pixs   32 bpp rgb
- * \param[in]    kelx   x-dependent kernel
- * \param[in]    kely   y-dependent kernel
+ * \param[in]    pixs 32 bpp rgb
+ * \param[in]    kelx x-dependent kernel
+ * \param[in]    kely y-dependent kernel
  * \return  pixd 32 bpp rgb
  *
  * <pre>
@@ -2103,12 +2135,14 @@ pixConvolveRGBSep(PIX       *pixs,
 {
 PIX  *pixt, *pixr, *pixg, *pixb, *pixd;
 
+    PROCNAME("pixConvolveRGBSep");
+
     if (!pixs)
-        return (PIX *)ERROR_PTR("pixs not defined", __func__, NULL);
+        return (PIX *)ERROR_PTR("pixs not defined", procName, NULL);
     if (pixGetDepth(pixs) != 32)
-        return (PIX *)ERROR_PTR("pixs is not 32 bpp", __func__, NULL);
+        return (PIX *)ERROR_PTR("pixs is not 32 bpp", procName, NULL);
     if (!kelx || !kely)
-        return (PIX *)ERROR_PTR("kelx, kely not both defined", __func__, NULL);
+        return (PIX *)ERROR_PTR("kelx, kely not both defined", procName, NULL);
 
     pixt = pixGetRGBComponent(pixs, COLOR_RED);
     pixr = pixConvolveSep(pixt, kelx, kely, 8, 1);
@@ -2134,9 +2168,9 @@ PIX  *pixt, *pixr, *pixg, *pixb, *pixd;
 /*!
  * \brief   fpixConvolve()
  *
- * \param[in]    fpixs      32 bit float array
- * \param[in]    kel        kernel
- * \param[in]    normflag   1 to normalize kernel to unit sum; 0 otherwise
+ * \param[in]    fpixs    32 bit float array
+ * \param[in]    kel      kernel
+ * \param[in]    normflag 1 to normalize kernel to unit sum; 0 otherwise
  * \return  fpixd 32 bit float array
  *
  * <pre>
@@ -2168,10 +2202,12 @@ l_float32   sum;
 L_KERNEL   *keli, *keln;
 FPIX       *fpixt, *fpixd;
 
+    PROCNAME("fpixConvolve");
+
     if (!fpixs)
-        return (FPIX *)ERROR_PTR("fpixs not defined", __func__, NULL);
+        return (FPIX *)ERROR_PTR("fpixs not defined", procName, NULL);
     if (!kel)
-        return (FPIX *)ERROR_PTR("kel not defined", __func__, NULL);
+        return (FPIX *)ERROR_PTR("kel not defined", procName, NULL);
 
     fpixd = NULL;
 
@@ -2185,7 +2221,7 @@ FPIX       *fpixt, *fpixd;
     fpixGetDimensions(fpixs, &w, &h);
     fpixt = fpixAddMirroredBorder(fpixs, cx, sx - cx, cy, sy - cy);
     if (!fpixt) {
-        L_ERROR("fpixt not made\n", __func__);
+        L_ERROR("fpixt not made\n", procName);
         goto cleanup;
     }
 
@@ -2222,11 +2258,11 @@ cleanup:
 /*!
  * \brief   fpixConvolveSep()
  *
- * \param[in]    fpixs      32 bit float array
- * \param[in]    kelx       x-dependent kernel
- * \param[in]    kely       y-dependent kernel
- * \param[in]    normflag   1 to normalize kernel to unit sum; 0 otherwise
- * \return  fpixd    32 bit float array
+ * \param[in]    fpixs 32 bit float array
+ * \param[in]    kelx x-dependent kernel
+ * \param[in]    kely y-dependent kernel
+ * \param[in]    normflag 1 to normalize kernel to unit sum; 0 otherwise
+ * \return  fpixd 32 bit float array
  *
  * <pre>
  * Notes:
@@ -2258,12 +2294,14 @@ l_int32    xfact, yfact;
 L_KERNEL  *kelxn, *kelyn;
 FPIX      *fpixt, *fpixd;
 
+    PROCNAME("fpixConvolveSep");
+
     if (!fpixs)
-        return (FPIX *)ERROR_PTR("pixs not defined", __func__, NULL);
+        return (FPIX *)ERROR_PTR("pixs not defined", procName, NULL);
     if (!kelx)
-        return (FPIX *)ERROR_PTR("kelx not defined", __func__, NULL);
+        return (FPIX *)ERROR_PTR("kelx not defined", procName, NULL);
     if (!kely)
-        return (FPIX *)ERROR_PTR("kely not defined", __func__, NULL);
+        return (FPIX *)ERROR_PTR("kely not defined", procName, NULL);
 
     xfact = ConvolveSamplingFactX;
     yfact = ConvolveSamplingFactY;
@@ -2296,12 +2334,12 @@ FPIX      *fpixt, *fpixd;
 /*!
  * \brief   pixConvolveWithBias()
  *
- * \param[in]    pixs     8 bpp; no colormap
+ * \param[in]    pixs 8 bpp; no colormap
  * \param[in]    kel1
- * \param[in]    kel2     can be null; use if separable
- * \param[in]    force8   if 1, force output to 8 bpp; otherwise, determine
- *                        output depth by the dynamic range of pixel values
- * \param[out]   pbias    applied bias
+ * \param[in]    kel2  can be null; use if separable
+ * \param[in]    force8 if 1, force output to 8 bpp; otherwise, determine
+ *                      output depth by the dynamic range of pixel values
+ * \param[out]   pbias applied bias
  * \return  pixd 8 or 16 bpp
  *
  * <pre>
@@ -2336,15 +2374,17 @@ l_float32  min1, min2, min, minval, maxval, range;
 FPIX      *fpix1, *fpix2;
 PIX       *pixd;
 
+    PROCNAME("pixConvolveWithBias");
+
     if (!pbias)
-        return (PIX *)ERROR_PTR("&bias not defined", __func__, NULL);
+        return (PIX *)ERROR_PTR("&bias not defined", procName, NULL);
     *pbias = 0;
     if (!pixs || pixGetDepth(pixs) != 8)
-        return (PIX *)ERROR_PTR("pixs undefined or not 8 bpp", __func__, NULL);
+        return (PIX *)ERROR_PTR("pixs undefined or not 8 bpp", procName, NULL);
     if (pixGetColormap(pixs))
-        return (PIX *)ERROR_PTR("pixs has colormap", __func__, NULL);
+        return (PIX *)ERROR_PTR("pixs has colormap", procName, NULL);
     if (!kel1)
-        return (PIX *)ERROR_PTR("kel1 not defined", __func__, NULL);
+        return (PIX *)ERROR_PTR("kel1 not defined", procName, NULL);
 
         /* Determine if negative values can be produced in the convolution */
     kernelGetMinMax(kel1, &min1, NULL);
@@ -2403,7 +2443,7 @@ PIX       *pixd;
  * \brief   l_setConvolveSampling()
 
  *
- * \param[in]    xfact, yfact     integer >= 1
+ * \param[in]    xfact, yfact integer >= 1
  * \return  void
  *
  * <pre>
@@ -2429,9 +2469,9 @@ l_setConvolveSampling(l_int32  xfact,
 /*!
  * \brief   pixAddGaussianNoise()
  *
- * \param[in]    pixs     8 bpp gray or 32 bpp rgb; no colormap
- * \param[in]    stdev    of noise
- * \return  pixd    8 or 32 bpp, or NULL on error
+ * \param[in]    pixs 8 bpp gray or 32 bpp rgb; no colormap
+ * \param[in]    stdev of noise
+ * \return  pixd 8 or 32 bpp, or NULL on error
  *
  * <pre>
  * Notes:
@@ -2448,15 +2488,17 @@ l_uint32   pixel;
 l_uint32  *datas, *datad, *lines, *lined;
 PIX       *pixd;
 
+    PROCNAME("pixAddGaussianNoise");
+
     if (!pixs)
-        return (PIX *)ERROR_PTR("pixs not defined", __func__, NULL);
+        return (PIX *)ERROR_PTR("pixs not defined", procName, NULL);
     if (pixGetColormap(pixs))
-        return (PIX *)ERROR_PTR("pixs has colormap", __func__, NULL);
+        return (PIX *)ERROR_PTR("pixs has colormap", procName, NULL);
     pixGetDimensions(pixs, &w, &h, &d);
     if (d != 8 && d != 32)
-        return (PIX *)ERROR_PTR("pixs not 8 or 32 bpp", __func__, NULL);
+        return (PIX *)ERROR_PTR("pixs not 8 or 32 bpp", procName, NULL);
 
-    pixd = pixCreateTemplate(pixs);
+    pixd = pixCreateTemplateNoInit(pixs);
     datas = pixGetData(pixs);
     datad = pixGetData(pixd);
     wpls = pixGetWpl(pixs);
@@ -2490,20 +2532,18 @@ PIX       *pixd;
 /*!
  * \brief   gaussDistribSampling()
  *
- * \return   gaussian distributed variable with zero mean and unit stdev
+ *      Return: gaussian distributed variable with zero mean and unit stdev
  *
- * <pre>
- * Notes:
+ *  Notes:
  *      (1) For an explanation of the Box-Muller method for generating
  *          a normally distributed random variable with zero mean and
  *          unit standard deviation, see Numerical Recipes in C,
  *          2nd edition, p. 288ff.
  *      (2) This can be called sequentially to get samples that can be
  *          used for adding noise to each pixel of an image, for example.
- * </pre>
  */
 l_float32
-gaussDistribSampling(void)
+gaussDistribSampling()
 {
 static l_int32    select = 0;  /* flips between 0 and 1 on successive calls */
 static l_float32  saveval;

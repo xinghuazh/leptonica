@@ -55,20 +55,13 @@
  *          SELA    *sela4ccThin()
  *          SELA    *sela8ccThin()
  *          SELA    *sela4and8ccThin()
- *
- *      Other structuring elements
- *          SEL    *selMakePlusSign()
  * </pre>
  */
-
-#ifdef HAVE_CONFIG_H
-#include <config_auto.h>
-#endif  /* HAVE_CONFIG_H */
 
 #include <math.h>
 #include "allheaders.h"
 
-#define L_BUF_SIZE 512
+static const l_int32  L_BUF_SIZE = 512;
 
     /* Linear brick sel sizes, including all those that are required
      * for decomposable sels up to size 63. */
@@ -102,9 +95,11 @@ char     name[L_BUF_SIZE];
 l_int32  i, size;
 SEL     *sel;
 
+    PROCNAME("selaAddBasic");
+
     if (!sela) {
         if ((sela = selaCreate(0)) == NULL)
-            return (SELA *)ERROR_PTR("sela not made", __func__, NULL);
+            return (SELA *)ERROR_PTR("sela not made", procName, NULL);
     }
 
     /*--------------------------------------------------------------*
@@ -187,9 +182,11 @@ selaAddHitMiss(SELA  *sela)
 {
 SEL  *sel;
 
+    PROCNAME("selaAddHitMiss");
+
     if (!sela) {
         if ((sela = selaCreate(0)) == NULL)
-            return (SELA *)ERROR_PTR("sela not made", __func__, NULL);
+            return (SELA *)ERROR_PTR("sela not made", procName, NULL);
     }
 
 #if 0   /*  use just for testing */
@@ -325,9 +322,11 @@ char     name[L_BUF_SIZE];
 l_int32  i;
 SEL     *sel;
 
+    PROCNAME("selaAddDwaLinear");
+
     if (!sela) {
         if ((sela = selaCreate(0)) == NULL)
-            return (SELA *)ERROR_PTR("sela not made", __func__, NULL);
+            return (SELA *)ERROR_PTR("sela not made", procName, NULL);
     }
 
     for (i = 2; i < 64; i++) {
@@ -365,9 +364,11 @@ char     name[L_BUF_SIZE];
 l_int32  i, f1, f2, prevsize, size;
 SEL     *selh, *selv;
 
+    PROCNAME("selaAddDwaCombs");
+
     if (!sela) {
         if ((sela = selaCreate(0)) == NULL)
-            return (SELA *)ERROR_PTR("sela not made", __func__, NULL);
+            return (SELA *)ERROR_PTR("sela not made", procName, NULL);
     }
 
     prevsize = 0;
@@ -377,19 +378,11 @@ SEL     *selh, *selv;
         if (size == prevsize)
             continue;
         selectComposableSels(i, L_HORIZ, NULL, &selh);
-        if (selh) {
-            snprintf(name, L_BUF_SIZE, "sel_comb_%dh", size);
-            selaAddSel(sela, selh, name, 0);
-        } else {
-            L_ERROR("selh not made for i = %d\n", __func__, i);
-        }
         selectComposableSels(i, L_VERT, NULL, &selv);
-        if (selv) {
-            snprintf(name, L_BUF_SIZE, "sel_comb_%dv", size);
-            selaAddSel(sela, selv, name, 0);
-        } else {
-            L_ERROR("selv not made for i = %d\n", __func__, i);
-        }
+        snprintf(name, L_BUF_SIZE, "sel_comb_%dh", size);
+        selaAddSel(sela, selh, name, 0);
+        snprintf(name, L_BUF_SIZE, "sel_comb_%dv", size);
+        selaAddSel(sela, selv, name, 0);
         prevsize = size;
     }
 
@@ -442,14 +435,16 @@ PIXA      *pixa;
 PTA       *pta1, *pta2, *pta3, *pta4;
 SEL       *sel;
 
+    PROCNAME("selaAddCrossJunctions");
+
     if (hlsize <= 0)
-        return (SELA *)ERROR_PTR("hlsize not > 0", __func__, NULL);
+        return (SELA *)ERROR_PTR("hlsize not > 0", procName, NULL);
     if (norient < 1 || norient > 8)
-        return (SELA *)ERROR_PTR("norient not in [1, ... 8]", __func__, NULL);
+        return (SELA *)ERROR_PTR("norient not in [1, ... 8]", procName, NULL);
 
     if (!sela) {
         if ((sela = selaCreate(0)) == NULL)
-            return (SELA *)ERROR_PTR("sela not made", __func__, NULL);
+            return (SELA *)ERROR_PTR("sela not made", procName, NULL);
     }
 
     pi = 3.1415926535;
@@ -513,11 +508,11 @@ SEL       *sel;
         lept_mkdir("lept/sel");
         pixaGetPixDimensions(pixa, 0, &w, NULL, NULL);
         pixt = pixaDisplayTiledAndScaled(pixa, 32, w, 1, 0, 10, 2);
-        pixWriteDebug("/tmp/lept/sel/xsel1.png", pixt, IFF_PNG);
+        pixWrite("/tmp/lept/sel/xsel1.png", pixt, IFF_PNG);
         pixDisplay(pixt, 0, 100);
         pixDestroy(&pixt);
         pixt = selaDisplayInPix(sela, 15, 2, 20, 1);
-        pixWriteDebug("/tmp/lept/sel/xsel2.png", pixt, IFF_PNG);
+        pixWrite("/tmp/lept/sel/xsel2.png", pixt, IFF_PNG);
         pixDisplay(pixt, 500, 100);
         pixDestroy(&pixt);
         selaWriteStream(stderr, sela);
@@ -565,14 +560,16 @@ PIXA      *pixa;
 PTA       *pta1, *pta2, *pta3;
 SEL       *sel;
 
+    PROCNAME("selaAddTJunctions");
+
     if (hlsize <= 2)
-        return (SELA *)ERROR_PTR("hlsizel not > 1", __func__, NULL);
+        return (SELA *)ERROR_PTR("hlsizel not > 1", procName, NULL);
     if (norient < 1 || norient > 8)
-        return (SELA *)ERROR_PTR("norient not in [1, ... 8]", __func__, NULL);
+        return (SELA *)ERROR_PTR("norient not in [1, ... 8]", procName, NULL);
 
     if (!sela) {
         if ((sela = selaCreate(0)) == NULL)
-            return (SELA *)ERROR_PTR("sela not made", __func__, NULL);
+            return (SELA *)ERROR_PTR("sela not made", procName, NULL);
     }
 
     pi = 3.1415926535;
@@ -643,11 +640,11 @@ SEL       *sel;
         lept_mkdir("lept/sel");
         pixaGetPixDimensions(pixa, 0, &w, NULL, NULL);
         pixt = pixaDisplayTiledAndScaled(pixa, 32, w, 4, 0, 10, 2);
-        pixWriteDebug("/tmp/lept/sel/tsel1.png", pixt, IFF_PNG);
+        pixWrite("/tmp/lept/sel/tsel1.png", pixt, IFF_PNG);
         pixDisplay(pixt, 0, 100);
         pixDestroy(&pixt);
         pixt = selaDisplayInPix(sela, 15, 2, 20, 4);
-        pixWriteDebug("/tmp/lept/sel/tsel2.png", pixt, IFF_PNG);
+        pixWrite("/tmp/lept/sel/tsel2.png", pixt, IFF_PNG);
         pixDisplay(pixt, 500, 100);
         pixDestroy(&pixt);
         selaWriteStream(stderr, sela);
@@ -845,39 +842,3 @@ SEL  *sel;
     return sela;
 }
 
-
-/* -------------------------------------------------------------------------- *
- *                        Other structuring elements                          *
- * -------------------------------------------------------------------------- */
-/*!
- * \brief   selMakePlusSign()
- *
- * \param[in]    size        side of containing square
- * \param[in]    linewidth   of lines
- * \return  sel, or NULL on error
- *
- * <pre>
- * Notes:
- *      (1) Useful for debugging to show location of selected pixels.
- *      (2) See displaySelectedPixels() for an example of use.
- * </pre>
- */
-SEL *
-selMakePlusSign(l_int32  size,
-                l_int32  linewidth)
-{
-PIX  *pix;
-SEL  *sel;
-
-    if (size < 3 || linewidth > size)
-        return (SEL *)ERROR_PTR("invalid input", __func__, NULL);
-
-    pix = pixCreate(size, size, 1);
-    pixRenderLine(pix, size / 2, 0, size / 2, size - 1,
-                  linewidth, L_SET_PIXELS);
-    pixRenderLine(pix, 0, size / 2, size, size / 2,
-                  linewidth, L_SET_PIXELS);
-    sel = selCreateFromPix(pix, size / 2, size / 2, "plus_sign");
-    pixDestroy(&pix);
-    return sel;
-}

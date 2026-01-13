@@ -57,32 +57,29 @@
  *      %fontsize = 10
  */
 
-#ifdef HAVE_CONFIG_H
-#include <config_auto.h>
-#endif  /* HAVE_CONFIG_H */
-
 #include "allheaders.h"
+
 
 int main(int    argc,
          char **argv)
 {
-char    *fileout;
-l_int32  nx, ny, tw, spacing, border, fontsize;
-PIXA    *pixa1, *pixa2;
+char        *fileout;
+l_int32      nx, ny, tw, spacing, border, fontsize;
+PIXA        *pixa1, *pixa2;
+static char  mainName[] = "comparepixa";
 
     if (argc != 10) {
-        lept_stderr("Syntax error in comparepixa:\n"
+        fprintf(stderr, "Syntax error in comparepixa:\n"
            "   comparepixa file1 file2 nx ny tw spacing border"
            " fontsize fileout\n");
         return 1;
     }
-    setLeptDebugOK(1);
 
         /* Input files can be either pixa or pixacomp */
     if ((pixa1 = pixaReadBoth(argv[1])) == NULL)
-        return ERROR_INT("pixa1 not read", __func__, 1);
+        return ERROR_INT("pixa1 not read", mainName, 1);
     if ((pixa2 = pixaReadBoth(argv[2])) == NULL)
-        return ERROR_INT("pixa2 not read", __func__, 1);
+        return ERROR_INT("pixa2 not read", mainName, 1);
     nx = atoi(argv[3]);
     ny = atoi(argv[4]);
     tw = atoi(argv[5]);

@@ -53,10 +53,6 @@
  * </pre>
  */
 
-#ifdef HAVE_CONFIG_H
-#include <config_auto.h>
-#endif  /* HAVE_CONFIG_H */
-
 #include "allheaders.h"
 
 /*-----------------------------------------------------------------*
@@ -65,9 +61,9 @@
 /*!
  * \brief   pixFindStrokeLength()
  *
- * \param[in]    pixs      1 bpp
- * \param[in]    tab8      [optional] table for counting fg pixels; can be NULL
- * \param[out]   plength   estimated length of the strokes
+ * \param[in]    pixs 1 bpp
+ * \param[in]    tab8  [optional] table for counting fg pixels; can be NULL
+ * \param[out]  *plength  estimated length of the strokes
  * \return  0 if OK, 1 on error
  *
  * <pre>
@@ -75,7 +71,7 @@
  *      (1) Returns half the number of fg boundary pixels.
  * </pre>
  */
-l_ok
+l_int32
 pixFindStrokeLength(PIX      *pixs,
                     l_int32  *tab8,
                     l_int32  *plength)
@@ -84,11 +80,13 @@ l_int32   n;
 l_int32  *tab;
 PIX      *pix1;
 
+    PROCNAME("pixFindStrokeLength");
+
     if (!plength)
-        return ERROR_INT("&length not defined", __func__, 1);
+        return ERROR_INT("&length not defined", procName, 1);
     *plength = 0;
     if (!pixs)
-        return ERROR_INT("pixs not defined", __func__, 1);
+        return ERROR_INT("pixs not defined", procName, 1);
 
     pix1 = pixExtractBoundary(pixs, 1);
     tab = (tab8) ? tab8 : makePixelSumTab8();
@@ -103,11 +101,11 @@ PIX      *pix1;
 /*!
  * \brief   pixFindStrokeWidth()
  *
- * \param[in]    pixs       1 bpp
- * \param[in]    thresh     fractional count threshold relative to distance 1
- * \param[in]    tab8       [optional] table for counting fg pixels; can be NULL
- * \param[out]   pwidth     estimated width of the strokes
- * \param[out]   pnahisto   [optional] histo of pixel distances from bg
+ * \param[in]    pixs 1 bpp
+ * \param[in]    thresh  fractional count threshold relative to distance 1
+ * \param[in]    tab8  [optional] table for counting fg pixels; can be NULL
+ * \param[out]  *pwidth  estimated width of the strokes
+ * \param[out]  *pnahisto  [optional] histo of pixel distances from bg
  * \return  0 if OK, 1 on error
  *
  * <pre>
@@ -121,7 +119,7 @@ PIX      *pix1;
  *          the noise. It is typically about 0.15.
  * </pre>
  */
-l_ok
+l_int32
 pixFindStrokeWidth(PIX        *pixs,
                    l_float32   thresh,
                    l_int32    *tab8,
@@ -135,11 +133,13 @@ l_float32  *fa;
 NUMA       *na1, *na2;
 PIX        *pix1;
 
+    PROCNAME("pixFindStrokeWidth");
+
     if (!pwidth)
-        return ERROR_INT("&width not defined", __func__, 1);
+        return ERROR_INT("&width not defined", procName, 1);
     *pwidth = 0;
     if (!pixs)
-        return ERROR_INT("pixs not defined", __func__, 1);
+        return ERROR_INT("pixs not defined", procName, 1);
 
     tab = (tab8) ? tab8 : makePixelSumTab8();
 
@@ -157,9 +157,9 @@ PIX        *pix1;
     pix1 = pixDistanceFunction(pixs, 8, 8, L_BOUNDARY_BG);
     na1 = pixGetGrayHistogram(pix1, 1);
     pixDestroy(&pix1);
-    numaGetNonzeroRange(na1, 0.1f, &first, &last);
+    numaGetNonzeroRange(na1, 0.1, &first, &last);
     na2 = numaClipToInterval(na1, 0, last);
-    numaWriteStderr(na2);
+    numaWriteStream(stderr, na2);
 
         /* Find the bucket with the largest distance whose contents
          * exceed the threshold. */
@@ -174,11 +174,11 @@ PIX        *pix1;
          * over-correction, so the computed width may be a bit larger
          * than the average width. */
     extra = (i < n - 1) ? fa[i + 1] / fa[1] : 0;
-    width2 = 2.0f * (i - 1.0f + ratio + extra);
-    lept_stderr("width1 = %5.2f, width2 = %5.2f\n", width1, width2);
+    width2 = 2.0 * (i - 1.0 + ratio + extra);
+    fprintf(stderr, "width1 = %5.2f, width2 = %5.2f\n", width1, width2);
 
         /* Average the two results */
-    *pwidth = (width1 + width2) / 2.0f;
+    *pwidth = (width1 + width2) / 2.0;
 
     if (!tab8) LEPT_FREE(tab);
     numaDestroy(&na1);
@@ -193,10 +193,10 @@ PIX        *pix1;
 /*!
  * \brief   pixaFindStrokeWidth()
  *
- * \param[in]    pixa     of 1 bpp images
- * \param[in]    thresh   fractional count threshold relative to distance 1
- * \param[in]    tab8     [optional] table for counting fg pixels; can be NULL
- * \param[in]    debug    1 for debug output; 0 to skip
+ * \param[in]    pixa  of 1 bpp images
+ * \param[in]    thresh  fractional count threshold relative to distance 1
+ * \param[in]    tab8  [optional] table for counting fg pixels; can be NULL
+ * \param[in]    debug  1 for debug output; 0 to skip
  * \return  na  array of stroke widths for each pix in %pixa; NULL on error
  *
  * <pre>
@@ -210,17 +210,19 @@ pixaFindStrokeWidth(PIXA     *pixa,
                    l_int32   *tab8,
                    l_int32    debug)
 {
-l_int32    i, n, same, maxd;
+l_int32    i, n, maxdepth;
 l_int32   *tab;
 l_float32  width;
 NUMA      *na;
 PIX       *pix;
 
+    PROCNAME("pixaFindStrokeWidth");
+
     if (!pixa)
-        return (NUMA *)ERROR_PTR("pixa not defined", __func__, NULL);
-    pixaVerifyDepth(pixa, &same, &maxd);
-    if (maxd > 1)
-        return (NUMA *)ERROR_PTR("pix not all 1 bpp", __func__, NULL);
+        return (NUMA *)ERROR_PTR("pixa not defined", procName, NULL);
+    pixaVerifyDepth(pixa, &maxdepth);
+    if (maxdepth > 1)
+        return (NUMA *)ERROR_PTR("pixa not all 1 bpp", procName, NULL);
 
     tab = (tab8) ? tab8 : makePixelSumTab8();
 
@@ -244,29 +246,31 @@ PIX       *pix;
 /*!
  * \brief   pixaModifyStrokeWidth()
  *
- * \param[in]     pixas      of 1 bpp pix
- * \param[out]    targetw    desired width for strokes in each pix
+ * \param[in]    pixa  of 1 bpp pix
+ * \param[out]   targetw  desired width for strokes in each pix
  * \return  pixa  with modified stroke widths, or NULL on error
  */
 PIXA *
 pixaModifyStrokeWidth(PIXA      *pixas,
                       l_float32  targetw)
 {
-l_int32    i, n, same, maxd;
+l_int32    i, n, maxdepth;
 l_float32  width;
 NUMA      *na;
 PIX       *pix1, *pix2;
 PIXA      *pixad;
 
-    if (!pixas)
-        return (PIXA *)ERROR_PTR("pixas not defined", __func__, NULL);
-    if (targetw < 1)
-        return (PIXA *)ERROR_PTR("target width < 1", __func__, NULL);
-    pixaVerifyDepth(pixas, &same, &maxd);
-    if (maxd > 1)
-        return (PIXA *)ERROR_PTR("pix not all 1 bpp", __func__, NULL);
+    PROCNAME("pixaModifyStrokeWidth");
 
-    na = pixaFindStrokeWidth(pixas, 0.1f, NULL, 0);
+    if (!pixas)
+        return (PIXA *)ERROR_PTR("pixas not defined", procName, NULL);
+    if (targetw < 1)
+        return (PIXA *)ERROR_PTR("target width < 1", procName, NULL);
+    pixaVerifyDepth(pixas, &maxdepth);
+    if (maxdepth > 1)
+        return (PIXA *)ERROR_PTR("pixas not all 1 bpp", procName, NULL);
+
+    na = pixaFindStrokeWidth(pixas, 0.1, NULL, 0);
     n = pixaGetCount(pixas);
     pixad = pixaCreate(n);
     for (i = 0; i < n; i++) {
@@ -285,9 +289,9 @@ PIXA      *pixad;
 /*!
  * \brief   pixModifyStrokeWidth()
  *
- * \param[in]   pixs      of 1 bpp pix
- * \param[in]   width     measured average stroke width
- * \param[in]   targetw   desired stroke width
+ * \param[in]   pixa  of 1 bpp pix
+ * \param[in]   width  measured average stroke width
+ * \param[in]   targetw  desired stroke width
  * \return  pix  with modified stroke width, or NULL on error
  */
 PIX *
@@ -295,13 +299,15 @@ pixModifyStrokeWidth(PIX       *pixs,
                      l_float32  width,
                      l_float32  targetw)
 {
-char     buf[32];
+char     buf[16];
 l_int32  diff, size;
 
+    PROCNAME("pixModifyStrokeWidth");
+
     if (!pixs || (pixGetDepth(pixs) != 1))
-        return (PIX *)ERROR_PTR("pixs undefined or not 1 bpp", __func__, NULL);
+        return (PIX *)ERROR_PTR("pixs undefined or not 1 bpp", procName, NULL);
     if (targetw < 1)
-        return (PIX *)ERROR_PTR("target width < 1", __func__, NULL);
+        return (PIX *)ERROR_PTR("target width < 1", procName, NULL);
 
     diff = lept_roundftoi(targetw - width);
     if (diff == 0) return pixCopy(NULL, pixs);
@@ -318,10 +324,10 @@ l_int32  diff, size;
 /*!
  * \brief   pixaSetStrokeWidth()
  *
- * \param[in]   pixas          of 1 bpp pix
- * \param[in]   width          set stroke width to this value, in [1 ... 100].
- * \param[in]   thinfirst      1 to thin all pix to a skeleton first; 0 to skip
- * \param[in]   connectivity   4 or 8, to be used if %thinfirst == 1
+ * \param[in]   pixas  of 1 bpp pix
+ * \param[in]   width  set stroke width to this value, in [1 ... 100].
+ * \param[in]   thinfirst  1 to thin all pix to a skeleton first; 0 to skip
+ * \param[in]   connectivity  4 or 8, to be used if %thinfirst == 1
  * \return  pixa  with all stroke widths being %width, or NULL on error
  *
  * <pre>
@@ -341,19 +347,21 @@ pixaSetStrokeWidth(PIXA    *pixas,
                    l_int32  thinfirst,
                    l_int32  connectivity)
 {
-l_int32  i, n, maxd, same;
+l_int32  i, n, d;
 PIX     *pix1, *pix2;
 PIXA    *pixad;
 
+    PROCNAME("pixaSetStrokeWidth");
+
     if (!pixas)
-        return (PIXA *)ERROR_PTR("pixas not defined", __func__, NULL);
+        return (PIXA *)ERROR_PTR("pixas not defined", procName, NULL);
     if (width < 1 || width > 100)
-        return (PIXA *)ERROR_PTR("width not in [1 ... 100]", __func__, NULL);
+        return (PIXA *)ERROR_PTR("width not in [1 ... 100]", procName, NULL);
     if (connectivity != 4 && connectivity != 8)
-        return (PIXA *)ERROR_PTR("connectivity not 4 or 8", __func__, NULL);
-    pixaVerifyDepth(pixas, &same, &maxd);
-    if (maxd > 1)
-        return (PIXA *)ERROR_PTR("pix are not all 1 bpp", __func__, NULL);
+        return (PIXA *)ERROR_PTR("connectivity not 4 or 8", procName, NULL);
+    pixaVerifyDepth(pixas, &d);
+    if (d != 1)
+        return (PIXA *)ERROR_PTR("pix are not all 1 bpp", procName, NULL);
 
     n = pixaGetCount(pixas);
     pixad = pixaCreate(n);
@@ -371,10 +379,10 @@ PIXA    *pixad;
 /*!
  * \brief   pixSetStrokeWidth()
  *
- * \param[in]   pixs           1 bpp
- * \param[in]   width          set stroke width to this value, in [1 ... 100].
- * \param[in]   thinfirst      1 to thin all pix to a skeleton first; 0 to skip
- * \param[in]   connectivity   4 or 8, to be used if %thinfirst == 1
+ * \param[in]   pixs  1 bpp pix
+ * \param[in]   width  set stroke width to this value, in [1 ... 100].
+ * \param[in]   thinfirst  1 to thin all pix to a skeleton first; 0 to skip
+ * \param[in]   connectivity  4 or 8, to be used if %thinfirst == 1
  * \return  pixd  with stroke width set to %width, or NULL on error
  *
  * <pre>
@@ -392,15 +400,17 @@ pixSetStrokeWidth(PIX     *pixs,
                   l_int32  connectivity)
 {
 char     buf[16];
-l_int32  border;
+l_int32  d, i, n, border;
 PIX     *pix1, *pix2, *pixd;
 
+    PROCNAME("pixSetStrokeWidth");
+
     if (!pixs || (pixGetDepth(pixs) != 1))
-        return (PIX *)ERROR_PTR("pixs undefined or not 1 bpp", __func__, NULL);
+        return (PIX *)ERROR_PTR("pixs undefined or not 1 bpp", procName, NULL);
     if (width < 1 || width > 100)
-        return (PIX *)ERROR_PTR("width not in [1 ... 100]", __func__, NULL);
+        return (PIX *)ERROR_PTR("width not in [1 ... 100]", procName, NULL);
     if (connectivity != 4 && connectivity != 8)
-        return (PIX *)ERROR_PTR("connectivity not 4 or 8", __func__, NULL);
+        return (PIX *)ERROR_PTR("connectivity not 4 or 8", procName, NULL);
 
     if (!thinfirst && width == 1)  /* nothing to do */
         return pixCopy(NULL, pixs);
@@ -423,3 +433,4 @@ PIX     *pix1, *pix2, *pixd;
     pixDestroy(&pix2);
     return pixd;
 }
+

@@ -35,10 +35,6 @@
  *     know their classes, but pretend we don't, by erasing the labels.
  */
 
-#ifdef HAVE_CONFIG_H
-#include <config_auto.h>
-#endif  /* HAVE_CONFIG_H */
-
 #include "string.h"
 #include "allheaders.h"
 
@@ -67,11 +63,10 @@ L_RECOG  *recogboot, *recog1;
 SARRAY   *sa;
 
     if (argc != 1) {
-        lept_stderr(" Syntax: recogtest2\n");
+        fprintf(stderr, " Syntax: recogtest2\n");
         return 1;
     }
 
-    setLeptDebugOK(1);
     lept_mkdir("lept/recog");
 
         /* Files with 'unlabeled' templates from book */
@@ -98,7 +93,7 @@ SARRAY   *sa;
     for (i = 0; i < 2; i++) {
         fname = sarrayGetString(sa, i, L_NOCOPY);
         pixa2 = pixaRead(fname);
-        pixaSetText(pixa2, NULL, NULL);
+        pixaSetText(pixa2, NULL);
 
             /* Train a new recognizer from the boot and unlabeled samples */
         pixa3 = recogTrainFromBoot(recogboot, pixa2, 0.65, 128, 1);
@@ -106,7 +101,7 @@ SARRAY   *sa;
         recogShowContent(stderr, recog1, 2, 1);
         if (i == 0)
             recogWrite("/tmp/lept/recog/recog1.rec", recog1);
-        else  /* i == 1 */
+        else if (i == 1)
             recogWrite("/tmp/lept/recog/recog2.rec", recog1);
         pixaDestroy(&pixa2);
         pixaDestroy(&pixa3);
@@ -120,7 +115,7 @@ SARRAY   *sa;
 
         /* Generate the boot recog, and show the unscaled and scaled
          * versions of the templates */
-    recogboot = recogMakeBootDigitRecog(0, 40, linew, 1, 1);
+    recogboot = recogMakeBootDigitRecog(40, linew, 1, 1);
     recogWrite("/tmp/lept/recog/boot2.rec", recogboot);
     recogShowContent(stderr, recogboot, 3, 1);
 
@@ -129,7 +124,7 @@ SARRAY   *sa;
     for (i = 0; i < 2; i++) {
         fname = sarrayGetString(sa, i, L_NOCOPY);
         pixa2 = pixaRead(fname);
-        pixaSetText(pixa2, NULL, NULL);
+        pixaSetText(pixa2, NULL);
 
             /* Train a new recognizer from the boot and unlabeled samples */
         pixa3 = recogTrainFromBoot(recogboot, pixa2, 0.65, 128, 1);
@@ -152,15 +147,15 @@ SARRAY   *sa;
 
         /* Now use minscore = 0.75 to remove the outliers in the BAR,
          * and show what is left. */
-    lept_stderr("initial size: %d\n", recog->num_samples);
+    fprintf(stderr, "initial size: %d\n", recog->num_samples);
     pix1 = pix2 = NULL;
     recogRemoveOutliers1(&recog, 0.75, 5, 3, &pix1, &pix2);
     pixDisplay(pix1, 500, 0);
     pixDisplay(pix2, 500, 500);
     pixDestroy(&pix1);
     pixDestroy(&pix2);
-    lept_stderr("final size: %d\n", recog->num_samples);
-    recogDebugAverages(recog, 1);
+    fprintf(stderr, "final size: %d\n", recog->num_samples);
+    recogDebugAverages(&recog, 1);
     recogShowContent(stderr, recog, 1);
     recogShowMatchesInRange(recog, recog->pixa_tr, 0.75, 1.0, 1);
     pixWrite("/tmp/lept/recog/range.png", recog->pixdb_range, IFF_PNG);
@@ -170,7 +165,7 @@ SARRAY   *sa;
     /*      Show operation of the default bootstrap recognizer     */
     /* ----------------------------------------------------------- */
 
-    recog1 = recogMakeBootDigitRecog(0, 40, 0, 1, 0);
+    recog1 = recogMakeBootDigitRecog(40, 0, 1, 0);
     pix1 = pixRead("test-87220.59.png");
     recogIdentifyMultiple(recog1, pix1, 0, 1, &boxa1, NULL, NULL, 0);
     sa = recogExtractNumbers(recog1, boxa1, 0.75, -1, &baa, &naa);

@@ -24,6 +24,7 @@
  -  SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
  *====================================================================*/
 
+
 /*!
  * \file bilinear.c
  * <pre>
@@ -109,15 +110,12 @@
  * </pre>
  */
 
-#ifdef HAVE_CONFIG_H
-#include <config_auto.h>
-#endif  /* HAVE_CONFIG_H */
-
 #include <string.h>
 #include <math.h>
 #include "allheaders.h"
 
 extern l_float32  AlphaMaskBorderVals[2];
+
 
 /*-------------------------------------------------------------*
  *             Sampled bilinear image transformation           *
@@ -125,10 +123,10 @@ extern l_float32  AlphaMaskBorderVals[2];
 /*!
  * \brief   pixBilinearSampledPta()
  *
- * \param[in]    pixs      all depths
- * \param[in]    ptad      4 pts of final coordinate space
- * \param[in]    ptas      4 pts of initial coordinate space
- * \param[in]    incolor   L_BRING_IN_WHITE, L_BRING_IN_BLACK
+ * \param[in]    pixs all depths
+ * \param[in]    ptad  4 pts of final coordinate space
+ * \param[in]    ptas  4 pts of initial coordinate space
+ * \param[in]    incolor L_BRING_IN_WHITE, L_BRING_IN_BLACK
  * \return  pixd, or NULL on error
  *
  * <pre>
@@ -150,18 +148,20 @@ pixBilinearSampledPta(PIX     *pixs,
 l_float32  *vc;
 PIX        *pixd;
 
+    PROCNAME("pixBilinearSampledPta");
+
     if (!pixs)
-        return (PIX *)ERROR_PTR("pixs not defined", __func__, NULL);
+        return (PIX *)ERROR_PTR("pixs not defined", procName, NULL);
     if (!ptas)
-        return (PIX *)ERROR_PTR("ptas not defined", __func__, NULL);
+        return (PIX *)ERROR_PTR("ptas not defined", procName, NULL);
     if (!ptad)
-        return (PIX *)ERROR_PTR("ptad not defined", __func__, NULL);
+        return (PIX *)ERROR_PTR("ptad not defined", procName, NULL);
     if (incolor != L_BRING_IN_WHITE && incolor != L_BRING_IN_BLACK)
-        return (PIX *)ERROR_PTR("invalid incolor", __func__, NULL);
+        return (PIX *)ERROR_PTR("invalid incolor", procName, NULL);
     if (ptaGetCount(ptas) != 4)
-        return (PIX *)ERROR_PTR("ptas count not 4", __func__, NULL);
+        return (PIX *)ERROR_PTR("ptas count not 4", procName, NULL);
     if (ptaGetCount(ptad) != 4)
-        return (PIX *)ERROR_PTR("ptad count not 4", __func__, NULL);
+        return (PIX *)ERROR_PTR("ptad count not 4", procName, NULL);
 
         /* Get backwards transform from dest to src, and apply it */
     getBilinearXformCoeffs(ptad, ptas, &vc);
@@ -175,9 +175,9 @@ PIX        *pixd;
 /*!
  * \brief   pixBilinearSampled()
  *
- * \param[in]    pixs      all depths
- * \param[in]    vc        vector of 8 coefficients for bilinear transformation
- * \param[in]    incolor   L_BRING_IN_WHITE, L_BRING_IN_BLACK
+ * \param[in]    pixs all depths
+ * \param[in]    vc  vector of 8 coefficients for bilinear transformation
+ * \param[in]    incolor L_BRING_IN_WHITE, L_BRING_IN_BLACK
  * \return  pixd, or NULL on error
  *
  * <pre>
@@ -200,15 +200,17 @@ l_uint32   *datas, *datad, *lines, *lined;
 PIX        *pixd;
 PIXCMAP    *cmap;
 
+    PROCNAME("pixBilinearSampled");
+
     if (!pixs)
-        return (PIX *)ERROR_PTR("pixs not defined", __func__, NULL);
+        return (PIX *)ERROR_PTR("pixs not defined", procName, NULL);
     if (!vc)
-        return (PIX *)ERROR_PTR("vc not defined", __func__, NULL);
+        return (PIX *)ERROR_PTR("vc not defined", procName, NULL);
     if (incolor != L_BRING_IN_WHITE && incolor != L_BRING_IN_BLACK)
-        return (PIX *)ERROR_PTR("invalid incolor", __func__, NULL);
+        return (PIX *)ERROR_PTR("invalid incolor", procName, NULL);
     pixGetDimensions(pixs, &w, &h, &d);
     if (d != 1 && d != 2 && d != 4 && d != 8 && d != 32)
-        return (PIX *)ERROR_PTR("depth not 1, 2, 4, 8 or 16", __func__, NULL);
+        return (PIX *)ERROR_PTR("depth not 1, 2, 4, 8 or 16", procName, NULL);
 
         /* Init all dest pixels to color to be brought in from outside */
     pixd = pixCreateTemplate(pixs);
@@ -268,10 +270,10 @@ PIXCMAP    *cmap;
 /*!
  * \brief   pixBilinearPta()
  *
- * \param[in]    pixs      all depths; colormap ok
- * \param[in]    ptad      4 pts of final coordinate space
- * \param[in]    ptas      4 pts of initial coordinate space
- * \param[in]    incolor   L_BRING_IN_WHITE, L_BRING_IN_BLACK
+ * \param[in]    pixs all depths; colormap ok
+ * \param[in]    ptad  4 pts of final coordinate space
+ * \param[in]    ptas  4 pts of initial coordinate space
+ * \param[in]    incolor L_BRING_IN_WHITE, L_BRING_IN_BLACK
  * \return  pixd, or NULL on error
  *
  * <pre>
@@ -290,18 +292,20 @@ l_int32   d;
 l_uint32  colorval;
 PIX      *pixt1, *pixt2, *pixd;
 
+    PROCNAME("pixBilinearPta");
+
     if (!pixs)
-        return (PIX *)ERROR_PTR("pixs not defined", __func__, NULL);
+        return (PIX *)ERROR_PTR("pixs not defined", procName, NULL);
     if (!ptas)
-        return (PIX *)ERROR_PTR("ptas not defined", __func__, NULL);
+        return (PIX *)ERROR_PTR("ptas not defined", procName, NULL);
     if (!ptad)
-        return (PIX *)ERROR_PTR("ptad not defined", __func__, NULL);
+        return (PIX *)ERROR_PTR("ptad not defined", procName, NULL);
     if (incolor != L_BRING_IN_WHITE && incolor != L_BRING_IN_BLACK)
-        return (PIX *)ERROR_PTR("invalid incolor", __func__, NULL);
+        return (PIX *)ERROR_PTR("invalid incolor", procName, NULL);
     if (ptaGetCount(ptas) != 4)
-        return (PIX *)ERROR_PTR("ptas count not 4", __func__, NULL);
+        return (PIX *)ERROR_PTR("ptas count not 4", procName, NULL);
     if (ptaGetCount(ptad) != 4)
-        return (PIX *)ERROR_PTR("ptad count not 4", __func__, NULL);
+        return (PIX *)ERROR_PTR("ptad count not 4", procName, NULL);
 
     if (pixGetDepth(pixs) == 1)
         return pixBilinearSampledPta(pixs, ptad, ptas, incolor);
@@ -337,9 +341,9 @@ PIX      *pixt1, *pixt2, *pixd;
 /*!
  * \brief   pixBilinear()
  *
- * \param[in]    pixs       all depths; colormap ok
- * \param[in]    vc         vector of 8 coefficients for bilinear transformation
- * \param[in]    incolor    L_BRING_IN_WHITE, L_BRING_IN_BLACK
+ * \param[in]    pixs all depths; colormap ok
+ * \param[in]    vc  vector of 8 coefficients for bilinear transformation
+ * \param[in]    incolor L_BRING_IN_WHITE, L_BRING_IN_BLACK
  * \return  pixd, or NULL on error
  *
  * <pre>
@@ -357,10 +361,12 @@ l_int32   d;
 l_uint32  colorval;
 PIX      *pixt1, *pixt2, *pixd;
 
+    PROCNAME("pixBilinear");
+
     if (!pixs)
-        return (PIX *)ERROR_PTR("pixs not defined", __func__, NULL);
+        return (PIX *)ERROR_PTR("pixs not defined", procName, NULL);
     if (!vc)
-        return (PIX *)ERROR_PTR("vc not defined", __func__, NULL);
+        return (PIX *)ERROR_PTR("vc not defined", procName, NULL);
 
     if (pixGetDepth(pixs) == 1)
         return pixBilinearSampled(pixs, vc, incolor);
@@ -396,10 +402,10 @@ PIX      *pixt1, *pixt2, *pixd;
 /*!
  * \brief   pixBilinearPtaColor()
  *
- * \param[in]    pixs        32 bpp
- * \param[in]    ptad        4 pts of final coordinate space
- * \param[in]    ptas        4 pts of initial coordinate space
- * \param[in]    colorval    e.g., 0 to bring in BLACK, 0xffffff00 for WHITE
+ * \param[in]    pixs 32 bpp
+ * \param[in]    ptad  4 pts of final coordinate space
+ * \param[in]    ptas  4 pts of initial coordinate space
+ * \param[in]    colorval e.g., 0 to bring in BLACK, 0xffffff00 for WHITE
  * \return  pixd, or NULL on error
  */
 PIX *
@@ -411,18 +417,20 @@ pixBilinearPtaColor(PIX      *pixs,
 l_float32  *vc;
 PIX        *pixd;
 
+    PROCNAME("pixBilinearPtaColor");
+
     if (!pixs)
-        return (PIX *)ERROR_PTR("pixs not defined", __func__, NULL);
+        return (PIX *)ERROR_PTR("pixs not defined", procName, NULL);
     if (!ptas)
-        return (PIX *)ERROR_PTR("ptas not defined", __func__, NULL);
+        return (PIX *)ERROR_PTR("ptas not defined", procName, NULL);
     if (!ptad)
-        return (PIX *)ERROR_PTR("ptad not defined", __func__, NULL);
+        return (PIX *)ERROR_PTR("ptad not defined", procName, NULL);
     if (pixGetDepth(pixs) != 32)
-        return (PIX *)ERROR_PTR("pixs must be 32 bpp", __func__, NULL);
+        return (PIX *)ERROR_PTR("pixs must be 32 bpp", procName, NULL);
     if (ptaGetCount(ptas) != 4)
-        return (PIX *)ERROR_PTR("ptas count not 4", __func__, NULL);
+        return (PIX *)ERROR_PTR("ptas count not 4", procName, NULL);
     if (ptaGetCount(ptad) != 4)
-        return (PIX *)ERROR_PTR("ptad count not 4", __func__, NULL);
+        return (PIX *)ERROR_PTR("ptad count not 4", procName, NULL);
 
         /* Get backwards transform from dest to src, and apply it */
     getBilinearXformCoeffs(ptad, ptas, &vc);
@@ -436,9 +444,9 @@ PIX        *pixd;
 /*!
  * \brief   pixBilinearColor()
  *
- * \param[in]    pixs       32 bpp
- * \param[in]    vc         vector of 8 coefficients for bilinear transformation
- * \param[in]    colorval   e.g., 0 to bring in BLACK, 0xffffff00 for WHITE
+ * \param[in]    pixs 32 bpp
+ * \param[in]    vc  vector of 8 coefficients for bilinear transformation
+ * \param[in]    colorval e.g., 0 to bring in BLACK, 0xffffff00 for WHITE
  * \return  pixd, or NULL on error
  */
 PIX *
@@ -452,13 +460,15 @@ l_uint32  *datas, *datad, *lined;
 l_float32  x, y;
 PIX       *pix1, *pix2, *pixd;
 
+    PROCNAME("pixBilinearColor");
+
     if (!pixs)
-        return (PIX *)ERROR_PTR("pixs not defined", __func__, NULL);
+        return (PIX *)ERROR_PTR("pixs not defined", procName, NULL);
     pixGetDimensions(pixs, &w, &h, &d);
     if (d != 32)
-        return (PIX *)ERROR_PTR("pixs must be 32 bpp", __func__, NULL);
+        return (PIX *)ERROR_PTR("pixs must be 32 bpp", procName, NULL);
     if (!vc)
-        return (PIX *)ERROR_PTR("vc not defined", __func__, NULL);
+        return (PIX *)ERROR_PTR("vc not defined", procName, NULL);
 
     datas = pixGetData(pixs);
     wpls = pixGetWpl(pixs);
@@ -495,10 +505,10 @@ PIX       *pix1, *pix2, *pixd;
 /*!
  * \brief   pixBilinearPtaGray()
  *
- * \param[in]    pixs       8 bpp
- * \param[in]    ptad       4 pts of final coordinate space
- * \param[in]    ptas       4 pts of initial coordinate space
- * \param[in]    grayval    e.g., 0 to bring in BLACK, 255 for WHITE
+ * \param[in]    pixs 8 bpp
+ * \param[in]    ptad  4 pts of final coordinate space
+ * \param[in]    ptas  4 pts of initial coordinate space
+ * \param[in]    grayval 0 to bring in BLACK, 255 for WHITE
  * \return  pixd, or NULL on error
  */
 PIX *
@@ -510,18 +520,20 @@ pixBilinearPtaGray(PIX     *pixs,
 l_float32  *vc;
 PIX        *pixd;
 
+    PROCNAME("pixBilinearPtaGray");
+
     if (!pixs)
-        return (PIX *)ERROR_PTR("pixs not defined", __func__, NULL);
+        return (PIX *)ERROR_PTR("pixs not defined", procName, NULL);
     if (!ptas)
-        return (PIX *)ERROR_PTR("ptas not defined", __func__, NULL);
+        return (PIX *)ERROR_PTR("ptas not defined", procName, NULL);
     if (!ptad)
-        return (PIX *)ERROR_PTR("ptad not defined", __func__, NULL);
+        return (PIX *)ERROR_PTR("ptad not defined", procName, NULL);
     if (pixGetDepth(pixs) != 8)
-        return (PIX *)ERROR_PTR("pixs must be 8 bpp", __func__, NULL);
+        return (PIX *)ERROR_PTR("pixs must be 8 bpp", procName, NULL);
     if (ptaGetCount(ptas) != 4)
-        return (PIX *)ERROR_PTR("ptas count not 4", __func__, NULL);
+        return (PIX *)ERROR_PTR("ptas count not 4", procName, NULL);
     if (ptaGetCount(ptad) != 4)
-        return (PIX *)ERROR_PTR("ptad count not 4", __func__, NULL);
+        return (PIX *)ERROR_PTR("ptad count not 4", procName, NULL);
 
         /* Get backwards transform from dest to src, and apply it */
     getBilinearXformCoeffs(ptad, ptas, &vc);
@@ -535,9 +547,9 @@ PIX        *pixd;
 /*!
  * \brief   pixBilinearGray()
  *
- * \param[in]    pixs      8 bpp
- * \param[in]    vc        vector of 8 coefficients for bilinear transformation
- * \param[in]    grayval   e.g., 0 to bring in BLACK, 255 for WHITE
+ * \param[in]    pixs 8 bpp
+ * \param[in]    vc  vector of 8 coefficients for bilinear transformation
+ * \param[in]    grayval 0 to bring in BLACK, 255 for WHITE
  * \return  pixd, or NULL on error
  */
 PIX *
@@ -550,13 +562,15 @@ l_uint32  *datas, *datad, *lined;
 l_float32  x, y;
 PIX       *pixd;
 
+    PROCNAME("pixBilinearGray");
+
     if (!pixs)
-        return (PIX *)ERROR_PTR("pixs not defined", __func__, NULL);
+        return (PIX *)ERROR_PTR("pixs not defined", procName, NULL);
     pixGetDimensions(pixs, &w, &h, NULL);
     if (pixGetDepth(pixs) != 8)
-        return (PIX *)ERROR_PTR("pixs must be 8 bpp", __func__, NULL);
+        return (PIX *)ERROR_PTR("pixs must be 8 bpp", procName, NULL);
     if (!vc)
-        return (PIX *)ERROR_PTR("vc not defined", __func__, NULL);
+        return (PIX *)ERROR_PTR("vc not defined", procName, NULL);
 
     datas = pixGetData(pixs);
     wpls = pixGetWpl(pixs);
@@ -586,13 +600,13 @@ PIX       *pixd;
 /*!
  * \brief   pixBilinearPtaWithAlpha()
  *
- * \param[in]    pixs     32 bpp rgb
- * \param[in]    ptad     4 pts of final coordinate space
- * \param[in]    ptas     4 pts of initial coordinate space
- * \param[in]    pixg     [optional] 8 bpp, can be null
- * \param[in]    fract    between 0.0 and 1.0, with 0.0 fully transparent
- *                        and 1.0 fully opaque
- * \param[in]    border   of pixels added to capture transformed source pixels
+ * \param[in]    pixs 32 bpp rgb
+ * \param[in]    ptad  4 pts of final coordinate space
+ * \param[in]    ptas  4 pts of initial coordinate space
+ * \param[in]    pixg [optional] 8 bpp, can be null
+ * \param[in]    fract between 0.0 and 1.0, with 0.0 fully transparent
+ *                     and 1.0 fully opaque
+ * \param[in]    border of pixels added to capture transformed source pixels
  * \return  pixd, or NULL on error
  *
  * <pre>
@@ -602,10 +616,10 @@ PIX       *pixd;
  *          boundary of the transformed pixs.  For pixels that are fully
  *          transparent, a blending function like pixBlendWithGrayMask()
  *          will give zero weight to corresponding pixels in pixs.
- *      (2) If %pixg is NULL, it is generated as an alpha layer that is
+ *      (2) If pixg is NULL, it is generated as an alpha layer that is
  *          partially opaque, using %fract.  Otherwise, it is cropped
- *          to %pixs if required and %fract is ignored.  The alpha channel
- *          in %pixs is never used.
+ *          to pixs if required and %fract is ignored.  The alpha channel
+ *          in pixs is never used.
  *      (3) Colormaps are removed.
  *      (4) When pixs is transformed, it doesn't matter what color is brought
  *          in because the alpha channel will be transparent (0) there.
@@ -638,26 +652,28 @@ l_int32  ws, hs, d;
 PIX     *pixd, *pixb1, *pixb2, *pixg2, *pixga;
 PTA     *ptad2, *ptas2;
 
+    PROCNAME("pixBilinearPtaWithAlpha");
+
     if (!pixs)
-        return (PIX *)ERROR_PTR("pixs not defined", __func__, NULL);
+        return (PIX *)ERROR_PTR("pixs not defined", procName, NULL);
     pixGetDimensions(pixs, &ws, &hs, &d);
     if (d != 32 && pixGetColormap(pixs) == NULL)
-        return (PIX *)ERROR_PTR("pixs not cmapped or 32 bpp", __func__, NULL);
+        return (PIX *)ERROR_PTR("pixs not cmapped or 32 bpp", procName, NULL);
     if (pixg && pixGetDepth(pixg) != 8) {
         L_WARNING("pixg not 8 bpp; using 'fract' transparent alpha\n",
-                  __func__);
+                  procName);
         pixg = NULL;
     }
     if (!pixg && (fract < 0.0 || fract > 1.0)) {
-        L_WARNING("invalid fract; using 1.0 (fully transparent)\n", __func__);
+        L_WARNING("invalid fract; using 1.0 (fully transparent)\n", procName);
         fract = 1.0;
     }
     if (!pixg && fract == 0.0)
-        L_WARNING("fully opaque alpha; image cannot be blended\n", __func__);
+        L_WARNING("fully opaque alpha; image cannot be blended\n", procName);
     if (!ptad)
-        return (PIX *)ERROR_PTR("ptad not defined", __func__, NULL);
+        return (PIX *)ERROR_PTR("ptad not defined", procName, NULL);
     if (!ptas)
-        return (PIX *)ERROR_PTR("ptas not defined", __func__, NULL);
+        return (PIX *)ERROR_PTR("ptas not defined", procName, NULL);
 
         /* Add border; the color doesn't matter */
     pixb1 = pixAddBorder(pixs, border, 0);
@@ -705,9 +721,9 @@ PTA     *ptad2, *ptas2;
 /*!
  * \brief   getBilinearXformCoeffs()
  *
- * \param[in]    ptas    source 4 points; unprimed
- * \param[in]    ptad    transformed 4 points; primed
- * \param[out]   pvc     vector of coefficients of transform
+ * \param[in]    ptas  source 4 points; unprimed
+ * \param[in]    ptad  transformed 4 points; primed
+ * \param[out]   pvc   vector of coefficients of transform
  * \return  0 if OK; 1 on error
  *
  * <pre>
@@ -756,7 +772,7 @@ PTA     *ptad2, *ptas2;
  * bilinearXFormPt.
  * </pre>
  */
-l_ok
+l_int32
 getBilinearXformCoeffs(PTA         *ptas,
                        PTA         *ptad,
                        l_float32  **pvc)
@@ -766,15 +782,19 @@ l_float32   x1, y1, x2, y2, x3, y3, x4, y4;
 l_float32  *b;   /* rhs vector of primed coords X'; coeffs returned in *pvc */
 l_float32  *a[8];  /* 8x8 matrix A  */
 
-    if (!ptas)
-        return ERROR_INT("ptas not defined", __func__, 1);
-    if (!ptad)
-        return ERROR_INT("ptad not defined", __func__, 1);
-    if (!pvc)
-        return ERROR_INT("&vc not defined", __func__, 1);
+    PROCNAME("getBilinearXformCoeffs");
 
-    b = (l_float32 *)LEPT_CALLOC(8, sizeof(l_float32));
+    if (!ptas)
+        return ERROR_INT("ptas not defined", procName, 1);
+    if (!ptad)
+        return ERROR_INT("ptad not defined", procName, 1);
+    if (!pvc)
+        return ERROR_INT("&vc not defined", procName, 1);
+
+    if ((b = (l_float32 *)LEPT_CALLOC(8, sizeof(l_float32))) == NULL)
+        return ERROR_INT("b not made", procName, 1);
     *pvc = b;
+
     ptaGetPt(ptas, 0, &x1, &y1);
     ptaGetPt(ptas, 1, &x2, &y2);
     ptaGetPt(ptas, 2, &x3, &y3);
@@ -784,8 +804,11 @@ l_float32  *a[8];  /* 8x8 matrix A  */
     ptaGetPt(ptad, 2, &b[4], &b[5]);
     ptaGetPt(ptad, 3, &b[6], &b[7]);
 
-    for (i = 0; i < 8; i++)
-        a[i] = (l_float32 *)LEPT_CALLOC(8, sizeof(l_float32));
+    for (i = 0; i < 8; i++) {
+        if ((a[i] = (l_float32 *)LEPT_CALLOC(8, sizeof(l_float32))) == NULL)
+            return ERROR_INT("a[i] not made", procName, 1);
+    }
+
     a[0][0] = x1;
     a[0][1] = y1;
     a[0][2] = x1 * y1;
@@ -823,6 +846,7 @@ l_float32  *a[8];  /* 8x8 matrix A  */
 
     for (i = 0; i < 8; i++)
         LEPT_FREE(a[i]);
+
     return 0;
 }
 
@@ -830,8 +854,8 @@ l_float32  *a[8];  /* 8x8 matrix A  */
 /*!
  * \brief   bilinearXformSampledPt()
  *
- * \param[in]    vc         vector of 8 coefficients
- * \param[in]    x, y       initial point
+ * \param[in]    vc vector of 8 coefficients
+ * \param[in]    x, y  initial point
  * \param[out]   pxp, pyp   transformed point
  * \return  0 if OK; 1 on error
  *
@@ -841,7 +865,7 @@ l_float32  *a[8];  /* 8x8 matrix A  */
  *      (2) It does not check ptrs for returned data!
  * </pre>
  */
-l_ok
+l_int32
 bilinearXformSampledPt(l_float32  *vc,
                        l_int32     x,
                        l_int32     y,
@@ -849,8 +873,10 @@ bilinearXformSampledPt(l_float32  *vc,
                        l_int32    *pyp)
 {
 
+    PROCNAME("bilinearXformSampledPt");
+
     if (!vc)
-        return ERROR_INT("vc not defined", __func__, 1);
+        return ERROR_INT("vc not defined", procName, 1);
 
     *pxp = (l_int32)(vc[0] * x + vc[1] * y + vc[2] * x * y + vc[3] + 0.5);
     *pyp = (l_int32)(vc[4] * x + vc[5] * y + vc[6] * x * y + vc[7] + 0.5);
@@ -861,9 +887,9 @@ bilinearXformSampledPt(l_float32  *vc,
 /*!
  * \brief   bilinearXformPt()
  *
- * \param[in]    vc           vector of 8 coefficients
- * \param[in]    x, y         initial point
- * \param[out]   pxp, pyp     transformed point
+ * \param[in]    vc vector of 8 coefficients
+ * \param[in]    x, y  initial point
+ * \param[out]   pxp, pyp   transformed point
  * \return  0 if OK; 1 on error
  *
  * <pre>
@@ -872,15 +898,17 @@ bilinearXformSampledPt(l_float32  *vc,
  *      (2) It does not check ptrs for returned data!
  * </pre>
  */
-l_ok
+l_int32
 bilinearXformPt(l_float32  *vc,
                 l_int32     x,
                 l_int32     y,
                 l_float32  *pxp,
                 l_float32  *pyp)
 {
+    PROCNAME("bilinearXformPt");
+
     if (!vc)
-        return ERROR_INT("vc not defined", __func__, 1);
+        return ERROR_INT("vc not defined", procName, 1);
 
     *pxp = vc[0] * x + vc[1] * y + vc[2] * x * y + vc[3];
     *pyp = vc[4] * x + vc[5] * y + vc[6] * x * y + vc[7];

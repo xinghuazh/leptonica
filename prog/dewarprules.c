@@ -44,10 +44,6 @@
  *     Solutions were given there using mathematica and opencv.
  */
 
-#ifdef HAVE_CONFIG_H
-#include <config_auto.h>
-#endif  /* HAVE_CONFIG_H */
-
 #include "string.h"
 #include "allheaders.h"
 
@@ -63,13 +59,12 @@ PIX        *pix8, *pix9, *pix10;
 PIXA       *pixa1, *pixa2;
 
     if (argc != 3) {
-        lept_stderr(" Syntax: dewarprules select ndew\n");
+        fprintf(stderr, " Syntax: dewarprules select ndew\n");
         return 1;
     }
     select = atoi(argv[1]);
     ndew = atoi(argv[2]);
 
-    setLeptDebugOK(1);
     lept_mkdir("dewarp");
 
     if (select == 0) {

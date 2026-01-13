@@ -25,8 +25,7 @@
  *====================================================================*/
 
 /*
- * \file  finditalic.c
- * <pre>
+ * finditalic.c
  *
  *      l_int32   pixItalicWords()
  *
@@ -35,12 +34,7 @@
  *    (filling from a seed into a mask).
  *
  *    To see how this works, run with prog/italic.png.
- * </pre>
  */
-
-#ifdef HAVE_CONFIG_H
-#include <config_auto.h>
-#endif  /* HAVE_CONFIG_H */
 
 #include "allheaders.h"
 
@@ -83,11 +77,11 @@ static const char *str_ital3 = " x"
 /*!
  * \brief   pixItalicWords()
  *
- * \param[in]    pixs       1 bpp
- * \param[in]    boxaw      [optional] word bounding boxes; can be NULL
- * \param[in]    pixw       [optional] word box mask; can be NULL
- * \param[out]   pboxa      boxa of italic words
- * \param[in]    debugflag  1 for debug output; 0 otherwise
+ * \param[in]    pixs 1 bpp
+ * \param[in]    boxaw [optional] word bounding boxes; can be NULL
+ * \param[in]    pixw [optional] word box mask; can be NULL
+ * \param[out]   pboxa boxa of italic words
+ * \param[in]    debugflag 1 for debug output; 0 otherwise
  * \return  0 if OK, 1 on error
  *
  * <pre>
@@ -112,26 +106,27 @@ static const char *str_ital3 = " x"
  *          more appropriate for a typical font scanned at 200 ppi.
  * </pre>
  */
-l_ok
+l_int32
 pixItalicWords(PIX     *pixs,
                BOXA    *boxaw,
                PIX     *pixw,
                BOXA   **pboxa,
                l_int32  debugflag)
 {
-char     opstring[32], buf[32];
-l_int32  size, type;
+char     opstring[32];
+l_int32  size;
 BOXA    *boxa;
 PIX     *pixsd, *pixm, *pixd;
 SEL     *sel_ital1, *sel_ital2, *sel_ital3;
 
-    if (!pboxa)
-        return ERROR_INT("&boxa not defined", __func__, 1);
-    *pboxa = NULL;
+    PROCNAME("pixItalicWords");
+
     if (!pixs)
-        return ERROR_INT("pixs not defined", __func__, 1);
+        return ERROR_INT("pixs not defined", procName, 1);
+    if (!pboxa)
+        return ERROR_INT("&boxa not defined", procName, 1);
     if (boxaw && pixw)
-        return ERROR_INT("both boxaw and pixw are defined", __func__, 1);
+        return ERROR_INT("both boxaw and pixw are defined", procName, 1);
 
     sel_ital1 = selCreateFromString(str_ital1, 13, 6, NULL);
     sel_ital2 = selCreateFromString(str_ital2, 10, 6, NULL);
@@ -146,20 +141,16 @@ SEL     *sel_ital1, *sel_ital2, *sel_ital3;
     pixOpen(pixsd, pixsd, sel_ital3);
 
         /* Make the word mask.  Use input boxes or mask if given. */
-    size = 0;  /* init */
     if (boxaw) {
         pixm = pixCreateTemplate(pixs);
         pixMaskBoxa(pixm, pixm, boxaw, L_SET_PIXELS);
-        type = 1;
     } else if (pixw) {
         pixm = pixClone(pixw);
-        type = 2;
     } else {
-        pixWordMaskByDilation(pixs, NULL, &size, NULL);
-        L_INFO("dilation size = %d\n", __func__, size);
+        pixWordMaskByDilation(pixs, 20, NULL, &size);
+        L_INFO("dilation size = %d\n", procName, size);
         snprintf(opstring, sizeof(opstring), "d1.5 + c%d.1", size);
         pixm = pixMorphSequence(pixs, opstring, 0);
-        type = 3;
     }
 
         /* Binary reconstruction to fill in those word mask
@@ -171,35 +162,36 @@ SEL     *sel_ital1, *sel_ital2, *sel_ital3;
     if (debugflag) {
             /* Save results at at 2x reduction */
         l_int32  res, upper;
-        lept_mkdir("lept/ital");
         BOXA  *boxat;
         GPLOT *gplot;
         NUMA  *na;
-        PIXA  *pixa1;
+        PIXA  *pad;
         PIX   *pix1, *pix2, *pix3;
-        pixa1 = pixaCreate(0);
+        pad = pixaCreate(0);
         boxat = pixConnComp(pixm, NULL, 8);
-        boxaWriteDebug("/tmp/lept/ital/ital.ba", boxat);
-        pixaAddPix(pixa1, pixs, L_COPY);  /* orig */
-        pixaAddPix(pixa1, pixsd, L_COPY);  /* seed */
+        boxaWrite("/tmp/ital.ba", boxat);
+        pixSaveTiledOutline(pixs, pad, 0.5, 1, 20, 2, 32);  /* orig */
+        pixSaveTiledOutline(pixsd, pad, 0.5, 1, 20, 2, 0);  /* seed */
         pix1 = pixConvertTo32(pixm);
         pixRenderBoxaArb(pix1, boxat, 3, 255, 0, 0);
-        pixaAddPix(pixa1, pix1, L_INSERT);  /* mask + outline */
-        pixaAddPix(pixa1, pixd, L_COPY);  /* ital mask */
+        pixSaveTiledOutline(pix1, pad, 0.5, 1, 20, 2, 0);  /* mask + outline */
+        pixDestroy(&pix1);
+        pixSaveTiledOutline(pixd, pad, 0.5, 1, 20, 2, 0);  /* ital mask */
         pix1 = pixConvertTo32(pixs);
         pixRenderBoxaArb(pix1, boxa, 3, 255, 0, 0);
-        pixaAddPix(pixa1, pix1, L_INSERT);  /* orig + outline */
+        pixSaveTiledOutline(pix1, pad, 0.5, 1, 20, 2, 0);  /* orig + outline */
+        pixDestroy(&pix1);
         pix1 = pixCreateTemplate(pixs);
         pix2 = pixSetBlackOrWhiteBoxa(pix1, boxa, L_SET_BLACK);
         pixCopy(pix1, pixs);
         pix3 = pixDilateBrick(NULL, pixs, 3, 3);
         pixCombineMasked(pix1, pix3, pix2);
-        pixaAddPix(pixa1, pix1, L_INSERT);  /* ital bolded */
+        pixSaveTiledOutline(pix1, pad, 0.5, 1, 20, 2, 0);  /* ital bolded */
+        pixDestroy(&pix1);
         pixDestroy(&pix2);
         pixDestroy(&pix3);
-        pix2 = pixaDisplayTiledInColumns(pixa1, 1, 0.5, 20, 2);
-        snprintf(buf, sizeof(buf), "/tmp/lept/ital/ital.%d.png", type);
-        pixWriteDebug(buf, pix2, IFF_PNG);
+        pix2 = pixaDisplay(pad, 0, 0);
+        pixWrite("/tmp/ital.png", pix2, IFF_PNG);
         pixDestroy(&pix2);
 
             /* Assuming the image represents 6 inches of actual page width,
@@ -207,13 +199,10 @@ SEL     *sel_ital1, *sel_ital2, *sel_ital3;
              *    (width of pixs in pixels) / 6
              * and the images have been saved at half this resolution.   */
         res = pixGetWidth(pixs) / 12;
-        L_INFO("resolution = %d\n", __func__, res);
-        l_pdfSetDateAndVersion(0);
-        snprintf(buf, sizeof(buf), "/tmp/lept/ital/ital.%d.pdf", type);
-        pixaConvertToPdf(pixa1, res, 1.0, L_FLATE_ENCODE, 75, "Italic Finder",
-                         buf);
-        l_pdfSetDateAndVersion(1);
-        pixaDestroy(&pixa1);
+        L_INFO("resolution = %d\n", procName, res);
+        pixaConvertToPdf(pad, res, 1.0, L_FLATE_ENCODE, 75, "Italic Finder",
+                         "/tmp/ital.pdf");
+        pixaDestroy(&pad);
         boxaDestroy(&boxat);
 
             /* Plot histogram of horizontal white run sizes.  A small
@@ -225,7 +214,7 @@ SEL     *sel_ital1, *sel_ital2, *sel_ital3;
         upper = L_MAX(30, 3 * size);
         na = pixRunHistogramMorph(pix1, L_RUN_OFF, L_HORIZ, upper);
         pixDestroy(&pix1);
-        gplot = gplotCreate("/tmp/lept/ital/runhisto", GPLOT_PNG,
+        gplot = gplotCreate("/tmp/runhisto", GPLOT_PNG,
                 "Histogram of horizontal runs of white pixels, vs length",
                 "run length", "number of runs");
         gplotAddPlot(gplot, NULL, na, GPLOT_LINES, "plot1");

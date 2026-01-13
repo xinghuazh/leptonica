@@ -46,10 +46,6 @@
  *            /tmp/lept/lion-out/lion-links.html   (html file of links)
  */
 
-#ifdef HAVE_CONFIG_H
-#include <config_auto.h>
-#endif  /* HAVE_CONFIG_H */
-
 #include <string.h>
 #include "allheaders.h"
 
@@ -65,26 +61,26 @@ static const l_int32  MIN_VIEW_WIDTH = 300;
 static l_int32 pixHtmlViewer(const char *dirin, const char *dirout,
                              const char  *rootname, l_int32 thumbwidth,
                              l_int32 viewwidth);
-static void WriteFormattedPix(const char *fname, PIX *pix);
+static void WriteFormattedPix(char *fname, PIX *pix);
 
 
 int main(int    argc,
          char **argv)
 {
-char    *dirin, *dirout, *rootname;
-l_int32  thumbwidth, viewwidth;
+char        *dirin, *dirout, *rootname;
+l_int32      thumbwidth, viewwidth;
+static char  mainName[] = "htmlviewer";
 
     if (argc != 6)
         return ERROR_INT(
             " Syntax:  htmlviewer dirin dirout rootname thumbwidth viewwidth",
-             __func__, 1);
+             mainName, 1);
+
     dirin = argv[1];
     dirout = argv[2];
     rootname = argv[3];
     thumbwidth = atoi(argv[4]);
     viewwidth = atoi(argv[5]);
-    setLeptDebugOK(1);
-
     pixHtmlViewer(dirin, dirout, rootname, thumbwidth, viewwidth);
     return 0;
 }
@@ -128,7 +124,7 @@ char      *fname, *fullname, *outname;
 char      *mainname, *linkname, *linknameshort;
 char      *viewfile, *thumbfile;
 char      *shtml, *slink;
-char       buf[512];
+char       charbuf[512];
 char       htmlstring[] = "<html>";
 char       framestring[] = "</frameset></html>";
 l_int32    i, nfiles, index, w, d, nimages, ret;
@@ -136,47 +132,49 @@ l_float32  factor;
 PIX       *pix, *pixthumb, *pixview;
 SARRAY    *safiles, *sathumbs, *saviews, *sahtml, *salink;
 
+    PROCNAME("pixHtmlViewer");
+
     if (!dirin)
-        return ERROR_INT("dirin not defined", __func__, 1);
+        return ERROR_INT("dirin not defined", procName, 1);
     if (!dirout)
-        return ERROR_INT("dirout not defined", __func__, 1);
+        return ERROR_INT("dirout not defined", procName, 1);
     if (!rootname)
-        return ERROR_INT("rootname not defined", __func__, 1);
+        return ERROR_INT("rootname not defined", procName, 1);
 
     if (thumbwidth == 0)
         thumbwidth = DEFAULT_THUMB_WIDTH;
     if (thumbwidth < MIN_THUMB_WIDTH) {
-        L_WARNING("thumbwidth too small; using min value\n", __func__);
+        L_WARNING("thumbwidth too small; using min value\n", procName);
         thumbwidth = MIN_THUMB_WIDTH;
     }
     if (viewwidth == 0)
         viewwidth = DEFAULT_VIEW_WIDTH;
     if (viewwidth < MIN_VIEW_WIDTH) {
-        L_WARNING("viewwidth too small; using min value\n", __func__);
+        L_WARNING("viewwidth too small; using min value\n", procName);
         viewwidth = MIN_VIEW_WIDTH;
     }
 
         /* Make the output directory if it doesn't already exist */
 #ifndef _WIN32
-    snprintf(buf, sizeof(buf), "mkdir -p %s", dirout);
-    ret = callSystemDebug(buf);
+    snprintf(charbuf, sizeof(charbuf), "mkdir -p %s", dirout);
+    ret = system(charbuf);
 #else
     ret = CreateDirectory(dirout, NULL) ? 0 : 1;
 #endif  /* !_WIN32 */
     if (ret) {
-        L_ERROR("output directory %s not made\n", __func__, dirout);
+        L_ERROR("output directory %s not made\n", procName, dirout);
         return 1;
     }
 
         /* Capture the filenames in the input directory */
     if ((safiles = getFilenamesInDirectory(dirin)) == NULL)
-        return ERROR_INT("safiles not made", __func__, 1);
+        return ERROR_INT("safiles not made", procName, 1);
 
         /* Generate output text file names */
-    snprintf(buf, sizeof(buf), "%s/%s.html", dirout, rootname);
-    mainname = stringNew(buf);
-    snprintf(buf, sizeof(buf), "%s/%s-links.html", dirout, rootname);
-    linkname = stringNew(buf);
+    sprintf(charbuf, "%s/%s.html", dirout, rootname);
+    mainname = stringNew(charbuf);
+    sprintf(charbuf, "%s/%s-links.html", dirout, rootname);
+    linkname = stringNew(charbuf);
     linknameshort = stringJoin(rootname, "-links.html");
 
         /* Generate the thumbs and views */
@@ -187,9 +185,9 @@ SARRAY    *safiles, *sathumbs, *saviews, *sahtml, *salink;
     for (i = 0; i < nfiles; i++) {
         fname = sarrayGetString(safiles, i, L_NOCOPY);
         fullname = genPathname(dirin, fname);
-        lept_stderr("name: %s\n", fullname);
+        fprintf(stderr, "name: %s\n", fullname);
         if ((pix = pixRead(fullname)) == NULL) {
-            lept_stderr("file %s not a readable image\n", fullname);
+            fprintf(stderr, "file %s not a readable image\n", fullname);
             lept_free(fullname);
             continue;
         }
@@ -199,9 +197,9 @@ SARRAY    *safiles, *sathumbs, *saviews, *sahtml, *salink;
         pixGetDimensions(pix, &w, NULL, &d);
         factor = (l_float32)thumbwidth / (l_float32)w;
         pixthumb = pixScale(pix, factor, factor);
-        snprintf(buf, sizeof(buf), "%s_thumb_%03d", rootname, index);
-        sarrayAddString(sathumbs, buf, L_COPY);
-        outname = genPathname(dirout, buf);
+        sprintf(charbuf, "%s_thumb_%03d", rootname, index);
+        sarrayAddString(sathumbs, charbuf, L_COPY);
+        outname = genPathname(dirout, charbuf);
         WriteFormattedPix(outname, pixthumb);
         lept_free(outname);
         pixDestroy(&pixthumb);
@@ -212,9 +210,9 @@ SARRAY    *safiles, *sathumbs, *saviews, *sahtml, *salink;
             pixview = pixClone(pix);   /* no upscaling */
         else
             pixview = pixScale(pix, factor, factor);
-        snprintf(buf, sizeof(buf), "%s_view_%03d", rootname, index);
-        sarrayAddString(saviews, buf, L_COPY);
-        outname = genPathname(dirout, buf);
+        snprintf(charbuf, sizeof(charbuf), "%s_view_%03d", rootname, index);
+        sarrayAddString(saviews, charbuf, L_COPY);
+        outname = genPathname(dirout, charbuf);
         WriteFormattedPix(outname, pixview);
         lept_free(outname);
         pixDestroy(&pixview);
@@ -225,34 +223,32 @@ SARRAY    *safiles, *sathumbs, *saviews, *sahtml, *salink;
         /* Generate the main html file */
     sahtml = sarrayCreate(0);
     sarrayAddString(sahtml, htmlstring, L_COPY);
-    snprintf(buf, sizeof(buf), "<frameset cols=\"%d, *\">", thumbwidth + 30);
-    sarrayAddString(sahtml, buf, L_COPY);
-    snprintf(buf, sizeof(buf), "<frame name=\"thumbs\" src=\"%s\">",
-             linknameshort);
-    sarrayAddString(sahtml, buf, L_COPY);
-    snprintf(buf, sizeof(buf), "<frame name=\"views\" src=\"%s\">",
+    sprintf(charbuf, "<frameset cols=\"%d, *\">", thumbwidth + 30);
+    sarrayAddString(sahtml, charbuf, L_COPY);
+    sprintf(charbuf, "<frame name=\"thumbs\" src=\"%s\">", linknameshort);
+    sarrayAddString(sahtml, charbuf, L_COPY);
+    sprintf(charbuf, "<frame name=\"views\" src=\"%s\">",
             sarrayGetString(saviews, 0, L_NOCOPY));
-    sarrayAddString(sahtml, buf, L_COPY);
+    sarrayAddString(sahtml, charbuf, L_COPY);
     sarrayAddString(sahtml, framestring, L_COPY);
     shtml = sarrayToString(sahtml, 1);
     l_binaryWrite(mainname, "w", shtml, strlen(shtml));
-    lept_stderr("******************************************\n"
-                "Writing html file: %s\n"
-                "******************************************\n", mainname);
+    fprintf(stderr, "******************************************\n"
+                    "Writing html file: %s\n"
+                    "******************************************\n", mainname);
     lept_free(shtml);
     lept_free(mainname);
 
         /* Generate the link html file */
     nimages = sarrayGetCount(saviews);
-    lept_stderr("num. images = %d\n", nimages);
+    fprintf(stderr, "num. images = %d\n", nimages);
     salink = sarrayCreate(0);
     for (i = 0; i < nimages; i++) {
         viewfile = sarrayGetString(saviews, i, L_NOCOPY);
         thumbfile = sarrayGetString(sathumbs, i, L_NOCOPY);
-        snprintf(buf, sizeof(buf),
-                 "<a href=\"%s\" TARGET=views><img src=\"%s\"></a>",
-                 viewfile, thumbfile);
-        sarrayAddString(salink, buf, L_COPY);
+        sprintf(charbuf, "<a href=\"%s\" TARGET=views><img src=\"%s\"></a>",
+            viewfile, thumbfile);
+        sarrayAddString(salink, charbuf, L_COPY);
     }
     slink = sarrayToString(salink, 1);
     l_binaryWrite(linkname, "w", slink, strlen(slink));
@@ -268,8 +264,8 @@ SARRAY    *safiles, *sathumbs, *saviews, *sahtml, *salink;
 }
 
 static void
-WriteFormattedPix(const char *fname,
-                  PIX        *pix)
+WriteFormattedPix(char  *fname,
+                  PIX   *pix)
 {
 l_int32  d;
 

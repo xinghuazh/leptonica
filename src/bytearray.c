@@ -36,6 +36,7 @@
  *           L_BYTEA      *l_byteaInitFromFile()
  *           L_BYTEA      *l_byteaInitFromStream()
  *           L_BYTEA      *l_byteaCopy()
+ *           L_BYTEA      *l_byteaClone()
  *           void          l_byteaDestroy()
  *
  *      Accessors
@@ -64,20 +65,14 @@
  * </pre>
  */
 
-#ifdef HAVE_CONFIG_H
-#include <config_auto.h>
-#endif  /* HAVE_CONFIG_H */
-
 #include <string.h>
 #include "allheaders.h"
-#include "array_internal.h"
 
-    /* Bounds on array size */
-static const l_uint32  MaxArraySize = 1000000000;   /* 10^9 bytes */
-static const l_int32   InitialArraySize = 200;      /*!< n'importe quoi */
+static const l_int32  INITIAL_ARRAYSIZE = 200;   /* n'import quoi */
 
     /* Static function */
 static l_int32 l_byteaExtendArrayToSize(L_BYTEA *ba, size_t size);
+
 
 /*---------------------------------------------------------------------*
  *                  Creation, copy, clone, destruction                 *
@@ -85,7 +80,7 @@ static l_int32 l_byteaExtendArrayToSize(L_BYTEA *ba, size_t size);
 /*!
  * \brief   l_byteaCreate()
  *
- * \param[in]    nbytes    determines initial size of data array
+ * \param[in]    nbytes determines initial size of data array
  * \return  l_bytea, or NULL on error
  *
  * <pre>
@@ -99,13 +94,16 @@ l_byteaCreate(size_t  nbytes)
 {
 L_BYTEA  *ba;
 
-    if (nbytes <= 0 || nbytes > MaxArraySize)
-        nbytes = InitialArraySize;
+    PROCNAME("l_byteaCreate");
+
+    if (nbytes <= 0)
+        nbytes = INITIAL_ARRAYSIZE;
+
     ba = (L_BYTEA *)LEPT_CALLOC(1, sizeof(L_BYTEA));
     ba->data = (l_uint8 *)LEPT_CALLOC(nbytes + 1, sizeof(l_uint8));
     if (!ba->data) {
         l_byteaDestroy(&ba);
-        return (L_BYTEA *)ERROR_PTR("ba array not made", __func__, NULL);
+        return (L_BYTEA *)ERROR_PTR("ba array not made", procName, NULL);
     }
     ba->nalloc = nbytes + 1;
     ba->refcount = 1;
@@ -116,25 +114,25 @@ L_BYTEA  *ba;
 /*!
  * \brief   l_byteaInitFromMem()
  *
- * \param[in]    data    to be copied to the array
- * \param[in]    size    amount of data
+ * \param[in]    data to be copied to the array
+ * \param[in]    size amount of data
  * \return  l_bytea, or NULL on error
  */
 L_BYTEA *
-l_byteaInitFromMem(const l_uint8  *data,
-                   size_t          size)
+l_byteaInitFromMem(l_uint8  *data,
+                   size_t    size)
 {
 L_BYTEA  *ba;
 
+    PROCNAME("l_byteaInitFromMem");
+
     if (!data)
-        return (L_BYTEA *)ERROR_PTR("data not defined", __func__, NULL);
+        return (L_BYTEA *)ERROR_PTR("data not defined", procName, NULL);
     if (size <= 0)
-        return (L_BYTEA *)ERROR_PTR("no bytes to initialize", __func__, NULL);
-    if (size > MaxArraySize)
-        return (L_BYTEA *)ERROR_PTR("size is too big", __func__, NULL);
+        return (L_BYTEA *)ERROR_PTR("no bytes to initialize", procName, NULL);
 
     if ((ba = l_byteaCreate(size)) == NULL)
-        return (L_BYTEA *)ERROR_PTR("ba not made", __func__, NULL);
+        return (L_BYTEA *)ERROR_PTR("ba not made", procName, NULL);
     memcpy(ba->data, data, size);
     ba->size = size;
     return ba;
@@ -153,16 +151,17 @@ l_byteaInitFromFile(const char  *fname)
 FILE     *fp;
 L_BYTEA  *ba;
 
+    PROCNAME("l_byteaInitFromFile");
+
     if (!fname)
-        return (L_BYTEA *)ERROR_PTR("fname not defined", __func__, NULL);
+        return (L_BYTEA *)ERROR_PTR("fname not defined", procName, NULL);
 
     if ((fp = fopenReadStream(fname)) == NULL)
-        return (L_BYTEA *)ERROR_PTR_1("file stream not opened",
-                                      fname, __func__, NULL);
+        return (L_BYTEA *)ERROR_PTR("file stream not opened", procName, NULL);
     ba = l_byteaInitFromStream(fp);
     fclose(fp);
     if (!ba)
-        return (L_BYTEA *)ERROR_PTR_1("ba not made", fname, __func__, NULL);
+        return (L_BYTEA *)ERROR_PTR("ba not made", procName, NULL);
     return ba;
 }
 
@@ -170,7 +169,7 @@ L_BYTEA  *ba;
 /*!
  * \brief   l_byteaInitFromStream()
  *
- * \param[in]    fp    file stream
+ * \param[in]    fp file stream
  * \return  l_bytea, or NULL on error
  */
 L_BYTEA *
@@ -180,14 +179,16 @@ l_uint8  *data;
 size_t    nbytes;
 L_BYTEA  *ba;
 
+    PROCNAME("l_byteaInitFromStream");
+
     if (!fp)
-        return (L_BYTEA *)ERROR_PTR("stream not defined", __func__, NULL);
+        return (L_BYTEA *)ERROR_PTR("stream not defined", procName, NULL);
 
     if ((data = l_binaryReadStream(fp, &nbytes)) == NULL)
-        return (L_BYTEA *)ERROR_PTR("data not read", __func__, NULL);
+        return (L_BYTEA *)ERROR_PTR("data not read", procName, NULL);
     if ((ba = l_byteaCreate(nbytes)) == NULL) {
         LEPT_FREE(data);
-        return (L_BYTEA *)ERROR_PTR("ba not made", __func__, NULL);
+        return (L_BYTEA *)ERROR_PTR("ba not made", procName, NULL);
     }
     memcpy(ba->data, data, nbytes);
     ba->size = nbytes;
@@ -199,8 +200,8 @@ L_BYTEA  *ba;
 /*!
  * \brief   l_byteaCopy()
  *
- * \param[in]    bas        source lba
- * \param[in]    copyflag   L_COPY, L_CLONE
+ * \param[in]    bas  source lba
+ * \param[in]    copyflag L_COPY, L_CLONE
  * \return  clone or copy of bas, or NULL on error
  *
  * <pre>
@@ -212,8 +213,10 @@ L_BYTEA *
 l_byteaCopy(L_BYTEA  *bas,
             l_int32   copyflag)
 {
+    PROCNAME("l_byteaCopy");
+
     if (!bas)
-        return (L_BYTEA *)ERROR_PTR("bas not defined", __func__, NULL);
+        return (L_BYTEA *)ERROR_PTR("bas not defined", procName, NULL);
 
     if (copyflag == L_CLONE) {
         bas->refcount++;
@@ -227,7 +230,7 @@ l_byteaCopy(L_BYTEA  *bas,
 /*!
  * \brief   l_byteaDestroy()
  *
- * \param[in,out]   pba    will be set to null before returning
+ * \param[in,out]   pba will be set to null before returning
  * \return  void
  *
  * <pre>
@@ -243,8 +246,10 @@ l_byteaDestroy(L_BYTEA  **pba)
 {
 L_BYTEA  *ba;
 
+    PROCNAME("l_byteaDestroy");
+
     if (pba == NULL) {
-        L_WARNING("ptr address is null!\n", __func__);
+        L_WARNING("ptr address is null!\n", procName);
         return;
     }
 
@@ -252,11 +257,14 @@ L_BYTEA  *ba;
         return;
 
         /* Decrement the ref count.  If it is 0, destroy the lba. */
-    if (--ba->refcount == 0) {
+    ba->refcount--;
+    if (ba->refcount <= 0) {
         if (ba->data) LEPT_FREE(ba->data);
         LEPT_FREE(ba);
     }
+
     *pba = NULL;
+    return;
 }
 
 
@@ -272,8 +280,10 @@ L_BYTEA  *ba;
 size_t
 l_byteaGetSize(L_BYTEA  *ba)
 {
+    PROCNAME("l_byteaGetSize");
+
     if (!ba)
-        return ERROR_INT("ba not defined", __func__, 0);
+        return ERROR_INT("ba not defined", procName, 0);
     return ba->size;
 }
 
@@ -282,7 +292,7 @@ l_byteaGetSize(L_BYTEA  *ba)
  * \brief   l_byteaGetData()
  *
  * \param[in]    ba
- * \param[out]   psize     size of data in lba
+ * \param[out]   psize size of data in lba
  * \return  ptr to existing data array, or NULL on error
  *
  * <pre>
@@ -294,10 +304,12 @@ l_uint8 *
 l_byteaGetData(L_BYTEA  *ba,
                size_t   *psize)
 {
+    PROCNAME("l_byteaGetData");
+
     if (!ba)
-        return (l_uint8 *)ERROR_PTR("ba not defined", __func__, NULL);
+        return (l_uint8 *)ERROR_PTR("ba not defined", procName, NULL);
     if (!psize)
-        return (l_uint8 *)ERROR_PTR("&size not defined", __func__, NULL);
+        return (l_uint8 *)ERROR_PTR("&size not defined", procName, NULL);
 
     *psize = ba->size;
     return ba->data;
@@ -308,7 +320,7 @@ l_byteaGetData(L_BYTEA  *ba,
  * \brief   l_byteaCopyData()
  *
  * \param[in]    ba
- * \param[out]   psize     size of data in lba
+ * \param[out]   psize size of data in lba
  * \return  copy of data in use in the data array, or NULL on error.
  *
  * <pre>
@@ -323,11 +335,13 @@ l_byteaCopyData(L_BYTEA  *ba,
 {
 l_uint8  *data;
 
+    PROCNAME("l_byteaCopyData");
+
     if (!psize)
-        return (l_uint8 *)ERROR_PTR("&size not defined", __func__, NULL);
+        return (l_uint8 *)ERROR_PTR("&size not defined", procName, NULL);
     *psize = 0;
     if (!ba)
-        return (l_uint8 *)ERROR_PTR("ba not defined", __func__, NULL);
+        return (l_uint8 *)ERROR_PTR("ba not defined", procName, NULL);
 
     data = l_byteaGetData(ba, psize);
     return l_binaryCopy(data, *psize);
@@ -341,31 +355,31 @@ l_uint8  *data;
  * \brief   l_byteaAppendData()
  *
  * \param[in]    ba
- * \param[in]    newdata    byte array to be appended
- * \param[in]    newbytes   size of data array
+ * \param[in]    newdata byte array to be appended
+ * \param[in]    newbytes size of data array
  * \return  0 if OK, 1 on error
  */
-l_ok
-l_byteaAppendData(L_BYTEA        *ba,
-                  const l_uint8  *newdata,
-                  size_t          newbytes)
+l_int32
+l_byteaAppendData(L_BYTEA  *ba,
+                  l_uint8  *newdata,
+                  size_t    newbytes)
 {
 size_t  size, nalloc, reqsize;
 
+    PROCNAME("l_byteaAppendData");
+
     if (!ba)
-        return ERROR_INT("ba not defined", __func__, 1);
+        return ERROR_INT("ba not defined", procName, 1);
     if (!newdata)
-        return ERROR_INT("newdata not defined", __func__, 1);
+        return ERROR_INT("newdata not defined", procName, 1);
 
     size = l_byteaGetSize(ba);
     reqsize = size + newbytes + 1;
     nalloc = ba->nalloc;
-    if (nalloc < reqsize) {
-        if (l_byteaExtendArrayToSize(ba, 2 * reqsize))
-            return ERROR_INT("extension failed", __func__, 1);
-    }
+    if (nalloc < reqsize)
+        l_byteaExtendArrayToSize(ba, 2 * reqsize);
 
-    memcpy(ba->data + size, newdata, newbytes);
+    memcpy((char *)(ba->data + size), (char *)newdata, newbytes);
     ba->size += newbytes;
     return 0;
 }
@@ -375,28 +389,28 @@ size_t  size, nalloc, reqsize;
  * \brief   l_byteaAppendString()
  *
  * \param[in]    ba
- * \param[in]    str    null-terminated string to be appended
+ * \param[in]    str null-terminated string to be appended
  * \return  0 if OK, 1 on error
  */
-l_ok
-l_byteaAppendString(L_BYTEA     *ba,
-                    const char  *str)
+l_int32
+l_byteaAppendString(L_BYTEA  *ba,
+                    char     *str)
 {
 size_t  size, len, nalloc, reqsize;
 
+    PROCNAME("l_byteaAppendString");
+
     if (!ba)
-        return ERROR_INT("ba not defined", __func__, 1);
+        return ERROR_INT("ba not defined", procName, 1);
     if (!str)
-        return ERROR_INT("str not defined", __func__, 1);
+        return ERROR_INT("str not defined", procName, 1);
 
     size = l_byteaGetSize(ba);
     len = strlen(str);
     reqsize = size + len + 1;
     nalloc = ba->nalloc;
-    if (nalloc < reqsize) {
-        if (l_byteaExtendArrayToSize(ba, 2 * reqsize))
-            return ERROR_INT("extension failed", __func__, 1);
-    }
+    if (nalloc < reqsize)
+        l_byteaExtendArrayToSize(ba, 2 * reqsize);
 
     memcpy(ba->data + size, str, len);
     ba->size += len;
@@ -408,34 +422,25 @@ size_t  size, len, nalloc, reqsize;
  * \brief   l_byteaExtendArrayToSize()
  *
  * \param[in]    ba
- * \param[in]    size    new size of lba data array
+ * \param[in]    size new size of lba data array
  * \return  0 if OK; 1 on error
- *
- * <pre>
- * Notes:
- *      (1) If necessary, reallocs the byte array to %size.
- *      (2) The max buffer size is 1 GB.
- * </pre>
  */
 static l_int32
 l_byteaExtendArrayToSize(L_BYTEA  *ba,
                          size_t    size)
 {
-    if (!ba)
-        return ERROR_INT("ba not defined", __func__, 1);
-    if (ba->nalloc > MaxArraySize)  /* belt & suspenders */
-        return ERROR_INT("ba has too many ptrs", __func__, 1);
-    if (size > MaxArraySize)
-        return ERROR_INT("size > 1 GB; too large", __func__, 1);
-    if (size <= ba->nalloc) {
-        L_INFO("size too small; no extension\n", __func__);
-        return 0;
-    }
+    PROCNAME("l_byteaExtendArrayToSize");
 
-    if ((ba->data =
-        (l_uint8 *)reallocNew((void **)&ba->data, ba->nalloc, size)) == NULL)
-        return ERROR_INT("new array not returned", __func__, 1);
-    ba->nalloc = size;
+    if (!ba)
+        return ERROR_INT("ba not defined", procName, 1);
+
+    if (size > ba->nalloc) {
+        if ((ba->data =
+            (l_uint8 *)reallocNew((void **)&ba->data, ba->nalloc, size))
+                 == NULL)
+            return ERROR_INT("new array not returned", procName, 1);
+        ba->nalloc = size;
+    }
     return 0;
 }
 
@@ -447,8 +452,8 @@ l_byteaExtendArrayToSize(L_BYTEA  *ba,
  * \brief   l_byteaJoin()
  *
  * \param[in]       ba1
- * \param[in,out]   pba2    data array is added to the one in ba1;
- *                          then ba2 is destroyed and its pointer is nulled.
+ * \param[in,out]   pba2 data array is added to the one in ba1, and
+ *                       then ba2 is destroyed
  * \return  0 if OK, 1 on error
  *
  * <pre>
@@ -456,7 +461,7 @@ l_byteaExtendArrayToSize(L_BYTEA  *ba,
  *      (1) It is a no-op, not an error, for %ba2 to be null.
  * </pre>
  */
-l_ok
+l_int32
 l_byteaJoin(L_BYTEA   *ba1,
             L_BYTEA  **pba2)
 {
@@ -464,10 +469,12 @@ l_uint8  *data2;
 size_t    nbytes2;
 L_BYTEA  *ba2;
 
+    PROCNAME("l_byteaJoin");
+
     if (!ba1)
-        return ERROR_INT("ba1 not defined", __func__, 1);
+        return ERROR_INT("ba1 not defined", procName, 1);
     if (!pba2)
-        return ERROR_INT("&ba2 not defined", __func__, 1);
+        return ERROR_INT("&ba2 not defined", procName, 1);
     if ((ba2 = *pba2) == NULL) return 0;
 
     data2 = l_byteaGetData(ba2, &nbytes2);
@@ -481,12 +488,12 @@ L_BYTEA  *ba2;
 /*!
  * \brief   l_byteaSplit()
  *
- * \param[in]    ba1       lba to split; array bytes nulled beyond the split loc
- * \param[in]    splitloc  location in ba1 to split; ba2 begins there
- * \param[out]   pba2      with data starting at splitloc
+ * \param[in]    ba1 lba to split; array bytes nulled beyond the split loc
+ * \param[in]    splitloc location in ba1 to split; ba2 begins there
+ * \param[out]   pba2 with data starting at splitloc
  * \return  0 if OK, 1 on error
  */
-l_ok
+l_int32
 l_byteaSplit(L_BYTEA   *ba1,
              size_t     splitloc,
              L_BYTEA  **pba2)
@@ -494,15 +501,17 @@ l_byteaSplit(L_BYTEA   *ba1,
 l_uint8  *data1;
 size_t    nbytes1, nbytes2;
 
+    PROCNAME("l_byteaSplit");
+
     if (!pba2)
-        return ERROR_INT("&ba2 not defined", __func__, 1);
+        return ERROR_INT("&ba2 not defined", procName, 1);
     *pba2 = NULL;
     if (!ba1)
-        return ERROR_INT("ba1 not defined", __func__, 1);
+        return ERROR_INT("ba1 not defined", procName, 1);
 
     data1 = l_byteaGetData(ba1, &nbytes1);
     if (splitloc >= nbytes1)
-        return ERROR_INT("splitloc invalid", __func__, 1);
+        return ERROR_INT("splitloc invalid", procName, 1);
     nbytes2 = nbytes1 - splitloc;
 
         /* Make the new lba */
@@ -522,27 +531,29 @@ size_t    nbytes1, nbytes2;
  * \brief   l_byteaFindEachSequence()
  *
  * \param[in]    ba
- * \param[in]    sequence   subarray of bytes to find in data
- * \param[in]    seqlen     length of sequence, in bytes
- * \param[out]   pda        byte positions of each occurrence of %sequence
+ * \param[in]    sequence subarray of bytes to find in data
+ * \param[in]    seqlen length of sequence, in bytes
+ * \param[out]   pda byte positions of each occurrence of %sequence
  * \return  0 if OK, 1 on error
  */
-l_ok
-l_byteaFindEachSequence(L_BYTEA        *ba,
-                        const l_uint8  *sequence,
-                        size_t          seqlen,
-                        L_DNA         **pda)
+l_int32
+l_byteaFindEachSequence(L_BYTEA   *ba,
+                        l_uint8   *sequence,
+                        l_int32    seqlen,
+                        L_DNA    **pda)
 {
 l_uint8  *data;
 size_t    size;
 
+    PROCNAME("l_byteaFindEachSequence");
+
     if (!pda)
-        return ERROR_INT("&da not defined", __func__, 1);
+        return ERROR_INT("&da not defined", procName, 1);
     *pda = NULL;
     if (!ba)
-        return ERROR_INT("ba not defined", __func__, 1);
+        return ERROR_INT("ba not defined", procName, 1);
     if (!sequence)
-        return ERROR_INT("sequence not defined", __func__, 1);
+        return ERROR_INT("sequence not defined", procName, 1);
 
     data = l_byteaGetData(ba, &size);
     *pda = arrayFindEachSequence(data, size, sequence, seqlen);
@@ -556,30 +567,32 @@ size_t    size;
 /*!
  * \brief   l_byteaWrite()
  *
- * \param[in]    fname      output file
+ * \param[in]    fname output file
  * \param[in]    ba
- * \param[in]    startloc   first byte to output
- * \param[in]    nbytes     number of bytes to write; use 0 to write to
- *                          the end of the data array
+ * \param[in]    startloc first byte to output
+ * \param[in]    endloc last byte to output; use 0 to write to the
+ *                      end of the data array
  * \return  0 if OK, 1 on error
  */
-l_ok
+l_int32
 l_byteaWrite(const char  *fname,
              L_BYTEA     *ba,
              size_t       startloc,
-             size_t       nbytes)
+             size_t       endloc)
 {
 l_int32  ret;
 FILE    *fp;
 
+    PROCNAME("l_byteaWrite");
+
     if (!fname)
-        return ERROR_INT("fname not defined", __func__, 1);
+        return ERROR_INT("fname not defined", procName, 1);
     if (!ba)
-        return ERROR_INT("ba not defined", __func__, 1);
+        return ERROR_INT("ba not defined", procName, 1);
 
     if ((fp = fopenWriteStream(fname, "wb")) == NULL)
-        return ERROR_INT_1("stream not opened", fname, __func__, 1);
-    ret = l_byteaWriteStream(fp, ba, startloc, nbytes);
+        return ERROR_INT("stream not opened", procName, 1);
+    ret = l_byteaWriteStream(fp, ba, startloc, endloc);
     fclose(fp);
     return ret;
 }
@@ -588,32 +601,36 @@ FILE    *fp;
 /*!
  * \brief   l_byteaWriteStream()
  *
- * \param[in]    fp         file stream opened for binary write
+ * \param[in]    fp file stream opened for binary write
  * \param[in]    ba
- * \param[in]    startloc   first byte to output
- * \param[in]    nbytes     number of bytes to write; use 0 to write to
- *                          the end of the data array
+ * \param[in]    startloc first byte to output
+ * \param[in]    endloc last byte to output; use 0 to write to the
+ *                      end of the data array
  * \return  0 if OK, 1 on error
  */
-l_ok
+l_int32
 l_byteaWriteStream(FILE     *fp,
                    L_BYTEA  *ba,
                    size_t    startloc,
-                   size_t    nbytes)
+                   size_t    endloc)
 {
 l_uint8  *data;
-size_t    size, maxbytes;
+size_t    size, nbytes;
+
+    PROCNAME("l_byteaWriteStream");
 
     if (!fp)
-        return ERROR_INT("stream not defined", __func__, 1);
+        return ERROR_INT("stream not defined", procName, 1);
     if (!ba)
-        return ERROR_INT("ba not defined", __func__, 1);
+        return ERROR_INT("ba not defined", procName, 1);
 
     data = l_byteaGetData(ba, &size);
     if (startloc >= size)
-        return ERROR_INT("invalid startloc", __func__, 1);
-    maxbytes = size - startloc;
-    nbytes = (nbytes == 0) ? maxbytes : L_MIN(nbytes, maxbytes);
+        return ERROR_INT("invalid startloc", procName, 1);
+    if (endloc == 0) endloc = size - 1;
+    nbytes = endloc - startloc + 1;
+    if (nbytes < 1)
+        return ERROR_INT("endloc must be >= startloc", procName, 1);
 
     fwrite(data + startloc, 1, nbytes, fp);
     return 0;

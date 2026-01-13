@@ -80,10 +80,6 @@
  * </pre>
  */
 
-#ifdef HAVE_CONFIG_H
-#include <config_auto.h>
-#endif  /* HAVE_CONFIG_H */
-
 #include <string.h>
 #include "allheaders.h"
 #include "readbarcode.h"
@@ -92,10 +88,6 @@
 static const l_int32  MAX_SPACE_WIDTH = 19;  /* was 15 */
 static const l_int32  MAX_NOISE_WIDTH = 50;  /* smaller than barcode width */
 static const l_int32  MAX_NOISE_HEIGHT = 30;  /* smaller than barcode height */
-
-    /* Minimum barcode image size */
-static const l_int32  MIN_BC_WIDTH = 50;
-static const l_int32  MIN_BC_HEIGHT = 50;
 
     /* Static functions */
 static PIX *pixGenerateBarcodeMask(PIX *pixs, l_int32 maxspace,
@@ -120,7 +112,7 @@ static l_int32 numaEvalSyncError(NUMA *nas, l_int32 ifirst, l_int32 ilast,
 
 
 #ifndef  NO_CONSOLE_IO
-#define  DEBUG_DESKEW     0
+#define  DEBUG_DESKEW     1
 #define  DEBUG_WIDTHS     0
 #endif  /* ~NO_CONSOLE_IO */
 
@@ -131,11 +123,11 @@ static l_int32 numaEvalSyncError(NUMA *nas, l_int32 ifirst, l_int32 ilast,
 /*!
  * \brief   pixProcessBarcodes()
  *
- * \param[in]    pixs        any depth
- * \param[in]    format      L_BF_ANY, L_BF_CODEI2OF5, L_BF_CODE93, ...
- * \param[in]    method      L_USE_WIDTHS, L_USE_WINDOWS
- * \param[out]   psaw        [optional] sarray of bar widths
- * \param[in]    debugflag   use 1 to generate debug output
+ * \param[in]    pixs any depth
+ * \param[in]    format L_BF_ANY, L_BF_CODEI2OF5, L_BF_CODE93, ...
+ * \param[in]    method L_USE_WIDTHS, L_USE_WINDOWS
+ * \param[out]   psaw [optional] sarray of bar widths
+ * \param[in]    debugflag use 1 to generate debug output
  * \return  sarray text of barcodes, or NULL if none found or on error
  */
 SARRAY *
@@ -149,13 +141,15 @@ PIX     *pixg;
 PIXA    *pixa;
 SARRAY  *sad;
 
+    PROCNAME("pixProcessBarcodes");
+
     if (psaw) *psaw = NULL;
     if (!pixs)
-        return (SARRAY *)ERROR_PTR("pixs not defined", __func__, NULL);
+        return (SARRAY *)ERROR_PTR("pixs not defined", procName, NULL);
     if (format != L_BF_ANY && !barcodeFormatIsSupported(format))
-        return (SARRAY *)ERROR_PTR("unsupported format", __func__, NULL);
+        return (SARRAY *)ERROR_PTR("unsupported format", procName, NULL);
     if (method != L_USE_WIDTHS && method != L_USE_WINDOWS)
-        return (SARRAY *)ERROR_PTR("invalid method", __func__, NULL);
+        return (SARRAY *)ERROR_PTR("invalid method", procName, NULL);
 
         /* Get an 8 bpp image, no cmap */
     if (pixGetDepth(pixs) == 8 && !pixGetColormap(pixs))
@@ -163,12 +157,14 @@ SARRAY  *sad;
     else
         pixg = pixConvertTo8(pixs, 0);
 
-    pixa = pixExtractBarcodes(pixg, debugflag);
-    pixDestroy(&pixg);
-    if (!pixa)
-        return (SARRAY *)ERROR_PTR("no barcode(s) found", __func__, NULL);
+    if ((pixa = pixExtractBarcodes(pixg, debugflag)) == NULL) {
+        pixDestroy(&pixg);
+        return (SARRAY *)ERROR_PTR("no barcode(s) found", procName, NULL);
+    }
 
     sad = pixReadBarcodes(pixa, format, method, psaw, debugflag);
+
+    pixDestroy(&pixg);
     pixaDestroy(&pixa);
     return sad;
 }
@@ -177,10 +173,10 @@ SARRAY  *sad;
 /*!
  * \brief   pixExtractBarcodes()
  *
- * \param[in]    pixs        8 bpp, no colormap
- * \param[in]    debugflag   use 1 to generate debug output
- * \return  pixa  deskewed and cropped barcodes, or NULL if none found
- *                or on error
+ * \param[in]    pixs 8 bpp, no colormap
+ * \param[in]    debugflag use 1 to generate debug output
+ * \return  pixa deskewed and cropped barcodes, or NULL if
+ *                    none found or on error
  */
 PIXA *
 pixExtractBarcodes(PIX     *pixs,
@@ -190,54 +186,55 @@ l_int32    i, n;
 l_float32  angle, conf;
 BOX       *box;
 BOXA      *boxa;
-PIX       *pix1, *pix2, *pix3;
+PIX       *pixb, *pixm, *pixt;
 PIXA      *pixa;
 
+    PROCNAME("pixExtractBarcodes");
+
     if (!pixs || pixGetDepth(pixs) != 8 || pixGetColormap(pixs))
-        return (PIXA *)ERROR_PTR("pixs undefined or not 8 bpp", __func__, NULL);
+        return (PIXA *)ERROR_PTR("pixs undefined or not 8 bpp", procName, NULL);
 
         /* Locate them; use small threshold for edges. */
-    boxa = pixLocateBarcodes(pixs, 20, &pix2, &pix1);
+    boxa = pixLocateBarcodes(pixs, 20, &pixb, &pixm);
     n = boxaGetCount(boxa);
-    L_INFO("%d possible barcode(s) found\n", __func__, n);
+    L_INFO("%d possible barcode(s) found\n", procName, n);
     if (n == 0) {
         boxaDestroy(&boxa);
-        pixDestroy(&pix2);
-        pixDestroy(&pix1);
+        pixDestroy(&pixb);
+        pixDestroy(&pixm);
         return NULL;
     }
 
     if (debugflag) {
-        boxaWriteStderr(boxa);
-        pixDisplay(pix2, 100, 100);
-        pixDisplay(pix1, 800, 100);
+        boxaWriteStream(stderr, boxa);
+        pixDisplay(pixb, 100, 100);
+        pixDisplay(pixm, 800, 100);
     }
-    pixDestroy(&pix1);
 
         /* Deskew each barcode individually */
     pixa = pixaCreate(n);
     for (i = 0; i < n; i++) {
         box = boxaGetBox(boxa, i, L_CLONE);
-        pix3 = pixDeskewBarcode(pixs, pix2, box, 15, 20, &angle, &conf);
-        if (!pix3) conf = 0.0;  /* don't use */
-        L_INFO("angle = %6.2f, conf = %6.2f\n", __func__, angle, conf);
+        pixt = pixDeskewBarcode(pixs, pixb, box, 15, 20, &angle, &conf);
+        L_INFO("angle = %6.2f, conf = %6.2f\n", procName, angle, conf);
         if (conf > 5.0) {
-            pixaAddPix(pixa, pix3, L_INSERT);
+            pixaAddPix(pixa, pixt, L_INSERT);
             pixaAddBox(pixa, box, L_INSERT);
         } else {
-            pixDestroy(&pix3);
+            pixDestroy(&pixt);
             boxDestroy(&box);
         }
     }
-    pixDestroy(&pix2);
-    boxaDestroy(&boxa);
 
 #if  DEBUG_DESKEW
-    pix3 = pixaDisplayTiledInRows(pixa, 8, 1000, 1.0, 0, 30, 2);
-    pixWrite("/tmp/lept/pix3.png", pix3, IFF_PNG);
-    pixDestroy(&pix3);
+    pixt = pixaDisplayTiledInRows(pixa, 8, 1000, 1.0, 0, 30, 2);
+    pixWrite("junkpixt", pixt, IFF_PNG);
+    pixDestroy(&pixt);
 #endif  /* DEBUG_DESKEW */
 
+    pixDestroy(&pixb);
+    pixDestroy(&pixm);
+    boxaDestroy(&boxa);
     return pixa;
 }
 
@@ -245,13 +242,13 @@ PIXA      *pixa;
 /*!
  * \brief   pixReadBarcodes()
  *
- * \param[in]    pixa        of 8 bpp deskewed and cropped barcodes
- * \param[in]    format      L_BF_ANY, L_BF_CODEI2OF5, L_BF_CODE93, ...
- * \param[in]    method      L_USE_WIDTHS, L_USE_WINDOWS;
- * \param[out]   psaw        [optional] sarray of bar widths
- * \param[in]    debugflag   use 1 to generate debug output
- * \return  sa   sarray of widths, one string for each barcode found,
- *               or NULL on error
+ * \param[in]    pixa of 8 bpp deskewed and cropped barcodes
+ * \param[in]    format L_BF_ANY, L_BF_CODEI2OF5, L_BF_CODE93, ...
+ * \param[in]    method L_USE_WIDTHS, L_USE_WINDOWS;
+ * \param[out]   psaw [optional] sarray of bar widths
+ * \param[in]    debugflag use 1 to generate debug output
+ * \return  sa sarray of widths, one string for each barcode found,
+ *                  or NULL on error
  */
 SARRAY *
 pixReadBarcodes(PIXA     *pixa,
@@ -262,35 +259,31 @@ pixReadBarcodes(PIXA     *pixa,
 {
 char      *barstr, *data;
 char       emptystring[] = "";
-l_int32    w, h, i, j, n, nbars, ival;
+l_int32    i, j, n, nbars, ival;
 NUMA      *na;
-PIX       *pix1;
+PIX       *pixt;
 SARRAY    *saw, *sad;
+
+    PROCNAME("pixReadBarcodes");
 
     if (psaw) *psaw = NULL;
     if (!pixa)
-        return (SARRAY *)ERROR_PTR("pixa not defined", __func__, NULL);
+        return (SARRAY *)ERROR_PTR("pixa not defined", procName, NULL);
     if (format != L_BF_ANY && !barcodeFormatIsSupported(format))
-        return (SARRAY *)ERROR_PTR("unsupported format", __func__, NULL);
+        return (SARRAY *)ERROR_PTR("unsupported format", procName, NULL);
     if (method != L_USE_WIDTHS && method != L_USE_WINDOWS)
-        return (SARRAY *)ERROR_PTR("invalid method", __func__, NULL);
+        return (SARRAY *)ERROR_PTR("invalid method", procName, NULL);
 
     n = pixaGetCount(pixa);
     saw = sarrayCreate(n);
     sad = sarrayCreate(n);
     for (i = 0; i < n; i++) {
             /* Extract the widths of the lines in each barcode */
-        pix1 = pixaGetPix(pixa, i, L_CLONE);
-        pixGetDimensions(pix1, &w, &h, NULL);
-        if (w < MIN_BC_WIDTH || h < MIN_BC_HEIGHT) {
-            L_ERROR("pix is too small: w = %d, h = %d\n", __func__, w, h);
-            pixDestroy(&pix1);
-            continue;
-        }
-        na = pixReadBarcodeWidths(pix1, method, debugflag);
-        pixDestroy(&pix1);
+        pixt = pixaGetPix(pixa, i, L_CLONE);
+        na = pixReadBarcodeWidths(pixt, method, debugflag);
+        pixDestroy(&pixt);
         if (!na) {
-            ERROR_INT("valid barcode widths not returned", __func__, 1);
+            ERROR_INT("valid barcode widths not returned", procName, 1);
             continue;
         }
 
@@ -307,7 +300,7 @@ SARRAY    *saw, *sad;
             /* Decode the width strings */
         data = barcodeDispatchDecoder(barstr, format, debugflag);
         if (!data) {
-            ERROR_INT("barcode not decoded", __func__, 1);
+            ERROR_INT("barcode not decoded", procName, 1);
             sarrayAddString(sad, emptystring, L_COPY);
             continue;
         }
@@ -318,13 +311,14 @@ SARRAY    *saw, *sad;
     if (sarrayGetCount(saw) == 0) {
         sarrayDestroy(&saw);
         sarrayDestroy(&sad);
-        return (SARRAY *)ERROR_PTR("no valid barcode data", __func__, NULL);
+        return (SARRAY *)ERROR_PTR("no valid barcode data", procName, NULL);
     }
 
     if (psaw)
         *psaw = saw;
     else
         sarrayDestroy(&saw);
+
     return sad;
 }
 
@@ -332,10 +326,10 @@ SARRAY    *saw, *sad;
 /*!
  * \brief   pixReadBarcodeWidths()
  *
- * \param[in]    pixs        of 8 bpp deskewed and cropped barcode
- * \param[in]    method      L_USE_WIDTHS, L_USE_WINDOWS;
- * \param[in]    debugflag   use 1 to generate debug output
- * \return  na   numa of widths (each in set {1,2,3,4}, or NULL on error
+ * \param[in]    pixs of 8 bpp deskewed and cropped barcode
+ * \param[in]    method L_USE_WIDTHS, L_USE_WINDOWS;
+ * \param[in]    debugflag use 1 to generate debug output
+ * \return  na numa of widths (each in set {1,2,3,4}, or NULL on error
  */
 NUMA *
 pixReadBarcodeWidths(PIX     *pixs,
@@ -345,12 +339,14 @@ pixReadBarcodeWidths(PIX     *pixs,
 l_float32  winwidth;
 NUMA      *na;
 
+    PROCNAME("pixReadBarcodeWidths");
+
     if (!pixs)
-        return (NUMA *)ERROR_PTR("pixs not defined", __func__, NULL);
+        return (NUMA *)ERROR_PTR("pixs not defined", procName, NULL);
     if (pixGetDepth(pixs) != 8)
-        return (NUMA *)ERROR_PTR("pixs not 8 bpp", __func__, NULL);
+        return (NUMA *)ERROR_PTR("pixs not 8 bpp", procName, NULL);
     if (method != L_USE_WIDTHS && method != L_USE_WINDOWS)
-        return (NUMA *)ERROR_PTR("invalid method", __func__, NULL);
+        return (NUMA *)ERROR_PTR("invalid method", procName, NULL);
 
         /* Extract the widths of the lines in each barcode */
     if (method == L_USE_WIDTHS)
@@ -361,12 +357,12 @@ NUMA      *na;
                                       NULL, debugflag);
 #if  DEBUG_WIDTHS
         if (method == L_USE_WINDOWS)
-            lept_stderr("Window width for barcode: %7.3f\n", winwidth);
-        numaWriteStderr(na);
+            fprintf(stderr, "Window width for barcode: %7.3f\n", winwidth);
+        numaWriteStream(stderr, na);
 #endif  /* DEBUG_WIDTHS */
 
     if (!na)
-        return (NUMA *)ERROR_PTR("barcode widths invalid", __func__, NULL);
+        return (NUMA *)ERROR_PTR("barcode widths invalid", procName, NULL);
 
     return na;
 }
@@ -378,11 +374,11 @@ NUMA      *na;
 /*!
  * \brief   pixLocateBarcodes()
  *
- * \param[in]    pixs     any depth
- * \param[in]    thresh   for binarization of edge filter output; typ. 20
- * \param[out]   ppixb    [optional] binarized edge filtered input image
- * \param[out]   ppixm    [optional] mask over barcodes
- * \return  boxa   location of barcodes, or NULL if none found or on error
+ * \param[in]    pixs any depth
+ * \param[in]    thresh for binarization of edge filter output; typ. 20
+ * \param[out]   ppixb [optional] binarized edge filtered input image
+ * \param[out]   ppixm [optional] mask over barcodes
+ * \return  boxa location of barcodes, or NULL if none found or on error
  */
 BOXA *
 pixLocateBarcodes(PIX     *pixs,
@@ -393,8 +389,10 @@ pixLocateBarcodes(PIX     *pixs,
 BOXA  *boxa;
 PIX   *pix8, *pixe, *pixb, *pixm;
 
+    PROCNAME("pixLocateBarcodes");
+
     if (!pixs)
-        return (BOXA *)ERROR_PTR("pixs not defined", __func__, NULL);
+        return (BOXA *)ERROR_PTR("pixs not defined", procName, NULL);
 
         /* Get an 8 bpp image, no cmap */
     if (pixGetDepth(pixs) == 8 && !pixGetColormap(pixs))
@@ -429,11 +427,11 @@ PIX   *pix8, *pixe, *pixb, *pixm;
 /*!
  * \brief   pixGenerateBarcodeMask()
  *
- * \param[in]    pixs       1 bpp
- * \param[in]    maxspace   largest space in the barcode, in pixels
- * \param[in]    nwidth     opening 'width' to remove noise
- * \param[in]    nheight    opening 'height' to remove noise
- * \return  pixm   mask over barcodes, or NULL if none found or on error
+ * \param[in]    pixs 1 bpp
+ * \param[in]    maxspace largest space in the barcode, in pixels
+ * \param[in]    nwidth opening 'width' to remove noise
+ * \param[in]    nheight opening 'height' to remove noise
+ * \return  pixm mask over barcodes, or NULL if none found or on error
  *
  * <pre>
  * Notes:
@@ -450,8 +448,10 @@ pixGenerateBarcodeMask(PIX     *pixs,
 {
 PIX  *pixt1, *pixt2, *pixd;
 
+    PROCNAME("pixGenerateBarcodeMask");
+
     if (!pixs || pixGetDepth(pixs) != 1)
-        return (PIX *)ERROR_PTR("pixs not defined", __func__, NULL);
+        return (PIX *)ERROR_PTR("pixs not defined", procName, NULL);
 
         /* Identify horizontal barcodes */
     pixt1 = pixCloseBrick(NULL, pixs, maxspace + 1, 1);
@@ -481,14 +481,14 @@ PIX  *pixt1, *pixt2, *pixd;
 /*!
  * \brief   pixDeskewBarcode()
  *
- * \param[in]    pixs        input image; 8 bpp
- * \param[in]    pixb        binarized edge-filtered input image
- * \param[in]    box         identified region containing barcode
- * \param[in]    margin      of extra pixels around box to extract
- * \param[in]    threshold   for binarization; ~20
- * \param[out]   pangle      [optional] in degrees, clockwise is positive
- * \param[out]   pconf       [optional] confidence
- * \return  pixd   deskewed barcode, or NULL on error
+ * \param[in]    pixs input image; 8 bpp
+ * \param[in]    pixb binarized edge-filtered input image
+ * \param[in]    box identified region containing barcode
+ * \param[in]    margin of extra pixels around box to extract
+ * \param[in]    threshold for binarization; ~20
+ * \param[out]   pangle [optional] in degrees, clockwise is positive
+ * \param[out]   pconf [optional] confidence
+ * \return  pixd deskewed barcode, or NULL on error
  *
  * <pre>
  * Notes:
@@ -507,37 +507,34 @@ pixDeskewBarcode(PIX        *pixs,
 {
 l_int32    x, y, w, h, n;
 l_float32  angle, angle1, angle2, conf, conf1, conf2, score1, score2, deg2rad;
-BOX       *box1, *box2;
-BOXA      *boxa1, *boxa2;
-PIX       *pix1, *pix2, *pix3, *pix4, *pix5, *pix6, *pixd;
+BOX       *boxe, *boxt;
+BOXA      *boxa, *boxat;
+PIX       *pixt1, *pixt2, *pixt3, *pixt4, *pixt5, *pixt6, *pixd;
 
-    if (pangle) *pangle = 0.0;
-    if (pconf) *pconf = 0.0;
+    PROCNAME("pixDeskewBarcode");
+
     if (!pixs || pixGetDepth(pixs) != 8)
-        return (PIX *)ERROR_PTR("pixs undefined or not 8 bpp", __func__, NULL);
+        return (PIX *)ERROR_PTR("pixs undefined or not 8 bpp", procName, NULL);
     if (!pixb || pixGetDepth(pixb) != 1)
-        return (PIX *)ERROR_PTR("pixb undefined or not 1 bpp", __func__, NULL);
+        return (PIX *)ERROR_PTR("pixb undefined or not 1 bpp", procName, NULL);
     if (!box)
-        return (PIX *)ERROR_PTR("box not defined or 1 bpp", __func__, NULL);
+        return (PIX *)ERROR_PTR("box not defined or 1 bpp", procName, NULL);
 
         /* Clip out */
-    deg2rad = 3.1415926535f / 180.f;
+    deg2rad = 3.1415926535 / 180.;
     boxGetGeometry(box, &x, &y, &w, &h);
-    box2 = boxCreate(x - 25, y - 25, w + 51, h + 51);
-    pix1 = pixClipRectangle(pixb, box2, NULL);
-    pix2 = pixClipRectangle(pixs, box2, NULL);
-    boxDestroy(&box2);
+    boxe = boxCreate(x - 25, y - 25, w + 51, h + 51);
+    pixt1 = pixClipRectangle(pixb, boxe, NULL);
+    pixt2 = pixClipRectangle(pixs, boxe, NULL);
+    boxDestroy(&boxe);
 
         /* Deskew, looking at all possible orientations over 180 degrees */
-    pix3 = pixRotateOrth(pix1, 1);  /* look for vertical bar lines */
-    pix4 = pixClone(pix1);   /* look for horizontal bar lines */
-    pixFindSkewSweepAndSearchScore(pix3, &angle1, &conf1, &score1,
-                                   1, 1, 0.0f, 45.0f, 2.5f, 0.01f);
-    pixFindSkewSweepAndSearchScore(pix4, &angle2, &conf2, &score2,
-                                   1, 1, 0.0f, 45.0f, 2.5f, 0.01f);
-    pixDestroy(&pix1);
-    pixDestroy(&pix3);
-    pixDestroy(&pix4);
+    pixt3 = pixRotateOrth(pixt1, 1);  /* look for vertical bar lines */
+    pixt4 = pixClone(pixt1);   /* look for horizontal bar lines */
+    pixFindSkewSweepAndSearchScore(pixt3, &angle1, &conf1, &score1,
+                                   1, 1, 0.0, 45.0, 2.5, 0.01);
+    pixFindSkewSweepAndSearchScore(pixt4, &angle2, &conf2, &score2,
+                                   1, 1, 0.0, 45.0, 2.5, 0.01);
 
         /* Because we're using the boundary pixels of the barcodes,
          * the peak can be sharper (and the confidence ratio higher)
@@ -549,51 +546,52 @@ PIX       *pix1, *pix2, *pix3, *pix4, *pix5, *pix6, *pixd;
         conf = conf1;
         if (conf1 > 6.0 && L_ABS(angle1) > 0.1) {
             angle = angle1;
-            pix5 = pixRotate(pix2, deg2rad * angle1, L_ROTATE_AREA_MAP,
+            pixt5 = pixRotate(pixt2, deg2rad * angle1, L_ROTATE_AREA_MAP,
                               L_BRING_IN_WHITE, 0, 0);
         } else {
             angle = 0.0;
-            pix5 = pixClone(pix2);
+            pixt5 = pixClone(pixt2);
         }
     } else {  /* score2 > score1 */
         conf = conf2;
-        pix6 = pixRotateOrth(pix2, 1);
+        pixt6 = pixRotateOrth(pixt2, 1);
         if (conf2 > 6.0 && L_ABS(angle2) > 0.1) {
             angle = 90.0 + angle2;
-            pix5 = pixRotate(pix6, deg2rad * angle2, L_ROTATE_AREA_MAP,
+            pixt5 = pixRotate(pixt6, deg2rad * angle2, L_ROTATE_AREA_MAP,
                               L_BRING_IN_WHITE, 0, 0);
         } else {
             angle = 90.0;
-            pix5 = pixClone(pix6);
+            pixt5 = pixClone(pixt6);
         }
-        pixDestroy(&pix6);
+        pixDestroy(&pixt6);
     }
-    pixDestroy(&pix2);
+    pixDestroy(&pixt3);
+    pixDestroy(&pixt4);
 
         /* Extract barcode plus a margin around it */
-    boxa1 = pixLocateBarcodes(pix5, threshold, 0, 0);
-    if ((n = boxaGetCount(boxa1)) != 1) {
-        L_WARNING("barcode mask in %d components\n", __func__, n);
-        boxa2 = boxaSort(boxa1, L_SORT_BY_AREA, L_SORT_DECREASING, NULL);
+    boxa = pixLocateBarcodes(pixt5, threshold, 0, 0);
+    if ((n = boxaGetCount(boxa)) != 1) {
+        L_WARNING("barcode mask in %d components\n", procName, n);
+        boxat = boxaSort(boxa, L_SORT_BY_AREA, L_SORT_DECREASING, NULL);
     } else {
-        boxa2 = boxaCopy(boxa1, L_CLONE);
+        boxat = boxaCopy(boxa, L_CLONE);
     }
-    box1 = boxaGetBox(boxa2, 0, L_CLONE);
-    boxGetGeometry(box1, &x, &y, &w, &h);
-    box2 = boxCreate(x - margin, y - margin, w + 2 * margin,
+    boxt = boxaGetBox(boxat, 0, L_CLONE);
+    boxGetGeometry(boxt, &x, &y, &w, &h);
+    boxe = boxCreate(x - margin, y - margin, w + 2 * margin,
                      h + 2 * margin);
-    pixd = pixClipRectangle(pix5, box2, NULL);
-    boxDestroy(&box1);
-    boxDestroy(&box2);
-    boxaDestroy(&boxa1);
-    boxaDestroy(&boxa2);
-    pixDestroy(&pix5);
+    pixd = pixClipRectangle(pixt5, boxe, NULL);
+    boxDestroy(&boxt);
+    boxDestroy(&boxe);
+    boxaDestroy(&boxa);
+    boxaDestroy(&boxat);
 
     if (pangle) *pangle = angle;
     if (pconf) *pconf = conf;
 
-    if (!pixd)
-        L_ERROR("pixd not made\n", __func__);
+    pixDestroy(&pixt1);
+    pixDestroy(&pixt2);
+    pixDestroy(&pixt5);
     return pixd;
 }
 
@@ -604,15 +602,15 @@ PIX       *pix1, *pix2, *pix3, *pix4, *pix5, *pix6, *pixd;
 /*!
  * \brief   pixExtractBarcodeWidths1()
  *
- * \param[in]    pixs        input image; 8 bpp
- * \param[in]    thresh      estimated pixel threshold for crossing
- *                           white <--> black; typ. ~120
- * \param[in]    binfract    histo binsize as a fraction of minsize; e.g., 0.25
- * \param[out]   pnaehist    [optional] histogram of black widths; NULL ok
- * \param[out]   pnaohist    [optional] histogram of white widths; NULL ok
- * \param[in]    debugflag   use 1 to generate debug output
- * \return  nad   numa of barcode widths in encoded integer units,
- *                or NULL on error
+ * \param[in]    pixs input image; 8 bpp
+ * \param[in]    thresh estimated pixel threshold for crossing
+ *                      white <--> black; typ. ~120
+ * \param[in]    binfract histo binsize as a fraction of minsize; e.g., 0.25
+ * \param[out]   pnaehist [optional] histogram of black widths; NULL ok
+ * \param[out]   pnaohist [optional] histogram of white widths; NULL ok
+ * \param[in]    debugflag use 1 to generate debug output
+ * \return  nad numa of barcode widths in encoded integer units,
+ *                  or NULL on error
  *
  * <pre>
  * Notes:
@@ -634,14 +632,13 @@ pixExtractBarcodeWidths1(PIX      *pixs,
 {
 NUMA  *nac, *nad;
 
-    if (pnaehist) *pnaehist = NULL;
-    if (pnaohist) *pnaohist = NULL;
+    PROCNAME("pixExtractBarcodeWidths1");
+
     if (!pixs || pixGetDepth(pixs) != 8)
-        return (NUMA *)ERROR_PTR("pixs undefined or not 8 bpp", __func__, NULL);
+        return (NUMA *)ERROR_PTR("pixs undefined or not 8 bpp", procName, NULL);
 
         /* Get the best estimate of the crossings, in pixel units */
-    if ((nac = pixExtractBarcodeCrossings(pixs, thresh, debugflag)) == NULL)
-        return (NUMA *)ERROR_PTR("nac not made", __func__, NULL);
+    nac = pixExtractBarcodeCrossings(pixs, thresh, debugflag);
 
         /* Get the array of bar widths, starting with a black bar  */
     nad = numaQuantizeCrossingsByWidth(nac, binfract, pnaehist,
@@ -655,14 +652,14 @@ NUMA  *nac, *nad;
 /*!
  * \brief   pixExtractBarcodeWidths2()
  *
- * \param[in]    pixs        input image; 8 bpp
- * \param[in]    thresh      estimated pixel threshold for crossing
- *                           white <--> black; typ. ~120
- * \param[out]   pwidth      [optional] best decoding window width, in pixels
- * \param[out]   pnac        [optional] number of transitions in each window
- * \param[in]    debugflag   use 1 to generate debug output
- * \return  nad   numa of barcode widths in encoded integer units,
- *                or NULL on error
+ * \param[in]    pixs input image; 8 bpp
+ * \param[in]    thresh estimated pixel threshold for crossing
+ *                      white <--> black; typ. ~120
+ * \param[out]   pwidth [optional] best decoding window width, in pixels
+ * \param[out]   pnac [optional] number of transitions in each window
+ * \param[in]    debugflag use 1 to generate debug output
+ * \return  nad numa of barcode widths in encoded integer units,
+ *                  or NULL on error
  *
  * <pre>
  * Notes:
@@ -687,18 +684,17 @@ pixExtractBarcodeWidths2(PIX        *pixs,
 {
 NUMA  *nacp, *nad;
 
-    if (pwidth) *pwidth = 0;
-    if (pnac) *pnac = NULL;
+    PROCNAME("pixExtractBarcodeWidths2");
+
     if (!pixs || pixGetDepth(pixs) != 8)
-        return (NUMA *)ERROR_PTR("pixs undefined or not 8 bpp", __func__, NULL);
+        return (NUMA *)ERROR_PTR("pixs undefined or not 8 bpp", procName, NULL);
 
         /* Get the best estimate of the crossings, in pixel units */
-    if ((nacp = pixExtractBarcodeCrossings(pixs, thresh, debugflag)) == NULL)
-        return (NUMA *)ERROR_PTR("nacp not made", __func__, NULL);
+    nacp = pixExtractBarcodeCrossings(pixs, thresh, debugflag);
 
         /* Quantize the crossings to get actual windowed data */
-    nad = numaQuantizeCrossingsByWindow(nacp, 2.0, pwidth, NULL,
-                                        pnac, debugflag);
+    nad = numaQuantizeCrossingsByWindow(nacp, 2.0, pwidth, NULL, pnac, debugflag);
+
     numaDestroy(&nacp);
     return nad;
 }
@@ -707,16 +703,11 @@ NUMA  *nacp, *nad;
 /*!
  * \brief   pixExtractBarcodeCrossings()
  *
- * \param[in]    pixs        input image; 8 bpp
- * \param[in]    thresh      estimated pixel threshold for crossing
- *                           white <--> black; typ. ~120
- * \param[in]    debugflag   use 1 to generate debug output
- * \return  numa   of crossings, in pixel units, or NULL on error
- *
- * <pre>
- * Notes:
- *      (1) Require at least 10 crossings.
- * </pre>
+ * \param[in]    pixs input image; 8 bpp
+ * \param[in]    thresh estimated pixel threshold for crossing
+ *                      white <--> black; typ. ~120
+ * \param[in]    debugflag use 1 to generate debug output
+ * \return  numa of crossings, in pixel units, or NULL on error
  */
 NUMA *
 pixExtractBarcodeCrossings(PIX       *pixs,
@@ -725,15 +716,15 @@ pixExtractBarcodeCrossings(PIX       *pixs,
 {
 l_int32    w;
 l_float32  bestthresh;
-GPLOT     *gplot;
 NUMA      *nas, *nax, *nay, *nad;
 
+    PROCNAME("pixExtractBarcodeCrossings");
+
     if (!pixs || pixGetDepth(pixs) != 8)
-        return (NUMA *)ERROR_PTR("pixs undefined or not 8 bpp", __func__, NULL);
+        return (NUMA *)ERROR_PTR("pixs undefined or not 8 bpp", procName, NULL);
 
         /* Scan pixels horizontally and average results */
-    if ((nas = pixAverageRasterScans(pixs, 50)) == NULL)
-        return (NUMA *)ERROR_PTR("nas not made", __func__, NULL);
+    nas = pixAverageRasterScans(pixs, 51);
 
         /* Interpolate to get 4x the number of values */
     w = pixGetWidth(pixs);
@@ -742,8 +733,8 @@ NUMA      *nas, *nax, *nay, *nad;
 
     if (debugflag) {
         lept_mkdir("lept/barcode");
-        gplot = gplotCreate("/tmp/lept/barcode/signal", GPLOT_PNG,
-                            "Pixel values", "dist in pixels", "value");
+        GPLOT *gplot = gplotCreate("/tmp/lept/barcode/signal", GPLOT_PNG,
+                                   "Pixel values", "dist in pixels", "value");
         gplotAddPlot(gplot, nax, nay, GPLOT_LINES, "plot 1");
         gplotMakeOutput(gplot);
         gplotDestroy(&gplot);
@@ -756,14 +747,10 @@ NUMA      *nas, *nax, *nay, *nad;
 
         /* Get the crossings with the best threshold. */
     nad = numaCrossingsByThreshold(nax, nay, bestthresh);
+
     numaDestroy(&nas);
     numaDestroy(&nax);
     numaDestroy(&nay);
-
-    if (numaGetCount(nad) < 10) {
-        L_ERROR("Only %d crossings; failure\n", __func__, numaGetCount(nad));
-        numaDestroy(&nad);
-    }
     return nad;
 }
 
@@ -774,8 +761,8 @@ NUMA      *nas, *nax, *nay, *nad;
 /*!
  * \brief   pixAverageRasterScans()
  *
- * \param[in]    pixs     input image; 8 bpp
- * \param[in]    nscans   number of adjacent scans, about the center vertically
+ * \param[in]    pixs input image; 8 bpp
+ * \param[in]    nscans number of adjacent scans, about the center vertically
  * \return  numa of average pixel values across image, or NULL on error
  */
 static NUMA *
@@ -787,11 +774,13 @@ l_uint32   *line, *data;
 l_float32  *array;
 NUMA       *nad;
 
+    PROCNAME("pixAverageRasterScans");
+
     if (!pixs || pixGetDepth(pixs) != 8)
-        return (NUMA *)ERROR_PTR("pixs undefined or not 8 bpp", __func__, NULL);
+        return (NUMA *)ERROR_PTR("pixs undefined or not 8 bpp", procName, NULL);
 
     pixGetDimensions(pixs, &w, &h, NULL);
-    if (nscans > h) {
+    if (nscans <= h) {
         first = 0;
         last = h - 1;
         nscans = h;
@@ -824,12 +813,12 @@ NUMA       *nad;
 /*!
  * \brief   numaQuantizeCrossingsByWidth()
  *
- * \param[in]    nas         numa of crossing locations, in pixel units
- * \param[in]    binfract    histo binsize as a fraction of minsize; e.g., 0.25
- * \param[out]   pnaehist    [optional] histo of even (black) bar widths
- * \param[out]   pnaohist    [optional] histo of odd (white) bar widths
- * \param[in]    debugflag   1 to generate plots of histograms of bar widths
- * \return  nad   sequence of widths, in unit sizes, or NULL on error
+ * \param[in]    nas numa of crossing locations, in pixel units
+ * \param[in]    binfract histo binsize as a fraction of minsize; e.g., 0.25
+ * \param[out]   pnaehist [optional] histo of even (black) bar widths
+ * \param[out]   pnaohist [optional] histo of odd (white) bar widths
+ * \param[in]    debugflag 1 to generate plots of histograms of bar widths
+ * \return  nad sequence of widths, in unit sizes, or NULL on error
  *
  * <pre>
  * Notes:
@@ -851,32 +840,24 @@ numaQuantizeCrossingsByWidth(NUMA       *nas,
                              NUMA      **pnaohist,
                              l_int32     debugflag)
 {
-l_int32    i, n, ret, ned, nod, iw, width;
+l_int32    i, n, ned, nod, iw, width;
 l_float32  val, minsize, maxsize, factor;
 GPLOT     *gplot;
 NUMA      *naedist, *naodist, *naehist, *naohist, *naecent, *naocent;
 NUMA      *naerange, *naorange, *naelut, *naolut, *nad;
 
-    if (pnaehist) *pnaehist = NULL;
-    if (pnaohist) *pnaohist = NULL;
-    if (!nas)
-        return (NUMA *)ERROR_PTR("nas not defined", __func__, NULL);
-    n = numaGetCount(nas);
-    if (n < 10)
-        return (NUMA *)ERROR_PTR("n < 10", __func__, NULL);
-    if (binfract <= 0.0)
-        return (NUMA *)ERROR_PTR("binfract <= 0.0", __func__, NULL);
+    PROCNAME("numaQuantizeCrossingsByWidth");
 
-        /* Get even and odd crossing distances, and determine the rank
-         * widths for rank 0.1 (minsize) and 0.9 (maxsize). */
-    ret = numaGetCrossingDistances(nas, &naedist, &naodist, &minsize, &maxsize);
-    if (ret || minsize < 1.0 || maxsize / minsize > 8.0) {
-        L_ERROR("bad data, or minsize = %5.2f < 1.0 or max/min = %f > 4.0\n",
-                __func__, minsize, maxsize / minsize);
-        numaDestroy(&naedist);
-        numaDestroy(&naodist);
-        return NULL;
-    }
+    if (!nas)
+        return (NUMA *)ERROR_PTR("nas not defined", procName, NULL);
+    n = numaGetCount(nas);
+    if (n < 2)
+        return (NUMA *)ERROR_PTR("n < 2", procName, NULL);
+    if (binfract <= 0.0)
+        return (NUMA *)ERROR_PTR("binfract <= 0.0", procName, NULL);
+
+        /* Get even and odd crossing distances */
+    numaGetCrossingDistances(nas, &naedist, &naodist, &minsize, &maxsize);
 
         /* Bin the spans in units of binfract * minsize.  These
          * units are convenient because they scale to make at least
@@ -923,21 +904,21 @@ NUMA      *naerange, *naorange, *naelut, *naolut, *nad;
     ned = numaGetCount(naedist);
     nod = numaGetCount(naodist);
     if (nod != ned - 1)
-        L_WARNING("ned != nod + 1\n", __func__);
+        L_WARNING("ned != nod + 1\n", procName);
     factor = 1.0 / (binfract * minsize);  /* for converting units */
     for (i = 0; i < ned - 1; i++) {
         numaGetFValue(naedist, i, &val);
         width = (l_int32)(factor * val);
         numaGetIValue(naelut, width, &iw);
         numaAddNumber(nad, iw);
-/*        lept_stderr("even: val = %7.3f, width = %d, iw = %d\n",
-                      val, width, iw); */
+/*        fprintf(stderr, "even: val = %7.3f, width = %d, iw = %d\n",
+                val, width, iw); */
         numaGetFValue(naodist, i, &val);
         width = (l_int32)(factor * val);
         numaGetIValue(naolut, width, &iw);
         numaAddNumber(nad, iw);
-/*        lept_stderr("odd: val = %7.3f, width = %d, iw = %d\n",
-                      val, width, iw); */
+/*        fprintf(stderr, "odd: val = %7.3f, width = %d, iw = %d\n",
+                val, width, iw); */
     }
     numaGetFValue(naedist, ned - 1, &val);
     width = (l_int32)(factor * val);
@@ -945,26 +926,44 @@ NUMA      *naerange, *naorange, *naelut, *naolut, *nad;
     numaAddNumber(nad, iw);
 
     if (debugflag) {
-        lept_stderr(" ---- Black bar widths (pixels) ------ \n");
-        numaWriteStderr(naedist);
-        lept_stderr(" ---- Histogram of black bar widths ------ \n");
-        numaWriteStderr(naehist);
-        lept_stderr(" ---- Peak ranges in black bar histogram bins --- \n");
-        numaWriteStderr(naerange);
-        lept_stderr(" ---- Peak black bar centroid width values ------ \n");
-        numaWriteStderr(naecent);
-        lept_stderr(" ---- Black bar lookup table ------ \n");
-        numaWriteStderr(naelut);
-        lept_stderr(" ---- White bar widths (pixels) ------ \n");
-        numaWriteStderr(naodist);
-        lept_stderr(" ---- Histogram of white bar widths ------ \n");
-        numaWriteStderr(naohist);
-        lept_stderr(" ---- Peak ranges in white bar histogram bins --- \n");
-        numaWriteStderr(naorange);
-        lept_stderr(" ---- Peak white bar centroid width values ------ \n");
-        numaWriteStderr(naocent);
-        lept_stderr(" ---- White bar lookup table ------ \n");
-        numaWriteStderr(naolut);
+        fprintf(stderr, " ---- Black bar widths (pixels) ------ \n");
+        numaWriteStream(stderr, naedist);
+    }
+    if (debugflag) {
+        fprintf(stderr, " ---- Histogram of black bar widths ------ \n");
+        numaWriteStream(stderr, naehist);
+    }
+    if (debugflag) {
+        fprintf(stderr, " ---- Peak ranges in black bar histogram bins ------ \n");
+        numaWriteStream(stderr, naerange);
+    }
+    if (debugflag) {
+        fprintf(stderr, " ---- Peak black bar centroid width values ------ \n");
+        numaWriteStream(stderr, naecent);
+    }
+    if (debugflag) {
+        fprintf(stderr, " ---- Black bar lookup table ------ \n");
+        numaWriteStream(stderr, naelut);
+    }
+    if (debugflag) {
+        fprintf(stderr, " ---- White bar widths (pixels) ------ \n");
+        numaWriteStream(stderr, naodist);
+    }
+    if (debugflag) {
+        fprintf(stderr, " ---- Histogram of white bar widths ------ \n");
+        numaWriteStream(stderr, naohist);
+    }
+    if (debugflag) {
+        fprintf(stderr, " ---- Peak ranges in white bar histogram bins ------ \n");
+        numaWriteStream(stderr, naorange);
+    }
+    if (debugflag) {
+        fprintf(stderr, " ---- Peak white bar centroid width values ------ \n");
+        numaWriteStream(stderr, naocent);
+    }
+    if (debugflag) {
+        fprintf(stderr, " ---- White bar lookup table ------ \n");
+        numaWriteStream(stderr, naolut);
     }
 
     numaDestroy(&naedist);
@@ -990,11 +989,11 @@ NUMA      *naerange, *naorange, *naelut, *naolut, *nad;
 /*!
  * \brief   numaGetCrossingDistances()
  *
- * \param[in]    nas        numa of crossing locations
- * \param[out]   pnaedist   [optional] even distances between crossings
- * \param[out]   pnaodist   [optional] odd distances between crossings
- * \param[out]   pmindist   [optional] min distance between crossings
- * \param[out]   pmaxdist   [optional] max distance between crossings
+ * \param[in]    nas numa of crossing locations
+ * \param[out]   pnaedist [optional] even distances between crossings
+ * \param[out]   pnaodist [optional] odd distances between crossings
+ * \param[out]   pmindist [optional] min distance between crossings
+ * \param[out]   pmaxdist [optional] max distance between crossings
  * \return  0 if OK, 1 on error
  */
 static l_int32
@@ -1005,17 +1004,19 @@ numaGetCrossingDistances(NUMA       *nas,
                          l_float32  *pmaxdist)
 {
 l_int32    i, n;
-l_float32  val, newval, mindist, maxdist;
-NUMA      *na1, *na2, *naedist, *naodist;
+l_float32  val, newval, mindist, maxdist, dist;
+NUMA      *naedist, *naodist;
+
+    PROCNAME("numaGetCrossingDistances");
 
     if (pnaedist) *pnaedist = NULL;
     if (pnaodist) *pnaodist = NULL;
     if (pmindist) *pmindist = 0.0;
     if (pmaxdist) *pmaxdist = 0.0;
     if (!nas)
-        return ERROR_INT("nas not defined", __func__, 1);
+        return ERROR_INT("nas not defined", procName, 1);
     if ((n = numaGetCount(nas)) < 2)
-        return ERROR_INT("n < 2", __func__, 1);
+        return ERROR_INT("n < 2", procName, 1);
 
         /* Get numas of distances between crossings.  Separate these
          * into even (e.g., black) and odd (e.g., white) spans.
@@ -1033,15 +1034,14 @@ NUMA      *na1, *na2, *naedist, *naodist;
         val = newval;
     }
 
-        /* The min and max rank distances of the spans are in pixel units. */
-    na1 = numaCopy(naedist);
-    numaJoin(na1, naodist, 0, -1);  /* use both bars and spaces */
-    na2 = numaMakeHistogram(na1, 100, NULL, NULL);
-    numaHistogramGetValFromRank(na2, 0.1f, &mindist);
-    numaHistogramGetValFromRank(na2, 0.9f, &maxdist);
-    numaDestroy(&na1);
-    numaDestroy(&na2);
-    L_INFO("mindist = %7.3f, maxdist = %7.3f\n", __func__, mindist, maxdist);
+        /* The mindist and maxdist of the spans are in pixel units. */
+    numaGetMin(naedist, &mindist, NULL);
+    numaGetMin(naodist, &dist, NULL);
+    mindist = L_MIN(dist, mindist);
+    numaGetMax(naedist, &maxdist, NULL);
+    numaGetMax(naodist, &dist, NULL);
+    maxdist = L_MAX(dist, maxdist);
+    L_INFO("mindist = %7.3f, maxdist = %7.3f\n", procName, mindist, maxdist);
 
     if (pnaedist)
         *pnaedist = naedist;
@@ -1060,11 +1060,11 @@ NUMA      *na1, *na2, *naedist, *naodist;
 /*!
  * \brief   numaLocatePeakRanges()
  *
- * \param[in]    nas        numa of histogram of crossing widths
- * \param[in]    minfirst   min location of center of first peak
- * \param[in]    minsep     min separation between peak range centers
- * \param[in]    maxmin     max allowed value for min histo value between peaks
- * \return  nad   ranges for each peak found, in pairs, or NULL on error
+ * \param[in]    nas numa of histogram of crossing widths
+ * \param[in]    minfirst min location of center of first peak
+ * \param[in]    minsep min separation between peak range centers
+ * \param[in]    maxmin max allowed value for min histo value between peaks
+ * \return  nad ranges for each peak found, in pairs, or NULL on error
  *
  * <pre>
  * Notes:
@@ -1095,8 +1095,10 @@ l_int32    i, n, inpeak, left;
 l_float32  center, prevcenter, val;
 NUMA      *nad;
 
+    PROCNAME("numaLocatePeakRanges");
+
     if (!nas)
-        return (NUMA *)ERROR_PTR("nas not defined", __func__, NULL);
+        return (NUMA *)ERROR_PTR("nas not defined", procName, NULL);
     n = numaGetCount(nas);
     nad = numaCreate(0);
 
@@ -1131,10 +1133,10 @@ NUMA      *nad;
 /*!
  * \brief   numaGetPeakCentroids()
  *
- * \param[in]    nahist    numa of histogram of crossing widths
- * \param[in]    narange   numa of ranges of x-values for the peaks in %nahist
- * \return  nad   centroids for each peak found; max of 4, corresponding
- *                to 4 different barcode line widths, or NULL on error
+ * \param[in]    nahist numa of histogram of crossing widths
+ * \param[in]    narange numa of ranges of x-values for the peaks in %nahist
+ * \return  nad centroids for each peak found; max of 4, corresponding
+ *                   to 4 different barcode line widths, or NULL on error
  */
 static NUMA *
 numaGetPeakCentroids(NUMA  *nahist,
@@ -1144,10 +1146,12 @@ l_int32    i, j, nr, low, high;
 l_float32  cent, sum, val;
 NUMA      *nad;
 
+    PROCNAME("numaGetPeakCentroids");
+
     if (!nahist)
-        return (NUMA *)ERROR_PTR("nahist not defined", __func__, NULL);
+        return (NUMA *)ERROR_PTR("nahist not defined", procName, NULL);
     if (!narange)
-        return (NUMA *)ERROR_PTR("narange not defined", __func__, NULL);
+        return (NUMA *)ERROR_PTR("narange not defined", procName, NULL);
     nr = numaGetCount(narange) / 2;
 
     nad = numaCreate(4);
@@ -1161,7 +1165,7 @@ NUMA      *nad;
             cent += j * val;
             sum += val;
         }
-        if (sum > 0) numaAddNumber(nad, cent / sum);
+        numaAddNumber(nad, cent / sum);
     }
 
     return nad;
@@ -1171,10 +1175,10 @@ NUMA      *nad;
 /*!
  * \brief   numaGetPeakWidthLUT()
  *
- * \param[in]    narange   numa of x-val ranges for the histogram width peaks
- * \param[in]    nacent    numa of centroids of each peak -- up to 4
- * \return  nalut  lookup table from the width of a bar to one of the four
- *                 integerized barcode units, or NULL on error
+ * \param[in]    narange numa of x-val ranges for the histogram width peaks
+ * \param[in]    nacent numa of centroids of each peak -- up to 4
+ * \return  nalut lookup table from the width of a bar to one of the four
+ *                     integerized barcode units, or NULL on error
  *
  * <pre>
  * Notes:
@@ -1195,13 +1199,15 @@ l_float32  *warray;
 l_float32   max, rat21, rat32, rat42;
 NUMA       *nalut;
 
+    PROCNAME("numaGetPeakWidthLUT");
+
     if (!narange)
-        return (NUMA *)ERROR_PTR("narange not defined", __func__, NULL);
+        return (NUMA *)ERROR_PTR("narange not defined", procName, NULL);
     if (!nacent)
-        return (NUMA *)ERROR_PTR("nacent not defined", __func__, NULL);
+        return (NUMA *)ERROR_PTR("nacent not defined", procName, NULL);
     nc = numaGetCount(nacent);  /* half the size of narange */
     if (nc < 1 || nc > 4)
-        return (NUMA *)ERROR_PTR("nc must be 1, 2, 3, or 4", __func__, NULL);
+        return (NUMA *)ERROR_PTR("nc must be 1, 2, 3, or 4", procName, NULL);
 
         /* Check the peak centroids for consistency with bar widths.
          * The third peak can correspond to a width of either 3 or 4.
@@ -1211,19 +1217,19 @@ NUMA       *nalut;
         warray = numaGetFArray(nacent, L_NOCOPY);
         if (warray[0] == 0)
             return (NUMA *)ERROR_PTR("first peak has width 0.0",
-                                     __func__, NULL);
+                                     procName, NULL);
         rat21 = warray[1] / warray[0];
         if (rat21 < 1.5 || rat21 > 2.6)
-            L_WARNING("width ratio 2/1 = %f\n", __func__, rat21);
+            L_WARNING("width ratio 2/1 = %f\n", procName, rat21);
         if (nc > 2) {
             rat32 = warray[2] / warray[1];
             if (rat32 < 1.3 || rat32 > 2.25)
-                L_WARNING("width ratio 3/2 = %f\n", __func__, rat32);
+                L_WARNING("width ratio 3/2 = %f\n", procName, rat32);
         }
         if (nc == 4) {
             rat42 = warray[3] / warray[1];
             if (rat42 < 1.7 || rat42 > 2.3)
-                L_WARNING("width ratio 4/2 = %f\n", __func__, rat42);
+                L_WARNING("width ratio 4/2 = %f\n", procName, rat42);
         }
     }
 
@@ -1256,14 +1262,14 @@ NUMA       *nalut;
 /*!
  * \brief   numaQuantizeCrossingsByWindow()
  *
- * \param[in]    nas         numa of crossing locations
- * \param[in]    ratio       of max window size over min window size in search;
- *                           typ. 2.0
- * \param[out]   pwidth      [optional] best window width
- * \param[out]   pfirstloc   [optional] center of window for first xing
- * \param[out]   pnac        [optional] array of window crossings (0, 1, 2)
- * \param[in]    debugflag   1 to generate various plots of intermediate results
- * \return  nad   sequence of widths, in unit sizes, or NULL on error
+ * \param[in]    nas numa of crossing locations
+ * \param[in]    ratio of max window size over min window size in search;
+ *                     typ. 2.0
+ * \param[out]   pwidth [optional] best window width
+ * \param[out]   pfirstloc [optional] center of window for first xing
+ * \param[out]   pnac [optional] array of window crossings (0, 1, 2)
+ * \param[in]    debugflag 1 to generate various plots of intermediate results
+ * \return  nad sequence of widths, in unit sizes, or NULL on error
  *
  * <pre>
  * Notes:
@@ -1287,10 +1293,12 @@ l_int32    i, nw, started, count, trans;
 l_float32  minsize, minwidth, minshift, xfirst;
 NUMA      *nac, *nad;
 
+    PROCNAME("numaQuantizeCrossingsByWindow");
+
     if (!nas)
-        return (NUMA *)ERROR_PTR("nas not defined", __func__, NULL);
+        return (NUMA *)ERROR_PTR("nas not defined", procName, NULL);
     if (numaGetCount(nas) < 2)
-        return (NUMA *)ERROR_PTR("nas size < 2", __func__, NULL);
+        return (NUMA *)ERROR_PTR("nas size < 2", procName, NULL);
 
         /* Get the minsize, which is needed for the search for
          * the window width (ultimately found as 'minwidth') */
@@ -1306,7 +1314,7 @@ NUMA      *nac, *nad;
                               &minwidth, &minshift, NULL);
 
     L_INFO("best width = %7.3f, best shift = %7.3f\n",
-           __func__, minwidth, minshift);
+           procName, minwidth, minshift);
 
         /* Get the crossing array (0,1,2) for the best window width and shift */
     numaEvalSyncError(nas, 0, 0, minwidth, minshift, NULL, &nac);
@@ -1324,7 +1332,7 @@ NUMA      *nac, *nad;
     for (i = 0; i < nw; i++) {
         numaGetIValue(nac, i, &trans);
         if (trans > 2)
-            L_WARNING("trans = %d > 2 !!!\n", __func__, trans);
+            L_WARNING("trans = %d > 2 !!!\n", procName, trans);
         if (started) {
             if (trans > 1) {  /* i.e., when trans == 2 */
                 numaAddNumber(nad, count);
@@ -1357,15 +1365,15 @@ NUMA      *nac, *nad;
 /*!
  * \brief   numaEvalBestWidthAndShift()
  *
- * \param[in]    nas          numa of crossing locations
- * \param[in]    nwidth       number of widths to consider
- * \param[in]    nshift       number of shifts to consider for each width
- * \param[in]    minwidth     smallest width to consider
- * \param[in]    maxwidth     largest width to consider
- * \param[out]   pbestwidth   best size of window
- * \param[out]   pbestshift   best shift for the window
- * \param[out]   pbestscore   [optional] average squared error of dist
- *                            of crossing signal from the center of the window
+ * \param[in]    nas numa of crossing locations
+ * \param[in]    nwidth number of widths to consider
+ * \param[in]    nshift number of shifts to consider for each width
+ * \param[in]    minwidth smallest width to consider
+ * \param[in]    maxwidth largest width to consider
+ * \param[out]   pbestwidth best size of window
+ * \param[out]   pbestshift best shift for the window
+ * \param[out]   pbestscore [optional] average squared error of dist
+ *                          of crossing signal from the center of the window
  * \return  0 if OK, 1 on error
  *
  * <pre>
@@ -1389,13 +1397,13 @@ l_int32    i, j;
 l_float32  delwidth, delshift, width, shift, score;
 l_float32  bestwidth, bestshift, bestscore;
 
-    if (!nas)
-        return ERROR_INT("nas not defined", __func__, 1);
-    if (!pbestwidth || !pbestshift)
-        return ERROR_INT("&bestwidth and &bestshift not defined", __func__, 1);
+    PROCNAME("numaEvalBestWidthAndShift");
 
-    bestwidth = 0.0f;
-    bestshift = 0.0f;
+    if (!nas)
+        return ERROR_INT("nas not defined", procName, 1);
+    if (!pbestwidth || !pbestshift)
+        return ERROR_INT("&bestwidth and &bestshift not defined", procName, 1);
+
     bestscore = 1.0;
     delwidth = (maxwidth - minwidth) / (nwidth - 1.0);
     for (i = 0; i < nwidth; i++) {
@@ -1409,8 +1417,8 @@ l_float32  bestwidth, bestshift, bestscore;
                 bestwidth = width;
                 bestshift = shift;
 #if  DEBUG_FREQUENCY
-                lept_stderr("width = %7.3f, shift = %7.3f, score = %7.3f\n",
-                            width, shift, score);
+                fprintf(stderr, "width = %7.3f, shift = %7.3f, score = %7.3f\n",
+                        width, shift, score);
 #endif  /* DEBUG_FREQUENCY */
             }
         }
@@ -1427,14 +1435,14 @@ l_float32  bestwidth, bestshift, bestscore;
 /*!
  * \brief   numaEvalSyncError()
  *
- * \param[in]    nas      numa of crossing locations
- * \param[in]    ifirst   first crossing to use
- * \param[in]    ilast    last crossing to use; use 0 for all crossings
- * \param[in]    width    size of window
- * \param[in]    shift    of center of window w/rt first crossing
- * \param[out]   pscore   [optional] average squared error of dist
- *                        of crossing signal from the center of the window
- * \param[out]   pnad     [optional] numa of 1s and 0s for crossings
+ * \param[in]    nas numa of crossing locations
+ * \param[in]    ifirst first crossing to use
+ * \param[in]    ilast last crossing to use; use 0 for all crossings
+ * \param[in]    width size of window
+ * \param[in]    shift of center of window w/rt first crossing
+ * \param[out]   pscore [optional] average squared error of dist
+ *                      of crossing signal from the center of the window
+ * \param[out]   pnad [optional] numa of 1s and 0s for crossings
  * \return  0 if OK, 1 on error
  *
  * <pre>
@@ -1461,14 +1469,16 @@ l_int32    iw;  /* cell in which transition occurs */
 l_float32  score, xfirst, xlast, xleft, xc, xwc;
 NUMA      *nad;
 
+    PROCNAME("numaEvalSyncError");
+
     if (!nas)
-        return ERROR_INT("nas not defined", __func__, 1);
+        return ERROR_INT("nas not defined", procName, 1);
     if ((n = numaGetCount(nas)) < 2)
-        return ERROR_INT("nas size < 2", __func__, 1);
+        return ERROR_INT("nas size < 2", procName, 1);
     if (ifirst < 0) ifirst = 0;
     if (ilast <= 0) ilast = n - 1;
     if (ifirst >= ilast)
-        return ERROR_INT("ifirst not < ilast", __func__, 1);
+        return ERROR_INT("ifirst not < ilast", procName, 1);
     nc = ilast - ifirst + 1;
 
         /* Set up an array corresponding to the (shifted) windows,

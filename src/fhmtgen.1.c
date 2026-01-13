@@ -25,7 +25,7 @@
  *====================================================================*/
 
 /*!
- *      Top-level fast hit-miss transform with auto-generated sels
+ * \brief       Top-level fast hit-miss transform with auto-generated sels
  *
  *             PIX     *pixHMTDwa_1()
  *             PIX     *pixFHMTGen_1()
@@ -55,12 +55,12 @@ static char  SEL_NAMES[][80] = {
                              "sel_lrc"};
 
 /*!
- * \brief  pixHMTDwa_1()
+ * \brief   pixHMTDwa_1()
  *
- * \param[in]    pixd      usual 3 choices: null, == pixs, != pixs
- * \param[in]    pixs      1 bpp
- * \param[in]    sel       name
- * \return   pixd
+ * \param[in]    pixd usual 3 choices: null, == pixs, != pixs
+ * \param[in]    pixs 1 bpp
+ * \param[in]    sel name
+ * \return  pixd
  *
  * <pre>
  * Notes:
@@ -76,10 +76,12 @@ pixHMTDwa_1(PIX         *pixd,
 {
 PIX  *pixt1, *pixt2, *pixt3;
 
+    PROCNAME("pixHMTDwa_1");
+
     if (!pixs)
-        return (PIX *)ERROR_PTR("pixs not defined", __func__, pixd);
+        return (PIX *)ERROR_PTR("pixs not defined", procName, pixd);
     if (pixGetDepth(pixs) != 1)
-        return (PIX *)ERROR_PTR("pixs must be 1 bpp", __func__, pixd);
+        return (PIX *)ERROR_PTR("pixs must be 1 bpp", procName, pixd);
 
     pixt1 = pixAddBorder(pixs, 32, 0);
     pixt2 = pixFHMTGen_1(NULL, pixt1, selname);
@@ -97,12 +99,12 @@ PIX  *pixt1, *pixt2, *pixt3;
 
 
 /*!
- * \brief  pixFHMTGen_1()
+ * \brief   pixFHMTGen_1()
  *
- * \param[in]    pixd     usual 3 choices: null, == pixs, != pixs
- * \param[in]    pixs     1 bpp
- * \param[in]    sel      name
- * \return   pixd
+ * \param[in]    pixd usual 3 choices: null, == pixs, != pixs
+ * \param[in]    pixs 1 bpp
+ * \param[in]    sel name
+ * \return  pixd
  *
  * <pre>
  * Notes:
@@ -124,10 +126,12 @@ l_int32    i, index, found, w, h, wpls, wpld;
 l_uint32  *datad, *datas, *datat;
 PIX       *pixt;
 
+    PROCNAME("pixFHMTGen_1");
+
     if (!pixs)
-        return (PIX *)ERROR_PTR("pixs not defined", __func__, pixd);
+        return (PIX *)ERROR_PTR("pixs not defined", procName, pixd);
     if (pixGetDepth(pixs) != 1)
-        return (PIX *)ERROR_PTR("pixs must be 1 bpp", __func__, pixd);
+        return (PIX *)ERROR_PTR("pixs must be 1 bpp", procName, pixd);
 
     found = FALSE;
     for (i = 0; i < NUM_SELS_GENERATED; i++) {
@@ -138,11 +142,11 @@ PIX       *pixt;
         }
     }
     if (found == FALSE)
-        return (PIX *)ERROR_PTR("sel index not found", __func__, pixd);
+        return (PIX *)ERROR_PTR("sel index not found", procName, pixd);
 
     if (!pixd) {
         if ((pixd = pixCreateTemplate(pixs)) == NULL)
-            return (PIX *)ERROR_PTR("pixd not made", __func__, NULL);
+            return (PIX *)ERROR_PTR("pixd not made", procName, NULL);
     }
     else  /* for in-place or pre-allocated */
         pixResizeImageData(pixd, pixs);
@@ -160,7 +164,7 @@ PIX       *pixt;
 
     if (pixd == pixs) {  /* need temp image if in-place */
         if ((pixt = pixCopy(NULL, pixs)) == NULL)
-            return (PIX *)ERROR_PTR("pixt not made", __func__, pixd);
+            return (PIX *)ERROR_PTR("pixt not made", procName, pixd);
         datat = pixGetData(pixt) + 32 * wpls + 1;
         fhmtgen_low_1(datad, w, h, wpld, datat, wpls, index);
         pixDestroy(&pixt);

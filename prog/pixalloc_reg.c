@@ -43,10 +43,6 @@
  *   (Turn off logging to get a fair comparison).
  */
 
-#ifdef HAVE_CONFIG_H
-#include <config_auto.h>
-#endif  /* HAVE_CONFIG_H */
-
 #include <math.h>
 #include "allheaders.h"
 
@@ -70,9 +66,6 @@ NUMA    *nas, *nab;
 PIX     *pixs;
 PIXA    *pixa, *pixas;
 
-    setLeptDebugOK(1);
-    lept_mkdir("lept/alloc");
-
     /* ----------------- Custom with a few large pix -----------------*/
         /* Set up pms */
     nas = numaCreate(4);  /* small */
@@ -81,14 +74,14 @@ PIXA    *pixa, *pixas;
     numaAddNumber(nas, 3);
     numaAddNumber(nas, 2);
     setPixMemoryManager(pmsCustomAlloc, pmsCustomDealloc);
-    pmsCreate(200000, 400000, nas, "/tmp/lept/alloc/file1.log");
+    pmsCreate(200000, 400000, nas, "/tmp/junk1.log");
 
         /* Make the pix and do successive copies and removals of the copies */
     pixas = GenerateSetOfMargePix();
     startTimer();
     for (i = 0; i < ntimes; i++)
         CopyStoreClean(pixas, nlevels, ncopies);
-    lept_stderr("Time (big pix; custom) = %7.3f sec\n", stopTimer());
+    fprintf(stderr, "Time (big pix; custom) = %7.3f sec\n", stopTimer());
 
         /* Clean up */
     numaDestroy(&nas);
@@ -104,7 +97,7 @@ PIXA    *pixa, *pixas;
     pixas = GenerateSetOfMargePix();
     for (i = 0; i < ntimes; i++)
         CopyStoreClean(pixas, nlevels, ncopies);
-    lept_stderr("Time (big pix; standard) = %7.3f sec\n", stopTimer());
+    fprintf(stderr, "Time (big pix; standard) = %7.3f sec\n", stopTimer());
     pixaDestroy(&pixas);
 
 
@@ -120,7 +113,7 @@ PIXA    *pixa, *pixas;
     numaAddNumber(nab, 100);
     setPixMemoryManager(pmsCustomAlloc, pmsCustomDealloc);
     if (logging)   /* use logging == 0 for speed comparison */
-        pmsCreate(20, 40, nab, "/tmp/lept/alloc/file2.log");
+        pmsCreate(20, 40, nab, "/tmp/junk2.log");
     else
         pmsCreate(20, 40, nab, NULL);
     pixs = pixRead("feyn.tif");
@@ -135,7 +128,7 @@ PIXA    *pixa, *pixas;
     numaDestroy(&nab);
     pixDestroy(&pixs);
     pmsDestroy();
-    lept_stderr("Time (custom) = %7.3f sec\n", stopTimer());
+    fprintf(stderr, "Time (custom) = %7.3f sec\n", stopTimer());
 
 
     /* ----------------- Standard with many small pix -----------------*/
@@ -149,7 +142,7 @@ PIXA    *pixa, *pixas;
         pixaDestroy(&pixa);
     }
     pixDestroy(&pixs);
-    lept_stderr("Time (standard) = %7.3f sec\n", stopTimer());
+    fprintf(stderr, "Time (standard) = %7.3f sec\n", stopTimer());
     return 0;
 }
 

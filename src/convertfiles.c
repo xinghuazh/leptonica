@@ -37,12 +37,9 @@
  * </pre>
  */
 
-#ifdef HAVE_CONFIG_H
-#include <config_auto.h>
-#endif  /* HAVE_CONFIG_H */
-
 #include <string.h>
 #include "allheaders.h"
+
 
 /*------------------------------------------------------------------*
  *                        Conversion to 1 bpp                       *
@@ -51,14 +48,13 @@
  * \brief   convertFilesTo1bpp()
  *
  * \param[in]    dirin
- * \param[in]    substr       [optional] substring filter on filenames;
- 8                            can be NULL
- * \param[in]    upscaling    1, 2 or 4; only for input color or grayscale
- * \param[in]    thresh       global threshold for binarization; 0 for default
+ * \param[in]    substr [optional] substring filter on filenames; can be NULL
+ * \param[in]    upscaling 1, 2 or 4; only for input color or grayscale
+ * \param[in]    thresh  global threshold for binarization; use 0 for default
  * \param[in]    firstpage
- * \param[in]    npages       use 0 to do all from %firstpage to the end
+ * \param[in]    npages use 0 to do all from %firstpage to the end
  * \param[in]    dirout
- * \param[in]    outformat    IFF_PNG, IFF_TIFF_G4
+ * \param[in]    outformat IFF_PNG, IFF_TIFF_G4
  * \return  0 if OK, 1 on error
  *
  * <pre>
@@ -67,7 +63,7 @@
  *          output directory are retained except for the extension.
  * </pre>
  */
-l_ok
+l_int32
 convertFilesTo1bpp(const char  *dirin,
                    const char  *substr,
                    l_int32      upscaling,
@@ -83,12 +79,14 @@ char    *fname, *tail, *basename;
 PIX     *pixs, *pixg1, *pixg2, *pixb;
 SARRAY  *safiles;
 
+    PROCNAME("convertFilesTo1bpp");
+
     if (!dirin)
-        return ERROR_INT("dirin", __func__, 1);
+        return ERROR_INT("dirin", procName, 1);
     if (!dirout)
-        return ERROR_INT("dirout", __func__, 1);
+        return ERROR_INT("dirout", procName, 1);
     if (upscaling != 1 && upscaling != 2 && upscaling != 4)
-        return ERROR_INT("invalid upscaling factor", __func__, 1);
+        return ERROR_INT("invalid upscaling factor", procName, 1);
     if (thresh <= 0) thresh = 180;
     if (firstpage < 0) firstpage = 0;
     if (npages < 0) npages = 0;
@@ -97,16 +95,16 @@ SARRAY  *safiles;
 
     safiles = getSortedPathnamesInDirectory(dirin, substr, firstpage, npages);
     if (!safiles)
-        return ERROR_INT("safiles not made", __func__, 1);
+        return ERROR_INT("safiles not made", procName, 1);
     if ((nfiles = sarrayGetCount(safiles)) == 0) {
         sarrayDestroy(&safiles);
-        return ERROR_INT("no matching files in the directory", __func__, 1);
+        return ERROR_INT("no matching files in the directory", procName, 1);
     }
 
     for (i = 0; i < nfiles; i++) {
         fname = sarrayGetString(safiles, i, L_NOCOPY);
         if ((pixs = pixRead(fname)) == NULL) {
-            L_WARNING("Couldn't read file %s\n", __func__, fname);
+            L_WARNING("Couldn't read file %s\n", procName, fname);
             continue;
         }
         if (pixGetDepth(pixs) == 32)

@@ -32,10 +32,6 @@
  *       jbRankhaus
  */
 
-#ifdef HAVE_CONFIG_H
-#include <config_auto.h>
-#endif  /* HAVE_CONFIG_H */
-
 #include "allheaders.h"
 
     /* Choose one of these */
@@ -79,8 +75,8 @@ L_REGPARAMS  *rp;
     pixDestroy(&pix2);
     boxDestroy(&box);
     sa = sarrayCreate(2);
-    sarrayAddString(sa, "/tmp/lept/class/pix1.tif", L_COPY);
-    sarrayAddString(sa, "/tmp/lept/class/pix2.tif", L_COPY);
+    sarrayAddString(sa, (char *)"/tmp/lept/class/pix1.tif", L_COPY);
+    sarrayAddString(sa, (char *)"/tmp/lept/class/pix2.tif", L_COPY);
 
     /*--------------------------------------------------------------*/
 
@@ -91,7 +87,7 @@ L_REGPARAMS  *rp;
         /* Save and write out the result */
     data = jbDataSave(classer);
     jbDataWrite("/tmp/lept/class/corr", data);
-    lept_stderr("Number of classes: %d\n", classer->nclass);
+    fprintf(stderr, "Number of classes: %d\n", classer->nclass);
 
     pix1 = pixRead("/tmp/lept/class/corr.templates.png");
     regTestWritePixAndCheck(rp, pix1, IFF_TIFF_G4);  /* 0 */
@@ -131,7 +127,7 @@ L_REGPARAMS  *rp;
         /* Save and write out the result */
     data = jbDataSave(classer);
     jbDataWrite("/tmp/lept/class2/haus", data);
-    lept_stderr("Number of classes: %d\n", classer->nclass);
+    fprintf(stderr, "Number of classes: %d\n", classer->nclass);
 
     pix1 = pixRead("/tmp/lept/class2/haus.templates.png");
     regTestWritePixAndCheck(rp, pix1, IFF_TIFF_G4);  /* 4 */

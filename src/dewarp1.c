@@ -79,7 +79,7 @@
  * \code
  *     // Make the Dewarpa for the pages
  *     L_Dewarpa *dewa = dewarpaCreate(1, 30, 1, 15, 50);
- *     dewarpaSetCurvatures(dewa, -1, 50, -1, -1, -1, -1);
+ *     dewarpaSetCurvatures(dewa, -1, 5, -1, -1, -1, -1);
  *     dewarpaUseBothArrays(dewa, 1);  // try to use both disparity
  *                                     // arrays for this example
  *
@@ -103,7 +103,7 @@
  *     // Make the Dewarpa for the set of pages; use fullres 1 bpp
  *     L_Dewarpa *dewa = dewarpaCreate(10, 30, 1, 15, 50);
  *     // Optionally set rendering parameters
- *     dewarpaSetCurvatures(dewa, -1, 30, -1, -1, -1, -1);
+ *     dewarpaSetCurvatures(dewa, -1, 10, -1, -1, -1, -1);
  *     dewarpaUseBothArrays(dewa, 0);  // just use the vertical disparity
  *                                     // array for this example
  *
@@ -396,22 +396,8 @@
  *  is formed by interpolation.  All the least square fits do a
  *  great job of smoothing everything out, as can be observed by
  *  the contour maps that are generated for the vertical disparity field.
- *
- *  Steps (4) through (6) again use the line data in step (1).
- *  By default, we do separate quadratic fits to the left and right
- *  line edges.  There is also the option to do linear fits to the
- *  line edges, which typically does not give as good a fit, but is
- *  safer for some pages that have text in the margins, or have multiple
- *  columns of text with a large space between the columns.  There is
- *  an option, which is the default, to check for multiple columns and
- *  if found to skip dewarping based on the line edges -- we compute but
- *  do not use the horizontal disparity array.
  * </pre>
  */
-
-#ifdef HAVE_CONFIG_H
-#include <config_auto.h>
-#endif  /* HAVE_CONFIG_H */
 
 #include <math.h>
 #include "allheaders.h"
@@ -419,23 +405,24 @@
 static l_int32 dewarpaExtendArraysToSize(L_DEWARPA *dewa, l_int32 size);
 
     /* Parameter values used in dewarpaCreate() */
-static const l_int32     InitialPtrArraySize = 20;   /* n'import quoi */
-static const l_int32     MaxPtrArraySize = 10000;
-static const l_int32     DefaultArraySampling = 30;
-static const l_int32     MinArraySampling = 8;
-static const l_int32     DefaultMinLines = 15;
-static const l_int32     MinMinLines = 4;
-static const l_int32     DefaultMaxRefDist = 16;
-static const l_int32     DefaultUseBoth = TRUE;
-static const l_int32     DefaultCheckColumns = TRUE;
+static const l_int32     INITIAL_PTR_ARRAYSIZE = 20;   /* n'import quoi */
+static const l_int32     MAX_PTR_ARRAYSIZE = 10000;
+static const l_int32     DEFAULT_ARRAY_SAMPLING = 30;
+static const l_int32     MIN_ARRAY_SAMPLING = 8;
+static const l_int32     DEFAULT_MIN_LINES = 15;
+static const l_int32     MIN_MIN_LINES = 4;
+static const l_int32     DEFAULT_MAX_REF_DIST = 16;
+static const l_int32     DEFAULT_USE_BOTH = TRUE;
+static const l_int32     DEFAULT_CHECK_COLUMNS = FALSE;
 
     /* Parameter values used in dewarpaSetCurvatures() */
-static const l_int32     DefaultMaxLineCurv = 150;
-static const l_int32     DefaultMinDiffLineCurv = 0;
-static const l_int32     DefaultMaxDiffLineCurv = 170;
-static const l_int32     DefaultMaxEdgeCurv = 50;
-static const l_int32     DefaultMaxDiffEdgeCurv = 40;
-static const l_int32     DefaultMaxEdgeSlope = 80;
+static const l_int32     DEFAULT_MAX_LINECURV = 180;
+static const l_int32     DEFAULT_MIN_DIFF_LINECURV = 0;
+static const l_int32     DEFAULT_MAX_DIFF_LINECURV = 200;
+static const l_int32     DEFAULT_MAX_EDGECURV = 50;
+static const l_int32     DEFAULT_MAX_DIFF_EDGECURV = 40;
+static const l_int32     DEFAULT_MAX_EDGESLOPE = 80;
+
 
 /*----------------------------------------------------------------------*
  *                           Create/destroy Dewarp                      *
@@ -443,8 +430,8 @@ static const l_int32     DefaultMaxEdgeSlope = 80;
 /*!
  * \brief   dewarpCreate()
  *
- * \param[in]   pixs     1 bpp
- * \param[in]   pageno   page number
+ * \param[in]   pixs 1 bpp
+ * \param[in]   pageno page number
  * \return  dew or NULL on error
  *
  * <pre>
@@ -461,12 +448,15 @@ dewarpCreate(PIX     *pixs,
 {
 L_DEWARP  *dew;
 
-    if (!pixs)
-        return (L_DEWARP *)ERROR_PTR("pixs not defined", __func__, NULL);
-    if (pixGetDepth(pixs) != 1)
-        return (L_DEWARP *)ERROR_PTR("pixs not 1 bpp", __func__, NULL);
+    PROCNAME("dewarpCreate");
 
-    dew = (L_DEWARP *)LEPT_CALLOC(1, sizeof(L_DEWARP));
+    if (!pixs)
+        return (L_DEWARP *)ERROR_PTR("pixs not defined", procName, NULL);
+    if (pixGetDepth(pixs) != 1)
+        return (L_DEWARP *)ERROR_PTR("pixs not 1 bpp", procName, NULL);
+
+    if ((dew = (L_DEWARP *)LEPT_CALLOC(1, sizeof(L_DEWARP))) == NULL)
+        return (L_DEWARP *)ERROR_PTR("dew not made", procName, NULL);
     dew->pixs = pixClone(pixs);
     dew->pageno = pageno;
     dew->w = pixGetWidth(pixs);
@@ -478,8 +468,8 @@ L_DEWARP  *dew;
 /*!
  * \brief   dewarpCreateRef()
  *
- * \param[in]    pageno    this page number
- * \param[in]    refpage   page number of dewarp disparity arrays to be used
+ * \param[in]    pageno this page number
+ * \param[in]    refpage page number of dewarp disparity arrays to be used
  * \return  dew or NULL on error
  *
  * <pre>
@@ -498,7 +488,10 @@ dewarpCreateRef(l_int32  pageno,
 {
 L_DEWARP  *dew;
 
-    dew = (L_DEWARP *)LEPT_CALLOC(1, sizeof(L_DEWARP));
+    PROCNAME("dewarpCreateRef");
+
+    if ((dew = (L_DEWARP *)LEPT_CALLOC(1, sizeof(L_DEWARP))) == NULL)
+        return (L_DEWARP *)ERROR_PTR("dew not made", procName, NULL);
     dew->pageno = pageno;
     dew->hasref = 1;
     dew->refpage = refpage;
@@ -509,7 +502,7 @@ L_DEWARP  *dew;
 /*!
  * \brief   dewarpDestroy()
  *
- * \param[in,out]   pdew    will be set to null before returning
+ * \param[in,out]   pdew will be set to null before returning
  * \return  void
  */
 void
@@ -517,8 +510,10 @@ dewarpDestroy(L_DEWARP  **pdew)
 {
 L_DEWARP  *dew;
 
+    PROCNAME("dewarpDestroy");
+
     if (pdew == NULL) {
-        L_WARNING("ptr address is null!\n", __func__);
+        L_WARNING("ptr address is null!\n", procName);
         return;
     }
     if ((dew = *pdew) == NULL)
@@ -535,6 +530,7 @@ L_DEWARP  *dew;
     numaDestroy(&dew->nacurves);
     LEPT_FREE(dew);
     *pdew = NULL;
+    return;
 }
 
 
@@ -544,11 +540,11 @@ L_DEWARP  *dew;
 /*!
  * \brief   dewarpaCreate()
  *
- * \param[in]   nptrs       number of dewarp page ptrs; typ. the number of pages
- * \param[in]   sampling    use 0 for default value; the minimum allowed is 8
- * \param[in]   redfactor   of input images: 1 is full res; 2 is 2x reduced
- * \param[in]   minlines    minimum number of lines to accept; use 0 for default
- * \param[in]   maxdist     for locating reference disparity; use -1 for default
+ * \param[in]   nptrs number of dewarp page ptrs; typically the number of pages
+ * \param[in]   sampling use 0 for default value; the minimum allowed is 8
+ * \param[in]   redfactor of input images: 1 is full resolution; 2 is 2x reduced
+ * \param[in]   minlines minimum number of lines to accept; use 0 for default
+ * \param[in]   maxdist for locating reference disparity; use -1 for default
  * \return  dewa or NULL on error
  *
  * <pre>
@@ -581,50 +577,52 @@ dewarpaCreate(l_int32  nptrs,
 {
 L_DEWARPA  *dewa;
 
+    PROCNAME("dewarpaCreate");
+
     if (nptrs <= 0)
-        nptrs = InitialPtrArraySize;
-    if (nptrs > MaxPtrArraySize)
-        return (L_DEWARPA *)ERROR_PTR("too many pages", __func__, NULL);
+        nptrs = INITIAL_PTR_ARRAYSIZE;
+    if (nptrs > MAX_PTR_ARRAYSIZE)
+        return (L_DEWARPA *)ERROR_PTR("too many pages", procName, NULL);
     if (redfactor != 1 && redfactor != 2)
         return (L_DEWARPA *)ERROR_PTR("redfactor not in {1,2}",
-                                      __func__, NULL);
+                                      procName, NULL);
     if (sampling == 0) {
-         sampling = DefaultArraySampling;
-    } else if (sampling < MinArraySampling) {
-         L_WARNING("sampling too small; setting to %d\n", __func__,
-                   MinArraySampling);
-         sampling = MinArraySampling;
+         sampling = DEFAULT_ARRAY_SAMPLING;
+    } else if (sampling < MIN_ARRAY_SAMPLING) {
+         L_WARNING("sampling too small; setting to %d\n", procName,
+                   MIN_ARRAY_SAMPLING);
+         sampling = MIN_ARRAY_SAMPLING;
     }
     if (minlines == 0) {
-        minlines = DefaultMinLines;
-    } else if (minlines < MinMinLines) {
-        L_WARNING("minlines too small; setting to %d\n", __func__,
-                  MinMinLines);
-        minlines = DefaultMinLines;
+        minlines = DEFAULT_MIN_LINES;
+    } else if (minlines < MIN_MIN_LINES) {
+        L_WARNING("minlines too small; setting to %d\n", procName,
+                  MIN_MIN_LINES);
+        minlines = DEFAULT_MIN_LINES;
     }
     if (maxdist < 0)
-         maxdist = DefaultMaxRefDist;
+         maxdist = DEFAULT_MAX_REF_DIST;
 
     dewa = (L_DEWARPA *)LEPT_CALLOC(1, sizeof(L_DEWARPA));
     dewa->dewarp = (L_DEWARP **)LEPT_CALLOC(nptrs, sizeof(L_DEWARPA *));
     dewa->dewarpcache = (L_DEWARP **)LEPT_CALLOC(nptrs, sizeof(L_DEWARPA *));
     if (!dewa->dewarp || !dewa->dewarpcache) {
         dewarpaDestroy(&dewa);
-        return (L_DEWARPA *)ERROR_PTR("dewarp ptrs not made", __func__, NULL);
+        return (L_DEWARPA *)ERROR_PTR("dewarp ptrs not made", procName, NULL);
     }
     dewa->nalloc = nptrs;
     dewa->sampling = sampling;
     dewa->redfactor = redfactor;
     dewa->minlines = minlines;
     dewa->maxdist = maxdist;
-    dewa->max_linecurv = DefaultMaxLineCurv;
-    dewa->min_diff_linecurv = DefaultMinDiffLineCurv;
-    dewa->max_diff_linecurv = DefaultMaxDiffLineCurv;
-    dewa->max_edgeslope = DefaultMaxEdgeSlope;
-    dewa->max_edgecurv = DefaultMaxEdgeCurv;
-    dewa->max_diff_edgecurv = DefaultMaxDiffEdgeCurv;
-    dewa->check_columns = DefaultCheckColumns;
-    dewa->useboth = DefaultUseBoth;
+    dewa->max_linecurv = DEFAULT_MAX_LINECURV;
+    dewa->min_diff_linecurv = DEFAULT_MIN_DIFF_LINECURV;
+    dewa->max_diff_linecurv = DEFAULT_MAX_DIFF_LINECURV;
+    dewa->max_edgeslope = DEFAULT_MAX_EDGESLOPE;
+    dewa->max_edgecurv = DEFAULT_MAX_EDGECURV;
+    dewa->max_diff_edgecurv = DEFAULT_MAX_DIFF_EDGECURV;
+    dewa->check_columns = DEFAULT_CHECK_COLUMNS;
+    dewa->useboth = DEFAULT_USE_BOTH;
     return dewa;
 }
 
@@ -632,11 +630,11 @@ L_DEWARPA  *dewa;
 /*!
  * \brief   dewarpaCreateFromPixacomp()
  *
- * \param[in]   pixac      pixacomp of G4, 1 bpp images; with 1x1x1 placeholders
- * \param[in]   useboth    0 for only vert disparity; 1 for both vert and horiz
- * \param[in]   sampling   use -1 or 0 for default value; otherwise minimum of 5
- * \param[in]   minlines   minimum number of lines to accept; e.g., 10
- * \param[in]   maxdist    for locating reference disparity; use -1 for default
+ * \param[in]   pixac pixacomp of G4, 1 bpp images; with 1x1x1 placeholders
+ * \param[in]   useboth 0 for only vert disparity; 1 for both vert and horiz
+ * \param[in]   sampling use -1 or 0 for default value; otherwise minimum of 5
+ * \param[in]   minlines minimum number of lines to accept; e.g., 10
+ * \param[in]   maxdist for locating reference disparity; use -1 for default
  * \return  dewa or NULL on error
  *
  * <pre>
@@ -671,13 +669,15 @@ L_DEWARP   *dew;
 L_DEWARPA  *dewa;
 PIX        *pixt;
 
+    PROCNAME("dewarpaCreateFromPixacomp");
+
     if (!pixac)
-        return (L_DEWARPA *)ERROR_PTR("pixac not defined", __func__, NULL);
+        return (L_DEWARPA *)ERROR_PTR("pixac not defined", procName, NULL);
 
     nptrs = pixacompGetCount(pixac);
     if ((dewa = dewarpaCreate(pixacompGetOffset(pixac) + nptrs,
                               sampling, 1, minlines, maxdist)) == NULL)
-        return (L_DEWARPA *)ERROR_PTR("dewa not made", __func__, NULL);
+        return (L_DEWARPA *)ERROR_PTR("dewa not made", procName, NULL);
     dewarpaUseBothArrays(dewa, useboth);
 
     for (i = 0; i < nptrs; i++) {
@@ -687,7 +687,7 @@ PIX        *pixt;
             dew = dewarpCreate(pixt, pageno);
             pixDestroy(&pixt);
             if (!dew) {
-                ERROR_INT("unable to make dew!", __func__, 1);
+                ERROR_INT("unable to make dew!", procName, 1);
                 continue;
             }
 
@@ -698,7 +698,7 @@ PIX        *pixt;
             dewarpBuildPageModel(dew, NULL);
             if (!dew->vsuccess) {  /* will need to use model from nearby page */
                 dewarpaDestroyDewarp(dewa, pageno);
-                L_ERROR("unable to build model for page %d\n", __func__, i);
+                L_ERROR("unable to build model for page %d\n", procName, i);
                 continue;
             }
                 /* Remove all extraneous data */
@@ -715,7 +715,7 @@ PIX        *pixt;
 /*!
  * \brief   dewarpaDestroy()
  *
- * \param[in,out]   pdewa    will be set to null before returning
+ * \param[in,out]   pdewa will be set to null before returning
  * \return  void
  */
 void
@@ -725,8 +725,10 @@ l_int32     i;
 L_DEWARP   *dew;
 L_DEWARPA  *dewa;
 
+    PROCNAME("dewarpaDestroy");
+
     if (pdewa == NULL) {
-        L_WARNING("ptr address is null!\n", __func__);
+        L_WARNING("ptr address is null!\n", procName);
         return;
     }
     if ((dewa = *pdewa) == NULL)
@@ -745,6 +747,7 @@ L_DEWARPA  *dewa;
     LEPT_FREE(dewa->dewarpcache);
     LEPT_FREE(dewa);
     *pdewa = NULL;
+    return;
 }
 
 
@@ -752,21 +755,23 @@ L_DEWARPA  *dewa;
  * \brief   dewarpaDestroyDewarp()
  *
  * \param[in]    dewa
- * \param[in]    pageno    of dew to be destroyed
+ * \param[in]    pageno of dew to be destroyed
  * \return  0 if OK, 1 on error
  */
-l_ok
+l_int32
 dewarpaDestroyDewarp(L_DEWARPA  *dewa,
                      l_int32     pageno)
 {
 L_DEWARP   *dew;
 
+    PROCNAME("dewarpaDestroyDewarp");
+
     if (!dewa)
-        return ERROR_INT("dewa or dew not defined", __func__, 1);
+        return ERROR_INT("dewa or dew not defined", procName, 1);
     if (pageno < 0 || pageno > dewa->maxpage)
-        return ERROR_INT("page out of bounds", __func__, 1);
+        return ERROR_INT("page out of bounds", procName, 1);
     if ((dew = dewa->dewarp[pageno]) == NULL)
-        return ERROR_INT("dew not defined", __func__, 1);
+        return ERROR_INT("dew not defined", procName, 1);
 
     dewarpDestroy(&dew);
     dewa->dewarp[pageno] = NULL;
@@ -781,7 +786,7 @@ L_DEWARP   *dew;
  * \brief   dewarpaInsertDewarp()
  *
  * \param[in]    dewa
- * \param[in]    dew     to be added
+ * \param[in]    dew  to be added
  * \return  0 if OK, 1 on error
  *
  * <pre>
@@ -796,22 +801,24 @@ L_DEWARP   *dew;
  *          allocation.
  * </pre>
  */
-l_ok
+l_int32
 dewarpaInsertDewarp(L_DEWARPA  *dewa,
                     L_DEWARP   *dew)
 {
 l_int32    pageno, n, newsize;
 L_DEWARP  *prevdew;
 
+    PROCNAME("dewarpaInsertDewarp");
+
     if (!dewa)
-        return ERROR_INT("dewa not defined", __func__, 1);
+        return ERROR_INT("dewa not defined", procName, 1);
     if (!dew)
-        return ERROR_INT("dew not defined", __func__, 1);
+        return ERROR_INT("dew not defined", procName, 1);
 
     dew->dewa = dewa;
     pageno = dew->pageno;
-    if (pageno > MaxPtrArraySize)
-        return ERROR_INT("too many pages", __func__, 1);
+    if (pageno > MAX_PTR_ARRAYSIZE)
+        return ERROR_INT("too many pages", procName, 1);
     if (pageno > dewa->maxpage)
         dewa->maxpage = pageno;
     dewa->modelsready = 0;  /* force re-evaluation at application time */
@@ -823,10 +830,8 @@ L_DEWARP  *prevdew;
         newsize = 2 * pageno;
     else if (pageno >= n)
         newsize = 2 * n;
-    if (newsize > n) {
-        if (dewarpaExtendArraysToSize(dewa, newsize))
-            return ERROR_INT("extension failed", __func__, 1);
-    }
+    if (newsize > n)
+        dewarpaExtendArraysToSize(dewa, newsize);
 
     if ((prevdew = dewarpaGetDewarp(dewa, pageno)) != NULL)
         dewarpDestroy(&prevdew);
@@ -853,7 +858,7 @@ L_DEWARP  *prevdew;
  * \brief   dewarpaExtendArraysToSize()
  *
  * \param[in]    dewa
- * \param[in]    size    new size of dewarpa array
+ * \param[in]    size new size of dewarpa array
  * \return  0 if OK; 1 on error
  *
  * <pre>
@@ -865,19 +870,21 @@ static l_int32
 dewarpaExtendArraysToSize(L_DEWARPA  *dewa,
                          l_int32     size)
 {
+    PROCNAME("dewarpaExtendArraysToSize");
+
     if (!dewa)
-        return ERROR_INT("dewa not defined", __func__, 1);
+        return ERROR_INT("dewa not defined", procName, 1);
 
     if (size > dewa->nalloc) {
         if ((dewa->dewarp = (L_DEWARP **)reallocNew((void **)&dewa->dewarp,
                 sizeof(L_DEWARP *) * dewa->nalloc,
                 size * sizeof(L_DEWARP *))) == NULL)
-            return ERROR_INT("new ptr array not returned", __func__, 1);
+            return ERROR_INT("new ptr array not returned", procName, 1);
         if ((dewa->dewarpcache =
                 (L_DEWARP **)reallocNew((void **)&dewa->dewarpcache,
                 sizeof(L_DEWARP *) * dewa->nalloc,
                 size * sizeof(L_DEWARP *))) == NULL)
-            return ERROR_INT("new ptr cache array not returned", __func__, 1);
+            return ERROR_INT("new ptr cache array not returned", procName, 1);
         dewa->nalloc = size;
     }
     return 0;
@@ -887,19 +894,21 @@ dewarpaExtendArraysToSize(L_DEWARPA  *dewa,
 /*!
  * \brief   dewarpaGetDewarp()
  *
- * \param[in]    dewa    populated with dewarp structs for pages
- * \param[in]    index   into dewa: this is the pageno
- * \return  dew   handle; still owned by dewa, or NULL on error
+ * \param[in]    dewa populated with dewarp structs for pages
+ * \param[in]    index into dewa: this is the pageno
+ * \return  dew handle; still owned by dewa, or NULL on error
  */
 L_DEWARP *
 dewarpaGetDewarp(L_DEWARPA  *dewa,
                  l_int32     index)
 {
+    PROCNAME("dewarpaGetDewarp");
+
     if (!dewa)
-        return (L_DEWARP *)ERROR_PTR("dewa not defined", __func__, NULL);
+        return (L_DEWARP *)ERROR_PTR("dewa not defined", procName, NULL);
     if (index < 0 || index > dewa->maxpage) {
         L_ERROR("index = %d is invalid; max index = %d\n",
-                __func__, index, dewa->maxpage);
+                procName, index, dewa->maxpage);
         return NULL;
     }
 
@@ -914,39 +923,35 @@ dewarpaGetDewarp(L_DEWARPA  *dewa,
  * \brief   dewarpaSetCurvatures()
  *
  * \param[in]    dewa
- * \param[in]    max_linecurv        -1 for default
- * \param[in]    min_diff_linecurv   -1 for default; 0 to accept all models
- * \param[in]    max_diff_linecurv   -1 for default
- * \param[in]    max_edgecurv        -1 for default; 0 to fit a line
- * \param[in]    max_diff_edgecurv   -1 for default
- * \param[in]    max_edgeslope       -1 for default
+ * \param[in]    max_linecurv -1 for default
+ * \param[in]    min_diff_linecurv -1 for default; 0 to accept all models
+ * \param[in]    max_diff_linecurv -1 for default
+ * \param[in]    max_edgecurv -1 for default
+ * \param[in]    max_diff_edgecurv -1 for default
+ * \param[in]    max_edgeslope -1 for default
  * \return  0 if OK, 1 on error
  *
  * <pre>
  * Notes:
- *      (1) Approximating the line by a quadratic, the coefficient
+ *      (1) Approximating the line by a quadratic, the coefficent
  *          of the quadratic term is the curvature, and distance
- *          units are in pixels (of course).  Curvatures are very
+ *          units are in pixels (of course).  The curvature is very
  *          small, so we multiply by 10^6 and express the constraints
- *          on the model curvatures in micro-units.  The slope parameter
- *          is multiplied by 10^3 and expressed in milli-units.
- *      (2) This sets five curvature thresholds and a slope threshold
- *          for dewarping to take place.  Use -1 for default values.
- *          * max_linecurv: the maximum absolute value of the vertical
- *            disparity line curvatures.
- *          * min_diff_linecurv: the minimum absolute value of the
- *            largest difference in vertical disparity line curvatures.
- *            Use a value of 0 to accept all models.
- *          * max_diff_linecurv: the maximum absolute value of the largest
- *            difference in vertical disparity line curvatures.
- *          * max_edgecurv: the maximum absolute value of the left and right
- *            edge curvature for the horizontal disparity.  Use a value of
- *            zero to fit a straight line (zero curvature).
- *          * max_diff_edgecurv: the maximum absolute value of the difference
- *            between left and right edge curvature for the horizontal
- *            disparity. This value is ignored if max_edgecurve = 0.
- *          * max_edgeslope: the maximum slope coefficient for left and
- *            right line edges.
+ *          on the model curvatures in micro-units.
+ *      (2) This sets five curvature thresholds and a slope threshold:
+ *          * the maximum absolute value of the vertical disparity
+ *            line curvatures
+ *          * the minimum absolute value of the largest difference in
+ *            vertical disparity line curvatures (Use a value of 0
+ *            to accept all models.)
+ *          * the maximum absolute value of the largest difference in
+ *            vertical disparity line curvatures
+ *          * the maximum absolute value of the left and right edge
+ *            curvature for the horizontal disparity
+ *          * the maximum absolute value of the difference between
+ *            left and right edge curvature for the horizontal disparity
+ *          all in micro-units, for dewarping to take place.
+ *          Use -1 for default values.
  *      (3) An image with a line curvature less than about 0.00001
  *          has fairly straight textlines.  This is 10 micro-units.
  *      (4) For example, if %max_linecurv == 100, this would prevent dewarping
@@ -954,11 +959,10 @@ dewarpaGetDewarp(L_DEWARPA  *dewa,
  *          A model having maximum line curvature larger than about 150
  *          micro-units should probably not be used.
  *      (5) A model having a left or right edge curvature larger than
- *          about 50 micro-units should probably not be used.  Set the
- *          parameter max_edgecurv = 0 for a linear LSF.
+ *          about 100 micro-units should probably not be used.
  * </pre>
  */
-l_ok
+l_int32
 dewarpaSetCurvatures(L_DEWARPA  *dewa,
                      l_int32     max_linecurv,
                      l_int32     min_diff_linecurv,
@@ -967,36 +971,38 @@ dewarpaSetCurvatures(L_DEWARPA  *dewa,
                      l_int32     max_diff_edgecurv,
                      l_int32     max_edgeslope)
 {
+    PROCNAME("dewarpaSetCurvatures");
+
     if (!dewa)
-        return ERROR_INT("dewa not defined", __func__, 1);
+        return ERROR_INT("dewa not defined", procName, 1);
 
     if (max_linecurv == -1)
-        dewa->max_linecurv = DefaultMaxLineCurv;
+        dewa->max_linecurv = DEFAULT_MAX_LINECURV;
     else
         dewa->max_linecurv = L_ABS(max_linecurv);
 
     if (min_diff_linecurv == -1)
-        dewa->min_diff_linecurv = DefaultMinDiffLineCurv;
+        dewa->min_diff_linecurv = DEFAULT_MIN_DIFF_LINECURV;
     else
         dewa->min_diff_linecurv = L_ABS(min_diff_linecurv);
 
     if (max_diff_linecurv == -1)
-        dewa->max_diff_linecurv = DefaultMaxDiffLineCurv;
+        dewa->max_diff_linecurv = DEFAULT_MAX_DIFF_LINECURV;
     else
         dewa->max_diff_linecurv = L_ABS(max_diff_linecurv);
 
     if (max_edgecurv == -1)
-        dewa->max_edgecurv = DefaultMaxEdgeCurv;
+        dewa->max_edgecurv = DEFAULT_MAX_EDGECURV;
     else
         dewa->max_edgecurv = L_ABS(max_edgecurv);
 
     if (max_diff_edgecurv == -1)
-        dewa->max_diff_edgecurv = DefaultMaxDiffEdgeCurv;
+        dewa->max_diff_edgecurv = DEFAULT_MAX_DIFF_EDGECURV;
     else
         dewa->max_diff_edgecurv = L_ABS(max_diff_edgecurv);
 
     if (max_edgeslope == -1)
-        dewa->max_edgeslope = DefaultMaxEdgeSlope;
+        dewa->max_edgeslope = DEFAULT_MAX_EDGESLOPE;
     else
         dewa->max_edgeslope = L_ABS(max_edgeslope);
 
@@ -1020,12 +1026,14 @@ dewarpaSetCurvatures(L_DEWARPA  *dewa,
  *          always be valid.
  * </pre>
  */
-l_ok
+l_int32
 dewarpaUseBothArrays(L_DEWARPA  *dewa,
                      l_int32     useboth)
 {
+    PROCNAME("dewarpaUseBothArrays");
+
     if (!dewa)
-        return ERROR_INT("dewa not defined", __func__, 1);
+        return ERROR_INT("dewa not defined", procName, 1);
 
     dewa->useboth = useboth;
     dewa->modelsready = 0;  /* force validation */
@@ -1037,7 +1045,7 @@ dewarpaUseBothArrays(L_DEWARPA  *dewa,
  * \brief   dewarpaSetCheckColumns()
  *
  * \param[in]    dewa
- * \param[in]    check_columns    0 for false, 1 for true
+ * \param[in]    check_columns 0 for false, 1 for true
  * \return  0 if OK, 1 on error
  *
  * <pre>
@@ -1046,23 +1054,24 @@ dewarpaUseBothArrays(L_DEWARPA  *dewa,
  *          'useboth' is set, this will count the number of text
  *          columns.  If the number is larger than 1, this will
  *          prevent the application of horizontal disparity arrays
- *          if they exist.
- *      (2) The check_columns field is set to TRUE by default.
- *          For horizontal disparity correction to take place on a
- *          single column of text, you must have:
+ *          if they exist.  Note that the default value of check_columns
+ *          if 0 (FALSE).
+ *      (2) This field is set to 0 by default.  For horizontal disparity
+ *          correction to take place on a single column of text, you must have:
  *           - a valid horizontal disparity array
  *           - useboth = 1 (TRUE)
- *          If there are multiple columns, in addition you need
+ *          If there are multiple columns, additionally
  *           - check_columns = 0 (FALSE)
- *
  * </pre>
  */
-l_ok
+l_int32
 dewarpaSetCheckColumns(L_DEWARPA  *dewa,
                        l_int32     check_columns)
 {
+    PROCNAME("dewarpaSetCheckColumns");
+
     if (!dewa)
-        return ERROR_INT("dewa not defined", __func__, 1);
+        return ERROR_INT("dewa not defined", procName, 1);
 
     dewa->check_columns = check_columns;
     return 0;
@@ -1073,7 +1082,7 @@ dewarpaSetCheckColumns(L_DEWARPA  *dewa,
  * \brief   dewarpaSetMaxDistance()
  *
  * \param[in]    dewa
- * \param[in]    maxdist    for using ref models
+ * \param[in]    maxdist for using ref models
  * \return  0 if OK, 1 on error
  *
  * <pre>
@@ -1081,12 +1090,14 @@ dewarpaSetCheckColumns(L_DEWARPA  *dewa,
  *      (1) This sets the maxdist field.
  * </pre>
  */
-l_ok
+l_int32
 dewarpaSetMaxDistance(L_DEWARPA  *dewa,
                       l_int32     maxdist)
 {
+    PROCNAME("dewarpaSetMaxDistance");
+
     if (!dewa)
-        return ERROR_INT("dewa not defined", __func__, 1);
+        return ERROR_INT("dewa not defined", procName, 1);
 
     dewa->maxdist = maxdist;
     dewa->modelsready = 0;  /* force validation */
@@ -1109,16 +1120,16 @@ dewarpRead(const char  *filename)
 FILE      *fp;
 L_DEWARP  *dew;
 
+    PROCNAME("dewarpRead");
+
     if (!filename)
-        return (L_DEWARP *)ERROR_PTR("filename not defined", __func__, NULL);
+        return (L_DEWARP *)ERROR_PTR("filename not defined", procName, NULL);
     if ((fp = fopenReadStream(filename)) == NULL)
-        return (L_DEWARP *)ERROR_PTR_1("stream not opened",
-                                       filename, __func__, NULL);
+        return (L_DEWARP *)ERROR_PTR("stream not opened", procName, NULL);
 
     if ((dew = dewarpReadStream(fp)) == NULL) {
         fclose(fp);
-        return (L_DEWARP *)ERROR_PTR_1("dew not read",
-                                       filename, __func__, NULL);
+        return (L_DEWARP *)ERROR_PTR("dew not read", procName, NULL);
     }
 
     fclose(fp);
@@ -1129,8 +1140,8 @@ L_DEWARP  *dew;
 /*!
  * \brief   dewarpReadStream()
  *
- * \param[in]    fp    file stream
- * \return  dew  dewarp, or NULL on error
+ * \param[in]    fp file stream
+ * \return  dew, or NULL on error
  *
  * <pre>
  * Notes:
@@ -1150,59 +1161,61 @@ l_int32    version, sampling, redfactor, minlines, pageno, hasref, refpage;
 l_int32    w, h, nx, ny, vdispar, hdispar, nlines;
 l_int32    mincurv, maxcurv, leftslope, rightslope, leftcurv, rightcurv;
 L_DEWARP  *dew;
-FPIX      *fpixv = NULL, *fpixh = NULL;
+FPIX      *fpixv, *fpixh;
+
+    PROCNAME("dewarpReadStream");
 
     if (!fp)
-        return (L_DEWARP *)ERROR_PTR("stream not defined", __func__, NULL);
+        return (L_DEWARP *)ERROR_PTR("stream not defined", procName, NULL);
 
     if (fscanf(fp, "\nDewarp Version %d\n", &version) != 1)
-        return (L_DEWARP *)ERROR_PTR("not a dewarp file", __func__, NULL);
+        return (L_DEWARP *)ERROR_PTR("not a dewarp file", procName, NULL);
     if (version != DEWARP_VERSION_NUMBER)
-        return (L_DEWARP *)ERROR_PTR("invalid dewarp version", __func__, NULL);
+        return (L_DEWARP *)ERROR_PTR("invalid dewarp version", procName, NULL);
     if (fscanf(fp, "pageno = %d\n", &pageno) != 1)
-        return (L_DEWARP *)ERROR_PTR("read fail for pageno", __func__, NULL);
+        return (L_DEWARP *)ERROR_PTR("read fail for pageno", procName, NULL);
     if (fscanf(fp, "hasref = %d, refpage = %d\n", &hasref, &refpage) != 2)
         return (L_DEWARP *)ERROR_PTR("read fail for hasref, refpage",
-                                     __func__, NULL);
+                                     procName, NULL);
     if (fscanf(fp, "sampling = %d, redfactor = %d\n", &sampling, &redfactor)
                != 2)
         return (L_DEWARP *)ERROR_PTR("read fail for sampling/redfactor",
-                                     __func__, NULL);
+                                     procName, NULL);
     if (fscanf(fp, "nlines = %d, minlines = %d\n", &nlines, &minlines) != 2)
         return (L_DEWARP *)ERROR_PTR("read fail for nlines/minlines",
-                                     __func__, NULL);
+                                     procName, NULL);
     if (fscanf(fp, "w = %d, h = %d\n", &w, &h) != 2)
-        return (L_DEWARP *)ERROR_PTR("read fail for w, h", __func__, NULL);
+        return (L_DEWARP *)ERROR_PTR("read fail for w, h", procName, NULL);
     if (fscanf(fp, "nx = %d, ny = %d\n", &nx, &ny) != 2)
-        return (L_DEWARP *)ERROR_PTR("read fail for nx, ny", __func__, NULL);
+        return (L_DEWARP *)ERROR_PTR("read fail for nx, ny", procName, NULL);
     if (fscanf(fp, "vert_dispar = %d, horiz_dispar = %d\n", &vdispar, &hdispar)
                != 2)
-        return (L_DEWARP *)ERROR_PTR("read fail for flags", __func__, NULL);
+        return (L_DEWARP *)ERROR_PTR("read fail for flags", procName, NULL);
     if (vdispar) {
         if (fscanf(fp, "min line curvature = %d, max line curvature = %d\n",
                    &mincurv, &maxcurv) != 2)
             return (L_DEWARP *)ERROR_PTR("read fail for mincurv & maxcurv",
-                                         __func__, NULL);
+                                         procName, NULL);
     }
     if (hdispar) {
         if (fscanf(fp, "left edge slope = %d, right edge slope = %d\n",
                    &leftslope, &rightslope) != 2)
             return (L_DEWARP *)ERROR_PTR("read fail for leftslope & rightslope",
-                                         __func__, NULL);
+                                         procName, NULL);
         if (fscanf(fp, "left edge curvature = %d, right edge curvature = %d\n",
                    &leftcurv, &rightcurv) != 2)
             return (L_DEWARP *)ERROR_PTR("read fail for leftcurv & rightcurv",
-                                         __func__, NULL);
+                                         procName, NULL);
     }
     if (vdispar) {
         if ((fpixv = fpixReadStream(fp)) == NULL)
             return (L_DEWARP *)ERROR_PTR("read fail for vdispar",
-                                         __func__, NULL);
+                                         procName, NULL);
     }
     if (hdispar) {
         if ((fpixh = fpixReadStream(fp)) == NULL)
             return (L_DEWARP *)ERROR_PTR("read fail for hdispar",
-                                         __func__, NULL);
+                                         procName, NULL);
     }
     getc(fp);
 
@@ -1242,8 +1255,8 @@ FPIX      *fpixv = NULL, *fpixh = NULL;
 /*!
  * \brief   dewarpReadMem()
  *
- * \param[in]    data     serialization of dewarp
- * \param[in]    size     of data in bytes
+ * \param[in]    data  serialization of dewarp
+ * \param[in]    size  of data in bytes
  * \return  dew  dewarp, or NULL on error
  */
 L_DEWARP  *
@@ -1253,14 +1266,16 @@ dewarpReadMem(const l_uint8  *data,
 FILE      *fp;
 L_DEWARP  *dew;
 
+    PROCNAME("dewarpReadMem");
+
     if (!data)
-        return (L_DEWARP *)ERROR_PTR("data not defined", __func__, NULL);
+        return (L_DEWARP *)ERROR_PTR("data not defined", procName, NULL);
     if ((fp = fopenReadFromMemory(data, size)) == NULL)
-        return (L_DEWARP *)ERROR_PTR("stream not opened", __func__, NULL);
+        return (L_DEWARP *)ERROR_PTR("stream not opened", procName, NULL);
 
     dew = dewarpReadStream(fp);
     fclose(fp);
-    if (!dew) L_ERROR("dew not read\n", __func__);
+    if (!dew) L_ERROR("dew not read\n", procName);
     return dew;
 }
 
@@ -1272,24 +1287,26 @@ L_DEWARP  *dew;
  * \param[in]    dew
  * \return  0 if OK, 1 on error
  */
-l_ok
+l_int32
 dewarpWrite(const char  *filename,
             L_DEWARP    *dew)
 {
 l_int32  ret;
 FILE    *fp;
 
+    PROCNAME("dewarpWrite");
+
     if (!filename)
-        return ERROR_INT("filename not defined", __func__, 1);
+        return ERROR_INT("filename not defined", procName, 1);
     if (!dew)
-        return ERROR_INT("dew not defined", __func__, 1);
+        return ERROR_INT("dew not defined", procName, 1);
 
     if ((fp = fopenWriteStream(filename, "wb")) == NULL)
-        return ERROR_INT_1("stream not opened", filename, __func__, 1);
+        return ERROR_INT("stream not opened", procName, 1);
     ret = dewarpWriteStream(fp, dew);
     fclose(fp);
     if (ret)
-        return ERROR_INT_1("dew not written to stream", filename, __func__, 1);
+        return ERROR_INT("dew not written to stream", procName, 1);
     return 0;
 }
 
@@ -1297,7 +1314,7 @@ FILE    *fp;
 /*!
  * \brief   dewarpWriteStream()
  *
- * \param[in]    fp     file stream opened for "wb"
+ * \param[in]    fp file stream opened for "wb"
  * \param[in]    dew
  * \return  0 if OK, 1 on error
  *
@@ -1308,16 +1325,18 @@ FILE    *fp;
  *          been built for this page.
  * </pre>
  */
-l_ok
+l_int32
 dewarpWriteStream(FILE      *fp,
                   L_DEWARP  *dew)
 {
 l_int32  vdispar, hdispar;
 
+    PROCNAME("dewarpWriteStream");
+
     if (!fp)
-        return ERROR_INT("stream not defined", __func__, 1);
+        return ERROR_INT("stream not defined", procName, 1);
     if (!dew)
-        return ERROR_INT("dew not defined", __func__, 1);
+        return ERROR_INT("dew not defined", procName, 1);
 
     fprintf(fp, "\nDewarp Version %d\n", DEWARP_VERSION_NUMBER);
     fprintf(fp, "pageno = %d\n", dew->pageno);
@@ -1344,7 +1363,7 @@ l_int32  vdispar, hdispar;
     fprintf(fp, "\n");
 
     if (!vdispar)
-        L_WARNING("no disparity arrays!\n", __func__);
+        L_WARNING("no disparity arrays!\n", procName);
     return 0;
 }
 
@@ -1352,8 +1371,8 @@ l_int32  vdispar, hdispar;
 /*!
  * \brief   dewarpWriteMem()
  *
- * \param[out]   pdata    data of serialized dewarp (not ascii)
- * \param[out]   psize    size of returned data
+ * \param[out]   pdata data of serialized dewarp (not ascii)
+ * \param[out]   psize size of returned data
  * \param[in]    dew
  * \return  0 if OK, 1 on error
  *
@@ -1362,7 +1381,7 @@ l_int32  vdispar, hdispar;
  *      (1) Serializes a dewarp in memory and puts the result in a buffer.
  * </pre>
  */
-l_ok
+l_int32
 dewarpWriteMem(l_uint8  **pdata,
                size_t    *psize,
                L_DEWARP  *dew)
@@ -1370,36 +1389,35 @@ dewarpWriteMem(l_uint8  **pdata,
 l_int32  ret;
 FILE    *fp;
 
+    PROCNAME("dewarpWriteMem");
+
     if (pdata) *pdata = NULL;
     if (psize) *psize = 0;
     if (!pdata)
-        return ERROR_INT("&data not defined", __func__, 1);
+        return ERROR_INT("&data not defined", procName, 1);
     if (!psize)
-        return ERROR_INT("&size not defined", __func__, 1);
+        return ERROR_INT("&size not defined", procName, 1);
     if (!dew)
-        return ERROR_INT("dew not defined", __func__, 1);
+        return ERROR_INT("dew not defined", procName, 1);
 
 #if HAVE_FMEMOPEN
     if ((fp = open_memstream((char **)pdata, psize)) == NULL)
-        return ERROR_INT("stream not opened", __func__, 1);
+        return ERROR_INT("stream not opened", procName, 1);
     ret = dewarpWriteStream(fp, dew);
-    fputc('\0', fp);
-    fclose(fp);
-    if (*psize > 0) *psize = *psize - 1;
 #else
-    L_INFO("no fmemopen API --> work-around: write to temp file\n", __func__);
+    L_INFO("work-around: writing to a temp file\n", procName);
   #ifdef _WIN32
     if ((fp = fopenWriteWinTempfile()) == NULL)
-        return ERROR_INT("tmpfile stream not opened", __func__, 1);
+        return ERROR_INT("tmpfile stream not opened", procName, 1);
   #else
     if ((fp = tmpfile()) == NULL)
-        return ERROR_INT("tmpfile stream not opened", __func__, 1);
+        return ERROR_INT("tmpfile stream not opened", procName, 1);
   #endif  /* _WIN32 */
     ret = dewarpWriteStream(fp, dew);
     rewind(fp);
     *pdata = l_binaryReadStream(fp, psize);
-    fclose(fp);
 #endif  /* HAVE_FMEMOPEN */
+    fclose(fp);
     return ret;
 }
 
@@ -1419,16 +1437,16 @@ dewarpaRead(const char  *filename)
 FILE       *fp;
 L_DEWARPA  *dewa;
 
+    PROCNAME("dewarpaRead");
+
     if (!filename)
-        return (L_DEWARPA *)ERROR_PTR("filename not defined", __func__, NULL);
+        return (L_DEWARPA *)ERROR_PTR("filename not defined", procName, NULL);
     if ((fp = fopenReadStream(filename)) == NULL)
-        return (L_DEWARPA *)ERROR_PTR_1("stream not opened",
-                                        filename, __func__, NULL);
+        return (L_DEWARPA *)ERROR_PTR("stream not opened", procName, NULL);
 
     if ((dewa = dewarpaReadStream(fp)) == NULL) {
         fclose(fp);
-        return (L_DEWARPA *)ERROR_PTR_1("dewa not read",
-                                        filename, __func__, NULL);
+        return (L_DEWARPA *)ERROR_PTR("dewa not read", procName, NULL);
     }
 
     fclose(fp);
@@ -1439,7 +1457,7 @@ L_DEWARPA  *dewa;
 /*!
  * \brief   dewarpaReadStream()
  *
- * \param[in]    fp    file stream
+ * \param[in]    fp file stream
  * \return  dewa, or NULL on error
  *
  * <pre>
@@ -1461,34 +1479,32 @@ L_DEWARP   *dew;
 L_DEWARPA  *dewa;
 NUMA       *namodels;
 
+    PROCNAME("dewarpaReadStream");
+
     if (!fp)
-        return (L_DEWARPA *)ERROR_PTR("stream not defined", __func__, NULL);
+        return (L_DEWARPA *)ERROR_PTR("stream not defined", procName, NULL);
 
     if (fscanf(fp, "\nDewarpa Version %d\n", &version) != 1)
-        return (L_DEWARPA *)ERROR_PTR("not a dewarpa file", __func__, NULL);
+        return (L_DEWARPA *)ERROR_PTR("not a dewarpa file", procName, NULL);
     if (version != DEWARP_VERSION_NUMBER)
-        return (L_DEWARPA *)ERROR_PTR("invalid dewarp version", __func__, NULL);
+        return (L_DEWARPA *)ERROR_PTR("invalid dewarp version", procName, NULL);
 
     if (fscanf(fp, "ndewarp = %d, maxpage = %d\n", &ndewarp, &maxpage) != 2)
-        return (L_DEWARPA *)ERROR_PTR("read fail for maxpage+", __func__, NULL);
-    if (ndewarp < 1)
-        return (L_DEWARPA *)ERROR_PTR("pages not >= 1", __func__, NULL);
-    if (ndewarp > MaxPtrArraySize)
-        return (L_DEWARPA *)ERROR_PTR("too many pages", __func__, NULL);
+        return (L_DEWARPA *)ERROR_PTR("read fail for maxpage+", procName, NULL);
     if (fscanf(fp,
                "sampling = %d, redfactor = %d, minlines = %d, maxdist = %d\n",
                &sampling, &redfactor, &minlines, &maxdist) != 4)
-        return (L_DEWARPA *)ERROR_PTR("read fail for 4 params", __func__, NULL);
+        return (L_DEWARPA *)ERROR_PTR("read fail for 4 params", procName, NULL);
     if (fscanf(fp,
           "max_linecurv = %d, min_diff_linecurv = %d, max_diff_linecurv = %d\n",
           &max_linecurv, &min_diff_linecurv, &max_diff_linecurv) != 3)
-        return (L_DEWARPA *)ERROR_PTR("read fail for linecurv", __func__, NULL);
+        return (L_DEWARPA *)ERROR_PTR("read fail for linecurv", procName, NULL);
     if (fscanf(fp,
               "max_edgeslope = %d, max_edgecurv = %d, max_diff_edgecurv = %d\n",
                &max_edgeslope, &max_edgecurv, &max_diff_edgecurv) != 3)
-        return (L_DEWARPA *)ERROR_PTR("read fail for edgecurv", __func__, NULL);
+        return (L_DEWARPA *)ERROR_PTR("read fail for edgecurv", procName, NULL);
     if (fscanf(fp, "fullmodel = %d\n", &useboth) != 1)
-        return (L_DEWARPA *)ERROR_PTR("read fail for useboth", __func__, NULL);
+        return (L_DEWARPA *)ERROR_PTR("read fail for useboth", procName, NULL);
 
     dewa = dewarpaCreate(maxpage + 1, sampling, redfactor, minlines, maxdist);
     dewa->maxpage = maxpage;
@@ -1503,8 +1519,7 @@ NUMA       *namodels;
     dewa->namodels = namodels;
     for (i = 0; i < ndewarp; i++) {
         if ((dew = dewarpReadStream(fp)) == NULL) {
-            L_ERROR("read fail for dew[%d]\n", __func__, i);
-            dewarpaDestroy(&dewa);
+            L_ERROR("read fail for dew[%d]\n", procName, i);
             return NULL;
         }
         dewarpaInsertDewarp(dewa, dew);
@@ -1513,6 +1528,7 @@ NUMA       *namodels;
 
         /* Validate the models and insert reference models */
     dewarpaInsertRefModels(dewa, 0, 0);
+
     return dewa;
 }
 
@@ -1531,14 +1547,16 @@ dewarpaReadMem(const l_uint8  *data,
 FILE       *fp;
 L_DEWARPA  *dewa;
 
+    PROCNAME("dewarpaReadMem");
+
     if (!data)
-        return (L_DEWARPA *)ERROR_PTR("data not defined", __func__, NULL);
+        return (L_DEWARPA *)ERROR_PTR("data not defined", procName, NULL);
     if ((fp = fopenReadFromMemory(data, size)) == NULL)
-        return (L_DEWARPA *)ERROR_PTR("stream not opened", __func__, NULL);
+        return (L_DEWARPA *)ERROR_PTR("stream not opened", procName, NULL);
 
     dewa = dewarpaReadStream(fp);
     fclose(fp);
-    if (!dewa) L_ERROR("dewa not read\n", __func__);
+    if (!dewa) L_ERROR("dewa not read\n", procName);
     return dewa;
 }
 
@@ -1550,24 +1568,26 @@ L_DEWARPA  *dewa;
  * \param[in]    dewa
  * \return  0 if OK, 1 on error
  */
-l_ok
+l_int32
 dewarpaWrite(const char  *filename,
              L_DEWARPA   *dewa)
 {
 l_int32  ret;
 FILE    *fp;
 
+    PROCNAME("dewarpaWrite");
+
     if (!filename)
-        return ERROR_INT("filename not defined", __func__, 1);
+        return ERROR_INT("filename not defined", procName, 1);
     if (!dewa)
-        return ERROR_INT("dewa not defined", __func__, 1);
+        return ERROR_INT("dewa not defined", procName, 1);
 
     if ((fp = fopenWriteStream(filename, "wb")) == NULL)
-        return ERROR_INT_1("stream not opened", filename, __func__, 1);
+        return ERROR_INT("stream not opened", procName, 1);
     ret = dewarpaWriteStream(fp, dewa);
     fclose(fp);
     if (ret)
-        return ERROR_INT_1("dewa not written to stream", filename, __func__, 1);
+        return ERROR_INT("dewa not written to stream", procName, 1);
     return 0;
 }
 
@@ -1575,20 +1595,22 @@ FILE    *fp;
 /*!
  * \brief   dewarpaWriteStream()
  *
- * \param[in]    fp     file stream opened for "wb"
+ * \param[in]    fp file stream opened for "wb"
  * \param[in]    dewa
  * \return  0 if OK, 1 on error
  */
-l_ok
+l_int32
 dewarpaWriteStream(FILE       *fp,
                    L_DEWARPA  *dewa)
 {
 l_int32  ndewarp, i, pageno;
 
+    PROCNAME("dewarpaWriteStream");
+
     if (!fp)
-        return ERROR_INT("stream not defined", __func__, 1);
+        return ERROR_INT("stream not defined", procName, 1);
     if (!dewa)
-        return ERROR_INT("dewa not defined", __func__, 1);
+        return ERROR_INT("dewa not defined", procName, 1);
 
         /* Generate the list of page numbers for which a model exists.
          * Note that no attempt is made to determine if the model is
@@ -1597,7 +1619,7 @@ l_int32  ndewarp, i, pageno;
          * can happen later, after all the models have been built. */
     dewarpaListPages(dewa);
     if (!dewa->namodels)
-        return ERROR_INT("dewa->namodels not made", __func__, 1);
+        return ERROR_INT("dewa->namodels not made", procName, 1);
     ndewarp = numaGetCount(dewa->namodels);  /*  with actual page models */
 
     fprintf(fp, "\nDewarpa Version %d\n", DEWARP_VERSION_NUMBER);
@@ -1623,8 +1645,8 @@ l_int32  ndewarp, i, pageno;
 /*!
  * \brief   dewarpaWriteMem()
  *
- * \param[out]   pdata    data of serialized dewarpa (not ascii)
- * \param[out]   psize    size of returned data
+ * \param[out]   pdata data of serialized dewarpa (not ascii)
+ * \param[out]   psize size of returned data
  * \param[in]    dewa
  * \return  0 if OK, 1 on error
  *
@@ -1633,7 +1655,7 @@ l_int32  ndewarp, i, pageno;
  *      (1) Serializes a dewarpa in memory and puts the result in a buffer.
  * </pre>
  */
-l_ok
+l_int32
 dewarpaWriteMem(l_uint8   **pdata,
                 size_t     *psize,
                 L_DEWARPA  *dewa)
@@ -1641,35 +1663,34 @@ dewarpaWriteMem(l_uint8   **pdata,
 l_int32  ret;
 FILE    *fp;
 
+    PROCNAME("dewarpaWriteMem");
+
     if (pdata) *pdata = NULL;
     if (psize) *psize = 0;
     if (!pdata)
-        return ERROR_INT("&data not defined", __func__, 1);
+        return ERROR_INT("&data not defined", procName, 1);
     if (!psize)
-        return ERROR_INT("&size not defined", __func__, 1);
+        return ERROR_INT("&size not defined", procName, 1);
     if (!dewa)
-        return ERROR_INT("dewa not defined", __func__, 1);
+        return ERROR_INT("dewa not defined", procName, 1);
 
 #if HAVE_FMEMOPEN
     if ((fp = open_memstream((char **)pdata, psize)) == NULL)
-        return ERROR_INT("stream not opened", __func__, 1);
+        return ERROR_INT("stream not opened", procName, 1);
     ret = dewarpaWriteStream(fp, dewa);
-    fputc('\0', fp);
-    fclose(fp);
-    if (*psize > 0) *psize = *psize - 1;
 #else
-    L_INFO("no fmemopen API --> work-around: write to temp file\n", __func__);
+    L_INFO("work-around: writing to a temp file\n", procName);
   #ifdef _WIN32
     if ((fp = fopenWriteWinTempfile()) == NULL)
-        return ERROR_INT("tmpfile stream not opened", __func__, 1);
+        return ERROR_INT("tmpfile stream not opened", procName, 1);
   #else
     if ((fp = tmpfile()) == NULL)
-        return ERROR_INT("tmpfile stream not opened", __func__, 1);
+        return ERROR_INT("tmpfile stream not opened", procName, 1);
   #endif  /* _WIN32 */
     ret = dewarpaWriteStream(fp, dewa);
     rewind(fp);
     *pdata = l_binaryReadStream(fp, psize);
-    fclose(fp);
 #endif  /* HAVE_FMEMOPEN */
+    fclose(fp);
     return ret;
 }

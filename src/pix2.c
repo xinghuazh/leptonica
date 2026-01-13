@@ -41,7 +41,6 @@
  *           l_int32     pixSetPixel()
  *           l_int32     pixGetRGBPixel()
  *           l_int32     pixSetRGBPixel()
- *           l_int32     pixSetCmapPixel()
  *           l_int32     pixGetRandomPixel()
  *           l_int32     pixClearPixel()
  *           l_int32     pixFlipPixel()
@@ -79,7 +78,6 @@
  *           PIX        *pixAddBorder()
  *           PIX        *pixAddBlackOrWhiteBorder()
  *           PIX        *pixAddBorderGeneral()
- *           PIX        *pixAddMultipleBlackWhiteBorders()
  *           PIX        *pixRemoveBorder()
  *           PIX        *pixRemoveBorderGeneral()
  *           PIX        *pixRemoveBorderToSize()
@@ -105,9 +103,6 @@
  *           l_int32     extractMinMaxComponent()
  *           l_int32     pixGetRGBLine()
  *
- *      Raster line pixel setter
- *           l_int32     setLineDataVal()
- *
  *      Conversion between big and little endians
  *           PIX        *pixEndianByteSwapNew()
  *           l_int32     pixEndianByteSwap()
@@ -119,10 +114,7 @@
  *           l_int32     pixGetRasterData()
  *
  *      Test alpha component opaqueness
- *           l_int32     pixAlphaIsOpaque()
- *
- *      Infer resolution from image size
- *           l_int32     pixInferResolution()
+ *           l_int32     pixAlphaIsOpaque
  *
  *      Setup helpers for 8 bpp byte processing
  *           l_uint8   **pixSetupByteProcessing()
@@ -130,16 +122,14 @@
  *
  *      Setting parameters for antialias masking with alpha transforms
  *           void        l_setAlphaMaskBorder()
+ *
+ *      *** indicates implicit assumption about RGB component ordering
  * </pre>
  */
 
-#ifdef HAVE_CONFIG_H
-#include <config_auto.h>
-#endif  /* HAVE_CONFIG_H */
 
 #include <string.h>
 #include "allheaders.h"
-#include "pix_internal.h"
 
 static const l_uint32 rmask32[] = {0x0,
     0x00000001, 0x00000003, 0x00000007, 0x0000000f,
@@ -169,9 +159,9 @@ LEPT_DLL l_float32  AlphaMaskBorderVals[2] = {0.0, 0.5};
  * \brief   pixGetPixel()
  *
  * \param[in]    pix
- * \param[in]    x,y    pixel coords
- * \param[out]   pval   pixel value
- * \return  0 if OK; 1 or 2 on error
+ * \param[in]    x,y pixel coords
+ * \param[out]   pval pixel value
+ * \return  0 if OK; 1 on error
  *
  * <pre>
  * Notes:
@@ -184,11 +174,11 @@ LEPT_DLL l_float32  AlphaMaskBorderVals[2] = {0.0, 0.5};
  *            * GET_DATA/SET_DATA: ~350 MPix/sec
  *          If speed is important and you're doing random access into
  *          the pix, use pixGetLinePtrs() and the array access macros.
- *      (3) If the point is outside the image, this returns an error (2),
+ *      (3) If the point is outside the image, this returns an error (1),
  *          with 0 in %pval.  To avoid spamming output, it fails silently.
  * </pre>
  */
-l_ok
+l_int32
 pixGetPixel(PIX       *pix,
             l_int32    x,
             l_int32    y,
@@ -197,15 +187,17 @@ pixGetPixel(PIX       *pix,
 l_int32    w, h, d, wpl, val;
 l_uint32  *line, *data;
 
+    PROCNAME("pixGetPixel");
+
     if (!pval)
-        return ERROR_INT("&val not defined", __func__, 1);
+        return ERROR_INT("&val not defined", procName, 1);
     *pval = 0;
     if (!pix)
-        return ERROR_INT("pix not defined", __func__, 1);
+        return ERROR_INT("pix not defined", procName, 1);
 
     pixGetDimensions(pix, &w, &h, &d);
     if (x < 0 || x >= w || y < 0 || y >= h)
-        return 2;
+        return 1;
 
     wpl = pixGetWpl(pix);
     data = pixGetData(pix);
@@ -231,7 +223,7 @@ l_uint32  *line, *data;
         val = line[x];
         break;
     default:
-        return ERROR_INT("depth must be in {1,2,4,8,16,32} bpp", __func__, 1);
+        return ERROR_INT("depth must be in {1,2,4,8,16,32} bpp", procName, 1);
     }
 
     *pval = val;
@@ -243,9 +235,9 @@ l_uint32  *line, *data;
  * \brief   pixSetPixel()
  *
  * \param[in]    pix
- * \param[in]    x,y   pixel coords
- * \param[in]    val   value to be inserted
- * \return  0 if OK; 1 or 2 on error
+ * \param[in]    x,y pixel coords
+ * \param[in]    val value to be inserted
+ * \return  0 if OK; 1 on error
  *
  * <pre>
  * Notes:
@@ -255,11 +247,9 @@ l_uint32  *line, *data;
  *          * For d == 2, 4, 8 and 16, %val is masked to the maximum allowable
  *            pixel value, and any (invalid) higher order bits are discarded.
  *      (2) See pixGetPixel() for information on performance.
- *      (3) If the point is outside the image, this returns an error (2),
- *          with 0 in %pval.  To avoid spamming output, it fails silently.
  * </pre>
  */
-l_ok
+l_int32
 pixSetPixel(PIX      *pix,
             l_int32   x,
             l_int32   y,
@@ -268,11 +258,15 @@ pixSetPixel(PIX      *pix,
 l_int32    w, h, d, wpl;
 l_uint32  *line, *data;
 
+    PROCNAME("pixSetPixel");
+
     if (!pix)
-        return ERROR_INT("pix not defined", __func__, 1);
+        return ERROR_INT("pix not defined", procName, 1);
     pixGetDimensions(pix, &w, &h, &d);
-    if (x < 0 || x >= w || y < 0 || y >= h)
-        return 2;
+    if (x < 0 || x >= w)
+        return ERROR_INT("x out of bounds", procName, 1);
+    if (y < 0 || y >= h)
+        return ERROR_INT("y out of bounds", procName, 1);
 
     data = pixGetData(pix);
     wpl = pixGetWpl(pix);
@@ -301,7 +295,7 @@ l_uint32  *line, *data;
         line[x] = val;
         break;
     default:
-        return ERROR_INT("depth must be in {1,2,4,8,16,32} bpp", __func__, 1);
+        return ERROR_INT("depth must be in {1,2,4,8,16,32} bpp", procName, 1);
     }
 
     return 0;
@@ -311,20 +305,14 @@ l_uint32  *line, *data;
 /*!
  * \brief   pixGetRGBPixel()
  *
- * \param[in]    pix    32 bpp rgb, not colormapped
- * \param[in]    x,y    pixel coords
- * \param[out]   prval  [optional] red component
- * \param[out]   pgval  [optional] green component
- * \param[out]   pbval  [optional] blue component
- * \return  0 if OK; 1 or 2 on error
- *
- * <pre>
- * Notes:
- *      (1) If the point is outside the image, this returns an error (2),
- *          with 0 in %pval.  To avoid spamming output, it fails silently.
- * </pre>
+ * \param[in]    pix 32 bpp rgb, not colormapped
+ * \param[in]    x,y pixel coords
+ * \param[out]   prval [optional] red component
+ * \param[out]   pgval [optional] green component
+ * \param[out]   pbval [optional] blue component
+ * \return  0 if OK; 1 on error
  */
-l_ok
+l_int32
 pixGetRGBPixel(PIX      *pix,
                l_int32   x,
                l_int32   y,
@@ -335,18 +323,22 @@ pixGetRGBPixel(PIX      *pix,
 l_int32    w, h, d, wpl;
 l_uint32  *data, *ppixel;
 
+    PROCNAME("pixGetRGBPixel");
+
     if (prval) *prval = 0;
     if (pgval) *pgval = 0;
     if (pbval) *pbval = 0;
     if (!prval && !pgval && !pbval)
-        return ERROR_INT("no output requested", __func__, 1);
+        return ERROR_INT("no output requested", procName, 1);
     if (!pix)
-        return ERROR_INT("pix not defined", __func__, 1);
+        return ERROR_INT("pix not defined", procName, 1);
     pixGetDimensions(pix, &w, &h, &d);
     if (d != 32)
-        return ERROR_INT("pix not 32 bpp", __func__, 1);
-    if (x < 0 || x >= w || y < 0 || y >= h)
-        return 2;
+        return ERROR_INT("pix not 32 bpp", procName, 1);
+    if (x < 0 || x >= w)
+        return ERROR_INT("x out of bounds", procName, 1);
+    if (y < 0 || y >= h)
+        return ERROR_INT("y out of bounds", procName, 1);
 
     wpl = pixGetWpl(pix);
     data = pixGetData(pix);
@@ -361,20 +353,14 @@ l_uint32  *data, *ppixel;
 /*!
  * \brief   pixSetRGBPixel()
  *
- * \param[in]    pix    32 bpp rgb
- * \param[in]    x,y    pixel coords
- * \param[in]    rval   red component
- * \param[in]    gval   green component
- * \param[in]    bval   blue component
- * \return  0 if OK; 1 or 2 on error
- *
- * <pre>
- * Notes:
- *      (1) If the point is outside the image, this returns an error (2),
- *          and to avoid spamming output, it fails silently.
- * </pre>
+ * \param[in]    pix 32 bpp rgb
+ * \param[in]    x,y pixel coords
+ * \param[in]    rval red component
+ * \param[in]    gval green component
+ * \param[in]    bval blue component
+ * \return  0 if OK; 1 on error
  */
-l_ok
+l_int32
 pixSetRGBPixel(PIX     *pix,
                l_int32  x,
                l_int32  y,
@@ -386,13 +372,17 @@ l_int32    w, h, d, wpl;
 l_uint32   pixel;
 l_uint32  *data, *line;
 
+    PROCNAME("pixSetRGBPixel");
+
     if (!pix)
-        return ERROR_INT("pix not defined", __func__, 1);
+        return ERROR_INT("pix not defined", procName, 1);
     pixGetDimensions(pix, &w, &h, &d);
     if (d != 32)
-        return ERROR_INT("pix not 32 bpp", __func__, 1);
-    if (x < 0 || x >= w || y < 0 || y >= h)
-        return 2;
+        return ERROR_INT("pix not 32 bpp", procName, 1);
+    if (x < 0 || x >= w)
+        return ERROR_INT("x out of bounds", procName, 1);
+    if (y < 0 || y >= h)
+        return ERROR_INT("y out of bounds", procName, 1);
 
     wpl = pixGetWpl(pix);
     data = pixGetData(pix);
@@ -404,71 +394,12 @@ l_uint32  *data, *line;
 
 
 /*!
- * \brief   pixSetCmapPixel()
- *
- * \param[in]    pix    2, 4 or 8 bpp, colormapped
- * \param[in]    x,y    pixel coords
- * \param[in]    rval   red component
- * \param[in]    gval   green component
- * \param[in]    bval   blue component
- * \return  0 if OK; 1 or 2 on error
- *
- * <pre>
- * Notes:
- *      (1) If the point is outside the image, this returns an error (2),
- *          and to avoid spamming output, it fails silently.
- *      (2) - If the color already exists, use it.
- *          - If the color does not exist in the colormap, it is added
- *            if possible.
- *          - If there is not room in the colormap for the new color:
- *            * if d < 8, return 2 with a warning.
- *            * if d == 8, find and use the nearest color.
- *      (3) Note that this operation scales with the number of colors
- *          in the colormap, and therefore can be very expensive if an
- *          attempt is made to set many pixels.  (In that case, it should
- *          be implemented with a map:rgb-->index for efficiency.)
- *          This is best used with very small images.
- * </pre>
- */
-l_ok
-pixSetCmapPixel(PIX     *pix,
-                l_int32  x,
-                l_int32  y,
-                l_int32  rval,
-                l_int32  gval,
-                l_int32  bval)
-{
-l_int32   w, h, d, index;
-PIXCMAP  *cmap;
-
-    if (!pix)
-        return ERROR_INT("pix not defined", __func__, 1);
-    if ((cmap = pixGetColormap(pix)) == NULL)
-        return ERROR_INT("pix is not colormapped", __func__, 1);
-    pixGetDimensions(pix, &w, &h, &d);
-    if (d != 2 && d != 4 && d != 8)
-        return ERROR_INT("pix depth not 2, 4 or 8", __func__, 1);
-    if (x < 0 || x >= w || y < 0 || y >= h)
-        return 2;
-
-    if (d == 8) {  /* always add */
-        pixcmapAddNearestColor(cmap, rval, gval, bval, &index);
-    } else {  /* d < 8 */
-        if (pixcmapAddNewColor(cmap, rval, gval, bval, &index) == 2)
-            return ERROR_INT("colormap is full", __func__, 2);
-    }
-    pixSetPixel(pix, x, y, index);
-    return 0;
-}
-
-
-/*!
  * \brief   pixGetRandomPixel()
  *
- * \param[in]    pix    any depth; can be colormapped
- * \param[out]   pval   [optional] pixel value
- * \param[out]   px     [optional] x coordinate chosen; can be null
- * \param[out]   py     [optional] y coordinate chosen; can be null
+ * \param[in]    pix any depth; can be colormapped
+ * \param[out]   pval [optional] pixel value
+ * \param[out]   px [optional] x coordinate chosen; can be null
+ * \param[out]   py [optional] y coordinate chosen; can be null
  * \return  0 if OK; 1 on error
  *
  * <pre>
@@ -476,7 +407,7 @@ PIXCMAP  *cmap;
  *      (1) If the pix is colormapped, it returns the rgb value.
  * </pre>
  */
-l_ok
+l_int32
 pixGetRandomPixel(PIX       *pix,
                   l_uint32  *pval,
                   l_int32   *px,
@@ -486,13 +417,15 @@ l_int32   w, h, x, y, rval, gval, bval;
 l_uint32  val;
 PIXCMAP  *cmap;
 
+    PROCNAME("pixGetRandomPixel");
+
     if (pval) *pval = 0;
     if (px) *px = 0;
     if (py) *py = 0;
     if (!pval && !px && !py)
-        return ERROR_INT("no output requested", __func__, 1);
+        return ERROR_INT("no output requested", procName, 1);
     if (!pix)
-        return ERROR_INT("pix not defined", __func__, 1);
+        return ERROR_INT("pix not defined", procName, 1);
 
     pixGetDimensions(pix, &w, &h, NULL);
     x = rand() % w;
@@ -516,17 +449,11 @@ PIXCMAP  *cmap;
 /*!
  * \brief   pixClearPixel()
  *
- * \param[in]    pix   any depth; warning if colormapped
- * \param[in]    x,y   pixel coords
- * \return  0 if OK; 1 or 2 on error.
- *
- * <pre>
- * Notes:
- *      (1) If the point is outside the image, this returns an error (2),
- *          with 0 in %pval.  To avoid spamming output, it fails silently.
- * </pre>
+ * \param[in]    pix
+ * \param[in]    x,y pixel coords
+ * \return  0 if OK; 1 on error.
  */
-l_ok
+l_int32
 pixClearPixel(PIX     *pix,
               l_int32  x,
               l_int32  y)
@@ -534,13 +461,15 @@ pixClearPixel(PIX     *pix,
 l_int32    w, h, d, wpl;
 l_uint32  *line, *data;
 
+    PROCNAME("pixClearPixel");
+
     if (!pix)
-        return ERROR_INT("pix not defined", __func__, 1);
-    if (pixGetColormap(pix))
-        L_WARNING("cmapped: setting to 0 may not be intended\n", __func__);
+        return ERROR_INT("pix not defined", procName, 1);
     pixGetDimensions(pix, &w, &h, &d);
-    if (x < 0 || x >= w || y < 0 || y >= h)
-        return 2;
+    if (x < 0 || x >= w)
+        return ERROR_INT("x out of bounds", procName, 1);
+    if (y < 0 || y >= h)
+        return ERROR_INT("y out of bounds", procName, 1);
 
     wpl = pixGetWpl(pix);
     data = pixGetData(pix);
@@ -566,7 +495,7 @@ l_uint32  *line, *data;
         line[x] = 0;
         break;
     default:
-        return ERROR_INT("depth must be in {1,2,4,8,16,32} bpp", __func__, 1);
+        return ERROR_INT("depth must be in {1,2,4,8,16,32} bpp", procName, 1);
     }
 
     return 0;
@@ -576,17 +505,11 @@ l_uint32  *line, *data;
 /*!
  * \brief   pixFlipPixel()
  *
- * \param[in]    pix   any depth, warning if colormapped
- * \param[in]    x,y   pixel coords
- * \return  0 if OK; 1 or 2 on error
- *
- * <pre>
- * Notes:
- *      (1) If the point is outside the image, this returns an error (2),
- *          with 0 in %pval.  To avoid spamming output, it fails silently.
- * </pre>
+ * \param[in]    pix
+ * \param[in]    x,y pixel coords
+ * \return  0 if OK; 1 on error
  */
-l_ok
+l_int32
 pixFlipPixel(PIX     *pix,
              l_int32  x,
              l_int32  y)
@@ -595,13 +518,15 @@ l_int32    w, h, d, wpl;
 l_uint32   val;
 l_uint32  *line, *data;
 
+    PROCNAME("pixFlipPixel");
+
     if (!pix)
-        return ERROR_INT("pix not defined", __func__, 1);
-    if (pixGetColormap(pix))
-        L_WARNING("cmapped: setting to 0 may not be intended\n", __func__);
+        return ERROR_INT("pix not defined", procName, 1);
     pixGetDimensions(pix, &w, &h, &d);
-    if (x < 0 || x >= w || y < 0 || y >= h)
-        return 2;
+    if (x < 0 || x >= w)
+        return ERROR_INT("x out of bounds", procName, 1);
+    if (y < 0 || y >= h)
+        return ERROR_INT("y out of bounds", procName, 1);
 
     data = pixGetData(pix);
     wpl = pixGetWpl(pix);
@@ -640,7 +565,7 @@ l_uint32  *line, *data;
         line[x] = val;
         break;
     default:
-        return ERROR_INT("depth must be in {1,2,4,8,16,32} bpp", __func__, 1);
+        return ERROR_INT("depth must be in {1,2,4,8,16,32} bpp", procName, 1);
     }
 
     return 0;
@@ -650,10 +575,10 @@ l_uint32  *line, *data;
 /*!
  * \brief   setPixelLow()
  *
- * \param[in]    line    ptr to beginning of line,
- * \param[in]    x       pixel location in line
- * \param[in]    depth   bpp
- * \param[in]    val     to be inserted
+ * \param[in]    line ptr to beginning of line,
+ * \param[in]    x pixel location in line
+ * \param[in]    depth bpp
+ * \param[in]    val to be inserted
  * \return  void
  *
  * <pre>
@@ -691,8 +616,10 @@ setPixelLow(l_uint32  *line,
         line[x] = val;
         break;
     default:
-        lept_stderr("illegal depth in setPixelLow()\n");
+        fprintf(stderr, "illegal depth in setPixelLow()\n");
     }
+
+    return;
 }
 
 
@@ -702,9 +629,9 @@ setPixelLow(l_uint32  *line,
 /*!
  * \brief   pixGetBlackOrWhiteVal()
  *
- * \param[in]    pixs    all depths; cmap ok
- * \param[in]    op      L_GET_BLACK_VAL, L_GET_WHITE_VAL
- * \param[out]   pval    pixel value
+ * \param[in]    pixs all depths; cmap ok
+ * \param[in]    op L_GET_BLACK_VAL, L_GET_WHITE_VAL
+ * \param[out]   pval pixel value
  * \return  0 if OK; 1 on error
  *
  * <pre>
@@ -715,38 +642,40 @@ setPixelLow(l_uint32  *line,
  *          the index of the closest color in intensity is returned.
  * </pre>
  */
-l_ok
+l_int32
 pixGetBlackOrWhiteVal(PIX       *pixs,
                       l_int32    op,
                       l_uint32  *pval)
 {
-l_int32   d, index;
+l_int32   d, val;
 PIXCMAP  *cmap;
 
+    PROCNAME("pixGetBlackOrWhiteVal");
+
     if (!pval)
-        return ERROR_INT("&val not defined", __func__, 1);
+        return ERROR_INT("&val not defined", procName, 1);
     *pval = 0;
     if (!pixs)
-        return ERROR_INT("pixs not defined", __func__, 1);
+        return ERROR_INT("pixs not defined", procName, 1);
     if (op != L_GET_BLACK_VAL && op != L_GET_WHITE_VAL)
-        return ERROR_INT("invalid op", __func__, 1);
+        return ERROR_INT("invalid op", procName, 1);
 
     cmap = pixGetColormap(pixs);
     d = pixGetDepth(pixs);
     if (!cmap) {
         if ((d == 1 && op == L_GET_WHITE_VAL) ||
             (d > 1 && op == L_GET_BLACK_VAL)) {  /* min val */
-            *pval = 0;
+            val = 0;
         } else {  /* max val */
-            *pval = (d == 32) ? 0xffffff00 : (1 << d) - 1;
+            val = (d == 32) ? 0xffffff00 : (1 << d) - 1;
         }
     } else {  /* handle colormap */
         if (op == L_GET_BLACK_VAL)
-            pixcmapAddBlackOrWhite(cmap, 0, &index);
+            pixcmapAddBlackOrWhite(cmap, 0, &val);
         else  /* L_GET_WHITE_VAL */
-            pixcmapAddBlackOrWhite(cmap, 1, &index);
-        *pval = index;
+            pixcmapAddBlackOrWhite(cmap, 1, &val);
     }
+    *pval = val;
 
     return 0;
 }
@@ -758,7 +687,7 @@ PIXCMAP  *cmap;
 /*!
  * \brief   pixClearAll()
  *
- * \param[in]    pix    all depths; use cmapped with caution
+ * \param[in]    pix all depths; use cmapped with caution
  * \return  0 if OK, 1 on error
  *
  * <pre>
@@ -769,13 +698,16 @@ PIXCMAP  *cmap;
  *          one in the colormap.  Be sure that this is the intended color!
  * </pre>
  */
-l_ok
+l_int32
 pixClearAll(PIX  *pix)
 {
-    if (!pix)
-        return ERROR_INT("pix not defined", __func__, 1);
+    PROCNAME("pixClearAll");
 
-    memset(pix->data, 0, 4LL * pix->wpl * pix->h);
+    if (!pix)
+        return ERROR_INT("pix not defined", procName, 1);
+
+    pixRasterop(pix, 0, 0, pixGetWidth(pix), pixGetHeight(pix),
+                PIX_CLR, NULL, 0, 0);
     return 0;
 }
 
@@ -783,7 +715,7 @@ pixClearAll(PIX  *pix)
 /*!
  * \brief   pixSetAll()
  *
- * \param[in]    pix     all depths; use cmapped with caution
+ * \param[in]    pix all depths; use cmapped with caution
  * \return  0 if OK, 1 on error
  *
  * <pre>
@@ -795,21 +727,24 @@ pixClearAll(PIX  *pix)
  *          color may not be defined, because the colormap may not be full.
  * </pre>
  */
-l_ok
+l_int32
 pixSetAll(PIX  *pix)
 {
 l_int32   n;
 PIXCMAP  *cmap;
 
+    PROCNAME("pixSetAll");
+
     if (!pix)
-        return ERROR_INT("pix not defined", __func__, 1);
+        return ERROR_INT("pix not defined", procName, 1);
     if ((cmap = pixGetColormap(pix)) != NULL) {
         n = pixcmapGetCount(cmap);
         if (n < cmap->nalloc)  /* cmap is not full */
-            return ERROR_INT("cmap entry does not exist", __func__, 1);
+            return ERROR_INT("cmap entry does not exist", procName, 1);
     }
 
-    memset(pix->data, 0xff, 4LL * pix->wpl * pix->h);
+    pixRasterop(pix, 0, 0, pixGetWidth(pix), pixGetHeight(pix),
+                PIX_SET, NULL, 0, 0);
     return 0;
 }
 
@@ -817,8 +752,8 @@ PIXCMAP  *cmap;
 /*!
  * \brief   pixSetAllGray()
  *
- * \param[in]    pix       all depths, cmap ok
- * \param[in]    grayval   in range 0 ... 255
+ * \param[in]    pix all depths, cmap ok
+ * \param[in]    grayval in range 0 ... 255
  * \return  0 if OK; 1 on error
  *
  * <pre>
@@ -835,7 +770,7 @@ PIXCMAP  *cmap;
  *          L2 distance of components.  This index is written to all pixels.
  * </pre>
  */
-l_ok
+l_int32
 pixSetAllGray(PIX     *pix,
               l_int32  grayval)
 {
@@ -844,13 +779,15 @@ l_uint32  val32;
 PIX      *alpha;
 PIXCMAP  *cmap;
 
+    PROCNAME("pixSetAllGray");
+
     if (!pix)
-        return ERROR_INT("pix not defined", __func__, 1);
+        return ERROR_INT("pix not defined", procName, 1);
     if (grayval < 0) {
-        L_WARNING("grayval < 0; setting to 0\n", __func__);
+        L_WARNING("grayval < 0; setting to 0\n", procName);
         grayval = 0;
     } else if (grayval > 255) {
-        L_WARNING("grayval > 255; setting to 255\n", __func__);
+        L_WARNING("grayval > 255; setting to 255\n", procName);
         grayval = 255;
     }
 
@@ -888,7 +825,7 @@ PIXCMAP  *cmap;
         pixSetRGBComponent(pix, alpha, L_ALPHA_CHANNEL);
         pixDestroy(&alpha);
     } else {
-        L_ERROR("invalid depth: %d\n", __func__, d);
+        L_ERROR("invalid depth: %d\n", procName, d);
         return 1;
     }
 
@@ -899,8 +836,8 @@ PIXCMAP  *cmap;
 /*!
  * \brief   pixSetAllArbitrary()
  *
- * \param[in]    pix    all depths; use cmapped with caution
- * \param[in]    val    value to set all pixels
+ * \param[in]    pix all depths; use cmapped with caution
+ * \param[in]    val  value to set all pixels
  * \return  0 if OK; 1 on error
  *
  * <pre>
@@ -915,7 +852,7 @@ PIXCMAP  *cmap;
  *          For RGBA, the LSB is interpreted as the alpha (transparency)
  *          component; full transparency has alpha == 0x0, whereas
  *          full opacity has alpha = 0xff.  An RGBA image with full
- *          opacity behaves like an RGB image.
+ *          opacity behaves like an RGB image. 
  *      (3) As an example of (2), suppose you want to initialize a 32 bpp
  *          pix with partial opacity, say 0xee337788.  If the pix is 3 spp,
  *          the 0x88 alpha component will be ignored and may be changed
@@ -925,7 +862,7 @@ PIXCMAP  *cmap;
  *          pixSetSpp(pix, 4) can be used to promote an RGB image to RGBA.
  * </pre>
  */
-l_ok
+l_int32
 pixSetAllArbitrary(PIX      *pix,
                    l_uint32  val)
 {
@@ -934,15 +871,17 @@ l_uint32   maxval, wordval;
 l_uint32  *data, *line;
 PIXCMAP   *cmap;
 
+    PROCNAME("pixSetAllArbitrary");
+
     if (!pix)
-        return ERROR_INT("pix not defined", __func__, 1);
+        return ERROR_INT("pix not defined", procName, 1);
 
         /* If colormapped, make sure that val is less than the size
          * of the cmap array. */
     if ((cmap = pixGetColormap(pix)) != NULL) {
         n = pixcmapGetCount(cmap);
         if (val >= n) {
-            L_WARNING("index not in colormap; using last color\n", __func__);
+            L_WARNING("index not in colormap; using last color\n", procName);
             val = n - 1;
         }
     }
@@ -954,7 +893,7 @@ PIXCMAP   *cmap;
         maxval = (1 << d) - 1;
         if (val > maxval) {
             L_WARNING("val = %d too large for depth; using maxval = %d\n",
-                      __func__, val, maxval);
+                      procName, val, maxval);
             val = maxval;
         }
     }
@@ -979,8 +918,8 @@ PIXCMAP   *cmap;
 /*!
  * \brief   pixSetBlackOrWhite()
  *
- * \param[in]    pixs    all depths; cmap ok
- * \param[in]    op      L_SET_BLACK, L_SET_WHITE
+ * \param[in]    pixs all depths; cmap ok
+ * \param[in]    op L_SET_BLACK, L_SET_WHITE
  * \return  0 if OK; 1 on error
  *
  * <pre>
@@ -993,17 +932,19 @@ PIXCMAP   *cmap;
  *          This index is written to all pixels.
  * </pre>
  */
-l_ok
+l_int32
 pixSetBlackOrWhite(PIX     *pixs,
                    l_int32  op)
 {
 l_int32   d, index;
 PIXCMAP  *cmap;
 
+    PROCNAME("pixSetBlackOrWhite");
+
     if (!pixs)
-        return ERROR_INT("pix not defined", __func__, 1);
+        return ERROR_INT("pix not defined", procName, 1);
     if (op != L_SET_BLACK && op != L_SET_WHITE)
-        return ERROR_INT("invalid op", __func__, 1);
+        return ERROR_INT("invalid op", procName, 1);
 
     cmap = pixGetColormap(pixs);
     d = pixGetDepth(pixs);
@@ -1027,9 +968,9 @@ PIXCMAP  *cmap;
 /*!
  * \brief   pixSetComponentArbitrary()
  *
- * \param[in]    pix    32 bpp
- * \param[in]    comp   COLOR_RED, COLOR_GREEN, COLOR_BLUE, L_ALPHA_CHANNEL
- * \param[in]    val    value to set this component
+ * \param[in]    pix 32 bpp
+ * \param[in]    comp COLOR_RED, COLOR_GREEN, COLOR_BLUE, L_ALPHA_CHANNEL
+ * \param[in]    val  value to set this component
  * \return  0 if OK; 1 on error
  *
  * <pre>
@@ -1038,7 +979,7 @@ PIXCMAP  *cmap;
  *              pixSetComponentArbitrary(pix, L_ALPHA_CHANNEL, 255)
  * </pre>
  */
-l_ok
+l_int32
 pixSetComponentArbitrary(PIX     *pix,
                          l_int32  comp,
                          l_int32  val)
@@ -1047,13 +988,15 @@ l_int32    i, nwords;
 l_uint32   mask1, mask2;
 l_uint32  *data;
 
+    PROCNAME("pixSetComponentArbitrary");
+
     if (!pix || pixGetDepth(pix) != 32)
-        return ERROR_INT("pix not defined or not 32 bpp", __func__, 1);
+        return ERROR_INT("pix not defined or not 32 bpp", procName, 1);
     if (comp != COLOR_RED && comp != COLOR_GREEN && comp != COLOR_BLUE &&
         comp != L_ALPHA_CHANNEL)
-        return ERROR_INT("invalid component", __func__, 1);
+        return ERROR_INT("invalid component", procName, 1);
     if (val < 0 || val > 255)
-        return ERROR_INT("val not in [0 ... 255]", __func__, 1);
+        return ERROR_INT("val not in [0 ... 255]", procName, 1);
 
     mask1 = ~(255 << (8 * (3 - comp)));
     mask2 = val << (8 * (3 - comp));
@@ -1074,8 +1017,8 @@ l_uint32  *data;
 /*!
  * \brief   pixClearInRect()
  *
- * \param[in]    pix   all depths; can be cmapped
- * \param[in]    box   in which all pixels will be cleared
+ * \param[in]    pix all depths; can be cmapped
+ * \param[in]    box in which all pixels will be cleared
  * \return  0 if OK, 1 on error
  *
  * <pre>
@@ -1086,16 +1029,18 @@ l_uint32  *data;
  *          one in the colormap.  Be sure that this is the intended color!
  * </pre>
  */
-l_ok
+l_int32
 pixClearInRect(PIX  *pix,
                BOX  *box)
 {
 l_int32  x, y, w, h;
 
+    PROCNAME("pixClearInRect");
+
     if (!pix)
-        return ERROR_INT("pix not defined", __func__, 1);
+        return ERROR_INT("pix not defined", procName, 1);
     if (!box)
-        return ERROR_INT("box not defined", __func__, 1);
+        return ERROR_INT("box not defined", procName, 1);
 
     boxGetGeometry(box, &x, &y, &w, &h);
     pixRasterop(pix, x, y, w, h, PIX_CLR, NULL, 0, 0);
@@ -1106,8 +1051,8 @@ l_int32  x, y, w, h;
 /*!
  * \brief   pixSetInRect()
  *
- * \param[in]    pix   all depths, can be cmapped
- * \param[in]    box   in which all pixels will be set
+ * \param[in]    pix all depths, can be cmapped
+ * \param[in]    box in which all pixels will be set
  * \return  0 if OK, 1 on error
  *
  * <pre>
@@ -1119,21 +1064,23 @@ l_int32  x, y, w, h;
  *          color may not be defined, because the colormap may not be full.
  * </pre>
  */
-l_ok
+l_int32
 pixSetInRect(PIX  *pix,
              BOX  *box)
 {
 l_int32   n, x, y, w, h;
 PIXCMAP  *cmap;
 
+    PROCNAME("pixSetInRect");
+
     if (!pix)
-        return ERROR_INT("pix not defined", __func__, 1);
+        return ERROR_INT("pix not defined", procName, 1);
     if (!box)
-        return ERROR_INT("box not defined", __func__, 1);
+        return ERROR_INT("box not defined", procName, 1);
     if ((cmap = pixGetColormap(pix)) != NULL) {
         n = pixcmapGetCount(cmap);
         if (n < cmap->nalloc)  /* cmap is not full */
-            return ERROR_INT("cmap entry does not exist", __func__, 1);
+            return ERROR_INT("cmap entry does not exist", procName, 1);
     }
 
     boxGetGeometry(box, &x, &y, &w, &h);
@@ -1145,9 +1092,9 @@ PIXCMAP  *cmap;
 /*!
  * \brief   pixSetInRectArbitrary()
  *
- * \param[in]    pix   all depths; can be cmapped
- * \param[in]    box   in which all pixels will be set to val
- * \param[in]    val   value to set all pixels
+ * \param[in]    pix all depths; can be cmapped
+ * \param[in]    box in which all pixels will be set to val
+ * \param[in]    val  value to set all pixels
  * \return  0 if OK; 1 on error
  *
  * <pre>
@@ -1159,28 +1106,29 @@ PIXCMAP  *cmap;
  *          this index exists in the colormap and that it is the intended one!
  * </pre>
  */
-l_ok
+l_int32
 pixSetInRectArbitrary(PIX      *pix,
                       BOX      *box,
                       l_uint32  val)
 {
-l_int32    n, x, y, xstart, xend, ystart, yend, bw, bh, w, h, d, wpl;
-l_uint32   maxval;
+l_int32    n, x, y, xstart, xend, ystart, yend, bw, bh, w, h, d, wpl, maxval;
 l_uint32  *data, *line;
 BOX       *boxc;
 PIXCMAP   *cmap;
 
+    PROCNAME("pixSetInRectArbitrary");
+
     if (!pix)
-        return ERROR_INT("pix not defined", __func__, 1);
+        return ERROR_INT("pix not defined", procName, 1);
     if (!box)
-        return ERROR_INT("box not defined", __func__, 1);
+        return ERROR_INT("box not defined", procName, 1);
     pixGetDimensions(pix, &w, &h, &d);
     if (d != 1 && d != 2 && d != 4 && d !=8 && d != 16 && d != 32)
-        return ERROR_INT("depth must be in {1,2,4,8,16,32} bpp", __func__, 1);
+        return ERROR_INT("depth must be in {1,2,4,8,16,32} bpp", procName, 1);
     if ((cmap = pixGetColormap(pix)) != NULL) {
         n = pixcmapGetCount(cmap);
         if (val >= n) {
-            L_WARNING("index not in colormap; using last color\n", __func__);
+            L_WARNING("index not in colormap; using last color\n", procName);
             val = n - 1;
         }
     }
@@ -1205,7 +1153,7 @@ PIXCMAP   *cmap;
 
         /* Find the overlap of box with the input pix */
     if ((boxc = boxClipToRectangle(box, w, h)) == NULL)
-        return ERROR_INT("no overlap of box with image", __func__, 1);
+        return ERROR_INT("no overlap of box with image", procName, 1);
     boxGetGeometry(boxc, &xstart, &ystart, &bw, &bh);
     xend = xstart + bw - 1;
     yend = ystart + bh - 1;
@@ -1234,7 +1182,7 @@ PIXCMAP   *cmap;
                 line[x] = val;
                 break;
             default:
-                return ERROR_INT("depth not 2|4|8|16|32 bpp", __func__, 1);
+                return ERROR_INT("depth not 2|4|8|16|32 bpp", procName, 1);
             }
         }
     }
@@ -1246,10 +1194,10 @@ PIXCMAP   *cmap;
 /*!
  * \brief   pixBlendInRect()
  *
- * \param[in]    pixs   32 bpp rgb
- * \param[in]    box    [optional] in which all pixels will be blended
- * \param[in]    val    blend value; 0xrrggbb00
- * \param[in]    fract  fraction of color to be blended with each pixel in pixs
+ * \param[in]    pixs 32 bpp rgb
+ * \param[in]    box [optional] in which all pixels will be blended
+ * \param[in]    val  blend value; 0xrrggbb00
+ * \param[in]    fract fraction of color to be blended with each pixel in pixs
  * \return  0 if OK; 1 on error
  *
  * <pre>
@@ -1259,7 +1207,7 @@ PIXCMAP   *cmap;
  *          If no rectangle is specified, it blends over the entire image.
  * </pre>
  */
-l_ok
+l_int32
 pixBlendInRect(PIX       *pixs,
                BOX       *box,
                l_uint32   val,
@@ -1270,8 +1218,10 @@ l_int32    prval, pgval, pbval, rval, gval, bval;
 l_uint32   val32;
 l_uint32  *datas, *lines;
 
+    PROCNAME("pixBlendInRect");
+
     if (!pixs || pixGetDepth(pixs) != 32)
-        return ERROR_INT("pixs not defined or not 32 bpp", __func__, 1);
+        return ERROR_INT("pixs not defined or not 32 bpp", procName, 1);
 
     extractRGBValues(val, &rval, &gval, &bval);
     pixGetDimensions(pixs, &w, &h, NULL);
@@ -1318,8 +1268,8 @@ l_uint32  *datas, *lines;
 /*!
  * \brief   pixSetPadBits()
  *
- * \param[in]    pix   1, 2, 4, 8, 16, 32 bpp
- * \param[in]    val   0 or 1
+ * \param[in]    pix 1, 2, 4, 8, 16, 32 bpp
+ * \param[in]    val  0 or 1
  * \return  0 if OK; 1 on error
  *
  * <pre>
@@ -1331,10 +1281,7 @@ l_uint32  *datas, *lines;
  *      (2) This sets the value of the pad bits (if any) in the last
  *          32-bit word in each scanline.
  *      (3) For 32 bpp pix, there are no pad bits, so this is a no-op.
- *      (4) For 24 bpp pix (which are not generally supported in leptonica),
- *          this operation would affect image components because the pixels
- *          are not aligned with 32-bit word boundaries.
- *      (5) When writing formatted output, such as tiff, png or jpeg,
+ *      (4) When writing formatted output, such as tiff, png or jpeg,
  *          the pad bits have no effect on the raster image that is
  *          generated by reading back from the file.  However, in some
  *          cases, the compressed file itself will depend on the pad
@@ -1346,7 +1293,7 @@ l_uint32  *datas, *lines;
  *          set to 0 before writing these compressed files.
  * </pre>
  */
-l_ok
+l_int32
 pixSetPadBits(PIX     *pix,
               l_int32  val)
 {
@@ -1354,16 +1301,14 @@ l_int32    i, w, h, d, wpl, endbits, fullwords;
 l_uint32   mask;
 l_uint32  *data, *pword;
 
+    PROCNAME("pixSetPadBits");
+
     if (!pix)
-        return ERROR_INT("pix not defined", __func__, 1);
+        return ERROR_INT("pix not defined", procName, 1);
 
     pixGetDimensions(pix, &w, &h, &d);
     if (d == 32)  /* no padding exists for 32 bpp */
         return 0;
-    if (d == 24) {  /* pixels not aligned with 32-bit words */
-        L_INFO("pix is 24 bpp\n", __func__);
-        return 1;
-    }
 
     data = pixGetData(pix);
     wpl = pixGetWpl(pix);
@@ -1390,10 +1335,10 @@ l_uint32  *data, *pword;
 /*!
  * \brief   pixSetPadBitsBand()
  *
- * \param[in]    pix   1, 2, 4, 8, 16, 32 bpp
- * \param[in]    by    starting y value of band
- * \param[in]    bh    height of band
- * \param[in]    val   0 or 1
+ * \param[in]    pix 1, 2, 4, 8, 16, 32 bpp
+ * \param[in]    by  starting y value of band
+ * \param[in]    bh  height of band
+ * \param[in]    val  0 or 1
  * \return  0 if OK; 1 on error
  *
  * <pre>
@@ -1406,10 +1351,9 @@ l_uint32  *data, *pword;
  *          32-bit word in each scanline, within the specified
  *          band of raster lines.
  *      (3) For 32 bpp pix, there are no pad bits, so this is a no-op.
- *          For 24 bpp pix, this function would change image components.
  * </pre>
  */
-l_ok
+l_int32
 pixSetPadBitsBand(PIX     *pix,
                   l_int32  by,
                   l_int32  bh,
@@ -1419,21 +1363,19 @@ l_int32    i, w, h, d, wpl, endbits, fullwords;
 l_uint32   mask;
 l_uint32  *data, *pword;
 
+    PROCNAME("pixSetPadBitsBand");
+
     if (!pix)
-        return ERROR_INT("pix not defined", __func__, 1);
+        return ERROR_INT("pix not defined", procName, 1);
 
     pixGetDimensions(pix, &w, &h, &d);
     if (d == 32)  /* no padding exists for 32 bpp */
         return 0;
-    if (d == 24) {  /* pixels not aligned with 32-bit words */
-        L_INFO("pix is 24 bpp\n", __func__);
-        return 1;
-    }
 
     if (by < 0)
         by = 0;
     if (by >= h)
-        return ERROR_INT("start y not in image", __func__, 1);
+        return ERROR_INT("start y not in image", procName, 1);
     if (by + bh > h)
         bh = h - by;
 
@@ -1466,9 +1408,9 @@ l_uint32  *data, *pword;
 /*!
  * \brief   pixSetOrClearBorder()
  *
- * \param[in]    pixs                     all depths
- * \param[in]    left, right, top, bot    border region amount to set or clear: these distances are from outside
- * \param[in]    op                       operation PIX_SET or PIX_CLR
+ * \param[in]    pixs all depths
+ * \param[in]    left, right, top, bot amount to set or clear
+ * \param[in]    op operation PIX_SET or PIX_CLR
  * \return  0 if OK; 1 on error
  *
  * <pre>
@@ -1483,7 +1425,7 @@ l_uint32  *data, *pword;
  *          and PIX_CLR for black.
  * </pre>
  */
-l_ok
+l_int32
 pixSetOrClearBorder(PIX     *pixs,
                     l_int32  left,
                     l_int32  right,
@@ -1493,10 +1435,12 @@ pixSetOrClearBorder(PIX     *pixs,
 {
 l_int32  w, h;
 
+    PROCNAME("pixSetOrClearBorder");
+
     if (!pixs)
-        return ERROR_INT("pixs not defined", __func__, 1);
+        return ERROR_INT("pixs not defined", procName, 1);
     if (op != PIX_SET && op != PIX_CLR)
-        return ERROR_INT("op must be PIX_SET or PIX_CLR", __func__, 1);
+        return ERROR_INT("op must be PIX_SET or PIX_CLR", procName, 1);
 
     pixGetDimensions(pixs, &w, &h, NULL);
     pixRasterop(pixs, 0, 0, left, h, op, NULL, 0, 0);
@@ -1511,9 +1455,9 @@ l_int32  w, h;
 /*!
  * \brief   pixSetBorderVal()
  *
- * \param[in]    pixs                   8, 16 or 32 bpp
- * \param[in]    left, right, top, bot  border region amount to set: these distances are from outside
- * \param[in]    val                    value to set at each border pixel
+ * \param[in]    pixs 8, 16 or 32 bpp
+ * \param[in]    left, right, top, bot amount to set
+ * \param[in]    val value to set at each border pixel
  * \return  0 if OK; 1 on error
  *
  * <pre>
@@ -1530,7 +1474,7 @@ l_int32  w, h;
  *      (4) The code is easily generalized for 2 or 4 bpp.
  * </pre>
  */
-l_ok
+l_int32
 pixSetBorderVal(PIX      *pixs,
                 l_int32   left,
                 l_int32   right,
@@ -1541,11 +1485,13 @@ pixSetBorderVal(PIX      *pixs,
 l_int32    w, h, d, wpls, i, j, bstart, rstart;
 l_uint32  *datas, *lines;
 
+    PROCNAME("pixSetBorderVal");
+
     if (!pixs)
-        return ERROR_INT("pixs not defined", __func__, 1);
+        return ERROR_INT("pixs not defined", procName, 1);
     pixGetDimensions(pixs, &w, &h, &d);
     if (d != 8 && d != 16 && d != 32)
-        return ERROR_INT("depth must be 8, 16 or 32 bpp", __func__, 1);
+        return ERROR_INT("depth must be 8, 16 or 32 bpp", procName, 1);
 
     datas = pixGetData(pixs);
     wpls = pixGetWpl(pixs);
@@ -1620,9 +1566,9 @@ l_uint32  *datas, *lines;
 /*!
  * \brief   pixSetBorderRingVal()
  *
- * \param[in]    pixs    any depth; cmap OK
- * \param[in]    dist    distance from outside; must be > 0; first ring is 1
- * \param[in]    val     value to set at each border pixel
+ * \param[in]    pixs any depth; cmap OK
+ * \param[in]    dist distance from outside; must be > 0; first ring is 1
+ * \param[in]    val value to set at each border pixel
  * \return  0 if OK; 1 on error
  *
  * <pre>
@@ -1632,22 +1578,24 @@ l_uint32  *datas, *lines;
  *          This sets all pixels in a given ring to a value.
  * </pre>
  */
-l_ok
+l_int32
 pixSetBorderRingVal(PIX      *pixs,
                     l_int32   dist,
                     l_uint32  val)
 {
 l_int32  w, h, d, i, j, xend, yend;
 
+    PROCNAME("pixSetBorderRingVal");
+
     if (!pixs)
-        return ERROR_INT("pixs not defined", __func__, 1);
+        return ERROR_INT("pixs not defined", procName, 1);
     if (dist < 1)
-        return ERROR_INT("dist must be > 0", __func__, 1);
+        return ERROR_INT("dist must be > 0", procName, 1);
     pixGetDimensions(pixs, &w, &h, &d);
     if (w < 2 * dist + 1 || h < 2 * dist + 1)
-        return ERROR_INT("ring doesn't exist", __func__, 1);
+        return ERROR_INT("ring doesn't exist", procName, 1);
     if (d < 32 && (val >= (1 << d)))
-        return ERROR_INT("invalid pixel value", __func__, 1);
+        return ERROR_INT("invalid pixel value", procName, 1);
 
     xend = w - dist;
     yend = h - dist;
@@ -1667,8 +1615,8 @@ l_int32  w, h, d, i, j, xend, yend;
 /*!
  * \brief   pixSetMirroredBorder()
  *
- * \param[in]    pixs                   all depths; colormap ok
- * \param[in]    left, right, top, bot  number of pixels to set
+ * \param[in]    pixs all depths; colormap ok
+ * \param[in]    left, right, top, bot number of pixels to set
  * \return  0 if OK, 1 on error
  *
  * <pre>
@@ -1681,7 +1629,7 @@ l_int32  w, h, d, i, j, xend, yend;
  *          because there is no overlap between the src and dest rectangles.
  * </pre>
  */
-l_ok
+l_int32
 pixSetMirroredBorder(PIX     *pixs,
                      l_int32  left,
                      l_int32  right,
@@ -1690,8 +1638,10 @@ pixSetMirroredBorder(PIX     *pixs,
 {
 l_int32  i, j, w, h;
 
+    PROCNAME("pixSetMirroredBorder");
+
     if (!pixs)
-        return ERROR_INT("pixs not defined", __func__, 1);
+        return ERROR_INT("pixs not defined", procName, 1);
 
     pixGetDimensions(pixs, &w, &h, NULL);
     for (j = 0; j < left; j++)
@@ -1714,9 +1664,9 @@ l_int32  i, j, w, h;
 /*!
  * \brief   pixCopyBorder()
  *
- * \param[in]    pixd                   all depths; colormap ok; can be NULL
- * \param[in]    pixs                   same depth and size as pixd
- * \param[in]    left, right, top, bot  number of pixels to copy
+ * \param[in]    pixd all depths; colormap ok; can be NULL
+ * \param[in]    pixs same depth and size as pixd
+ * \param[in]    left, right, top, bot number of pixels to copy
  * \return  pixd, or NULL on error if pixd is not defined
  *
  * <pre>
@@ -1740,20 +1690,22 @@ pixCopyBorder(PIX     *pixd,
 {
 l_int32  w, h;
 
+    PROCNAME("pixCopyBorder");
+
     if (!pixs)
-        return (PIX *)ERROR_PTR("pixs not defined", __func__, pixd);
+        return (PIX *)ERROR_PTR("pixs not defined", procName, pixd);
 
     if (pixd) {
         if (pixd == pixs) {
-            L_WARNING("same: nothing to do\n", __func__);
+            L_WARNING("same: nothing to do\n", procName);
             return pixd;
         } else if (!pixSizesEqual(pixs, pixd)) {
             return (PIX *)ERROR_PTR("pixs and pixd sizes differ",
-                                    __func__, pixd);
+                                    procName, pixd);
         }
     } else {
         if ((pixd = pixCreateTemplate(pixs)) == NULL)
-            return (PIX *)ERROR_PTR("pixd not made", __func__, pixd);
+            return (PIX *)ERROR_PTR("pixd not made", procName, pixd);
     }
 
     pixGetDimensions(pixs, &w, &h, NULL);
@@ -1772,9 +1724,9 @@ l_int32  w, h;
 /*!
  * \brief   pixAddBorder()
  *
- * \param[in]    pixs   all depths; colormap ok
- * \param[in]    npix   number of pixels to be added to each side
- * \param[in]    val    value of added border pixels
+ * \param[in]    pixs all depths; colormap ok
+ * \param[in]    npix number of pixels to be added to each side
+ * \param[in]    val  value of added border pixels
  * \return  pixd with the added exterior pixels, or NULL on error
  *
  * <pre>
@@ -1787,8 +1739,10 @@ pixAddBorder(PIX      *pixs,
              l_int32   npix,
              l_uint32  val)
 {
+    PROCNAME("pixAddBorder");
+
     if (!pixs)
-        return (PIX *)ERROR_PTR("pixs not defined", __func__, NULL);
+        return (PIX *)ERROR_PTR("pixs not defined", procName, NULL);
     if (npix == 0)
         return pixClone(pixs);
     return pixAddBorderGeneral(pixs, npix, npix, npix, npix, val);
@@ -1830,10 +1784,12 @@ pixAddBlackOrWhiteBorder(PIX     *pixs,
 {
 l_uint32  val;
 
+    PROCNAME("pixAddBlackOrWhiteBorder");
+
     if (!pixs)
-        return (PIX *)ERROR_PTR("pixs not defined", __func__, NULL);
+        return (PIX *)ERROR_PTR("pixs not defined", procName, NULL);
     if (op != L_GET_BLACK_VAL && op != L_GET_WHITE_VAL)
-        return (PIX *)ERROR_PTR("invalid op", __func__, NULL);
+        return (PIX *)ERROR_PTR("invalid op", procName, NULL);
 
     pixGetBlackOrWhiteVal(pixs, op, &val);
     return pixAddBorderGeneral(pixs, left, right, top, bot, val);
@@ -1843,9 +1799,9 @@ l_uint32  val;
 /*!
  * \brief   pixAddBorderGeneral()
  *
- * \param[in]    pixs                   all depths; colormap ok
+ * \param[in]    pixs all depths; colormap ok
  * \param[in]    left, right, top, bot  number of pixels added
- * \param[in]    val                    value of added border pixels
+ * \param[in]    val   value of added border pixels
  * \return  pixd with the added exterior pixels, or NULL on error
  *
  * <pre>
@@ -1880,20 +1836,21 @@ pixAddBorderGeneral(PIX      *pixs,
                     l_int32   bot,
                     l_uint32  val)
 {
-l_int32   ws, hs, wd, hd, d, op;
-l_uint32  maxval;
-PIX      *pixd;
+l_int32  ws, hs, wd, hd, d, maxval, op;
+PIX     *pixd;
+
+    PROCNAME("pixAddBorderGeneral");
 
     if (!pixs)
-        return (PIX *)ERROR_PTR("pixs not defined", __func__, NULL);
+        return (PIX *)ERROR_PTR("pixs not defined", procName, NULL);
     if (left < 0 || right < 0 || top < 0 || bot < 0)
-        return (PIX *)ERROR_PTR("negative border added!", __func__, NULL);
+        return (PIX *)ERROR_PTR("negative border added!", procName, NULL);
 
     pixGetDimensions(pixs, &ws, &hs, &d);
     wd = ws + left + right;
     hd = hs + top + bot;
-    if ((pixd = pixCreate(wd, hd, d)) == NULL)
-        return (PIX *)ERROR_PTR("pixd not made", __func__, NULL);
+    if ((pixd = pixCreateNoInit(wd, hd, d)) == NULL)
+        return (PIX *)ERROR_PTR("pixd not made", procName, NULL);
     pixCopyResolution(pixd, pixs);
     pixCopyColormap(pixd, pixs);
 
@@ -1920,79 +1877,20 @@ PIX      *pixd;
 
 
 /*!
- * \brief   pixAddMultipleBlackWhiteBorders()
- *
- * \param[in]    pixs       all depths; colormap ok
- * \param[in]    nblack1    width of first black border
- * \param[in]    nwhite1    width of first white border
- * \param[in]    nblack2    width of second black border
- * \param[in]    nwhite2    width of second white border
- * \param[in]    nblack3    width of third black border
- * \param[in]    nwhite3    width of third white border
- * \return  pixd with the added borders, or NULL on error
- *
- * <pre>
- * Notes:
- *      (1) This is a convenience function for adding up to 3 black and
- *          3 white borders, alternating black and white.
- *      (2) Each of the 6 args gives the width of the next border, starting
- *          with a black border.  Any of the args can be 0, skipping
- *          the addition of that border.
- *      (3) Maximum allowed border width is 500 for any border.
- * </pre>
- */
-PIX *
-pixAddMultipleBlackWhiteBorders(PIX      *pixs,
-                                l_int32   nblack1,
-                                l_int32   nwhite1,
-                                l_int32   nblack2,
-                                l_int32   nwhite2,
-                                l_int32   nblack3,
-                                l_int32   nwhite3)
-{
-l_int32  i, color;
-l_int32  w[6];
-PIX     *pix1, *pixd;
-
-    if (!pixs)
-        return (PIX *)ERROR_PTR("pixs not defined", __func__, NULL);
-
-    w[0] = nblack1;
-    w[1] = nwhite1;
-    w[2] = nblack2;
-    w[3] = nwhite2;
-    w[4] = nblack3;
-    w[5] = nwhite3;
-    pixd = pixClone(pixs);
-    for (i = 0; i < 6; i++) {
-        if (w[i] > 500)
-            L_WARNING("w = %d > 500; skipping\n", __func__, w[i]);
-        if (w[i] > 0 && w[i] <= 500) {
-            color = (i % 2 == 0) ? L_GET_BLACK_VAL : L_GET_WHITE_VAL;
-            pix1 = pixAddBlackOrWhiteBorder(pixd, w[i], w[i], w[i], w[i],
-                                            color);
-            pixDestroy(&pixd);
-            pixd = pix1;
-        }
-    }
-
-    return pixd;
-}
-
-
-/*!
  * \brief   pixRemoveBorder()
  *
- * \param[in]    pixs   all depths; colormap ok
- * \param[in]    npix   number to be removed from each of the 4 sides
+ * \param[in]    pixs all depths; colormap ok
+ * \param[in]    npix number to be removed from each of the 4 sides
  * \return  pixd with pixels removed around border, or NULL on error
  */
 PIX *
 pixRemoveBorder(PIX     *pixs,
                 l_int32  npix)
 {
+    PROCNAME("pixRemoveBorder");
+
     if (!pixs)
-        return (PIX *)ERROR_PTR("pixs not defined", __func__, NULL);
+        return (PIX *)ERROR_PTR("pixs not defined", procName, NULL);
     if (npix == 0)
         return pixClone(pixs);
     return pixRemoveBorderGeneral(pixs, npix, npix, npix, npix);
@@ -2002,7 +1900,7 @@ pixRemoveBorder(PIX     *pixs,
 /*!
  * \brief   pixRemoveBorderGeneral()
  *
- * \param[in]    pixs                   all depths; colormap ok
+ * \param[in]    pixs all depths; colormap ok
  * \param[in]    left, right, top, bot  number of pixels removed
  * \return  pixd with pixels removed around border, or NULL on error
  */
@@ -2016,20 +1914,22 @@ pixRemoveBorderGeneral(PIX     *pixs,
 l_int32  ws, hs, wd, hd, d;
 PIX     *pixd;
 
+    PROCNAME("pixRemoveBorderGeneral");
+
     if (!pixs)
-        return (PIX *)ERROR_PTR("pixs not defined", __func__, NULL);
+        return (PIX *)ERROR_PTR("pixs not defined", procName, NULL);
     if (left < 0 || right < 0 || top < 0 || bot < 0)
-        return (PIX *)ERROR_PTR("negative border removed!", __func__, NULL);
+        return (PIX *)ERROR_PTR("negative border removed!", procName, NULL);
 
     pixGetDimensions(pixs, &ws, &hs, &d);
     wd = ws - left - right;
     hd = hs - top - bot;
     if (wd <= 0)
-        return (PIX *)ERROR_PTR("width must be > 0", __func__, NULL);
+        return (PIX *)ERROR_PTR("width must be > 0", procName, NULL);
     if (hd <= 0)
-        return (PIX *)ERROR_PTR("height must be > 0", __func__, NULL);
-    if ((pixd = pixCreate(wd, hd, d)) == NULL)
-        return (PIX *)ERROR_PTR("pixd not made", __func__, NULL);
+        return (PIX *)ERROR_PTR("height must be > 0", procName, NULL);
+    if ((pixd = pixCreateNoInit(wd, hd, d)) == NULL)
+        return (PIX *)ERROR_PTR("pixd not made", procName, NULL);
     pixCopyResolution(pixd, pixs);
     pixCopySpp(pixd, pixs);
     pixCopyColormap(pixd, pixs);
@@ -2044,9 +1944,9 @@ PIX     *pixd;
 /*!
  * \brief   pixRemoveBorderToSize()
  *
- * \param[in]    pixs   all depths; colormap ok
- * \param[in]    wd     target width; use 0 if only removing from height
- * \param[in]    hd     target height; use 0 if only removing from width
+ * \param[in]    pixs all depths; colormap ok
+ * \param[in]    wd  target width; use 0 if only removing from height
+ * \param[in]    hd  target height; use 0 if only removing from width
  * \return  pixd with pixels removed around border, or NULL on error
  *
  * <pre>
@@ -2064,8 +1964,10 @@ pixRemoveBorderToSize(PIX     *pixs,
 {
 l_int32  w, h, top, bot, left, right, delta;
 
+    PROCNAME("pixRemoveBorderToSize");
+
     if (!pixs)
-        return (PIX *)ERROR_PTR("pixs not defined", __func__, NULL);
+        return (PIX *)ERROR_PTR("pixs not defined", procName, NULL);
 
     pixGetDimensions(pixs, &w, &h, NULL);
     if ((wd <= 0 || wd >= w) && (hd <= 0 || hd >= h))
@@ -2089,8 +1991,8 @@ l_int32  w, h, top, bot, left, right, delta;
 /*!
  * \brief   pixAddMirroredBorder()
  *
- * \param[in]    pixs                   all depths; colormap ok
- * \param[in]    left, right, top, bot  number of pixels added
+ * \param[in]    pixs all depths; colormap ok
+ * \param[in]    left, right, top, bot number of pixels added
  * \return  pixd, or NULL on error
  *
  * <pre>
@@ -2120,11 +2022,13 @@ pixAddMirroredBorder(PIX      *pixs,
 l_int32  i, j, w, h;
 PIX     *pixd;
 
+    PROCNAME("pixAddMirroredBorder");
+
     if (!pixs)
-        return (PIX *)ERROR_PTR("pixs not defined", __func__, NULL);
+        return (PIX *)ERROR_PTR("pixs not defined", procName, NULL);
     pixGetDimensions(pixs, &w, &h, NULL);
     if (left > w || right > w || top > h || bot > h)
-        return (PIX *)ERROR_PTR("border too large", __func__, NULL);
+        return (PIX *)ERROR_PTR("border too large", procName, NULL);
 
         /* Set pixels on left, right, top and bottom, in that order */
     pixd = pixAddBorderGeneral(pixs, left, right, top, bot, 0);
@@ -2148,8 +2052,8 @@ PIX     *pixd;
 /*!
  * \brief   pixAddRepeatedBorder()
  *
- * \param[in]    pixs                   all depths; colormap ok
- * \param[in]    left, right, top, bot  number of pixels added
+ * \param[in]    pixs all depths; colormap ok
+ * \param[in]    left, right, top, bot number of pixels added
  * \return  pixd, or NULL on error
  *
  * <pre>
@@ -2171,11 +2075,13 @@ pixAddRepeatedBorder(PIX      *pixs,
 l_int32  w, h;
 PIX     *pixd;
 
+    PROCNAME("pixAddRepeatedBorder");
+
     if (!pixs)
-        return (PIX *)ERROR_PTR("pixs not defined", __func__, NULL);
+        return (PIX *)ERROR_PTR("pixs not defined", procName, NULL);
     pixGetDimensions(pixs, &w, &h, NULL);
     if (left > w || right > w || top > h || bot > h)
-        return (PIX *)ERROR_PTR("border too large", __func__, NULL);
+        return (PIX *)ERROR_PTR("border too large", procName, NULL);
 
     pixd = pixAddBorderGeneral(pixs, left, right, top, bot, 0);
 
@@ -2192,13 +2098,13 @@ PIX     *pixd;
 /*!
  * \brief   pixAddMixedBorder()
  *
- * \param[in]    pixs                   all depths; colormap ok
- * \param[in]    left, right, top, bot  number of pixels added
+ * \param[in]    pixs all depths; colormap ok
+ * \param[in]    left, right, top, bot number of pixels added
  * \return  pixd, or NULL on error
  *
  * <pre>
  * Notes:
- *      (1) This applies mirrored boundary conditions (b.c.) horizontally
+ *      (1) This applies mirrored boundary conditions horizontally
  *          and repeated b.c. vertically.
  *      (2) It is specifically used for avoiding special operations
  *          near boundaries when convolving a hue-saturation histogram
@@ -2225,11 +2131,13 @@ pixAddMixedBorder(PIX      *pixs,
 l_int32  j, w, h;
 PIX     *pixd;
 
+    PROCNAME("pixAddMixedBorder");
+
     if (!pixs)
-        return (PIX *)ERROR_PTR("pixs not defined", __func__, NULL);
+        return (PIX *)ERROR_PTR("pixs not defined", procName, NULL);
     pixGetDimensions(pixs, &w, &h, NULL);
     if (left > w || right > w || top > h || bot > h)
-        return (PIX *)ERROR_PTR("border too large", __func__, NULL);
+        return (PIX *)ERROR_PTR("border too large", procName, NULL);
 
         /* Set mirrored pixels on left and right;
          * then set repeated pixels on top and bottom. */
@@ -2250,8 +2158,8 @@ PIX     *pixd;
 /*!
  * \brief   pixAddContinuedBorder()
  *
- * \param[in]    pixs                   all depths; colormap ok
- * \param[in]    left, right, top, bot  pixels on each side to be added
+ * \param[in]    pixs
+ * \param[in]    left, right, top, bot pixels on each side to be added
  * \return  pixd, or NULL on error
  *
  * <pre>
@@ -2270,8 +2178,10 @@ pixAddContinuedBorder(PIX     *pixs,
 l_int32  i, j, w, h;
 PIX     *pixd;
 
+    PROCNAME("pixAddContinuedBorder");
+
     if (!pixs)
-        return (PIX *)ERROR_PTR("pixs not defined", __func__, NULL);
+        return (PIX *)ERROR_PTR("pixs not defined", procName, NULL);
 
     pixd = pixAddBorderGeneral(pixs, left, right, top, bot, 0);
     pixGetDimensions(pixs, &w, &h, NULL);
@@ -2296,12 +2206,12 @@ PIX     *pixd;
 /*!
  * \brief   pixShiftAndTransferAlpha()
  *
- * \param[in]    pixd            32 bpp
- * \param[in]    pixs            32 bpp
+ * \param[in]    pixd  32 bpp
+ * \param[in]    pixs  32 bpp
  * \param[in]    shiftx, shifty
  * \return  0 if OK; 1 on error
  */
-l_ok
+l_int32
 pixShiftAndTransferAlpha(PIX       *pixd,
                          PIX       *pixs,
                          l_float32  shiftx,
@@ -2310,12 +2220,14 @@ pixShiftAndTransferAlpha(PIX       *pixd,
 l_int32  w, h;
 PIX     *pix1, *pix2;
 
+    PROCNAME("pixShiftAndTransferAlpha");
+
     if (!pixs || !pixd)
-        return ERROR_INT("pixs and pixd not both defined", __func__, 1);
+        return ERROR_INT("pixs and pixd not both defined", procName, 1);
     if (pixGetDepth(pixs) != 32 || pixGetSpp(pixs) != 4)
-        return ERROR_INT("pixs not 32 bpp and 4 spp", __func__, 1);
+        return ERROR_INT("pixs not 32 bpp and 4 spp", procName, 1);
     if (pixGetDepth(pixd) != 32)
-        return ERROR_INT("pixd not 32 bpp", __func__, 1);
+        return ERROR_INT("pixd not 32 bpp", procName, 1);
 
     if (shiftx == 0 && shifty == 0) {
         pixCopyRGBComponent(pixd, pixs, L_ALPHA_CHANNEL);
@@ -2336,9 +2248,9 @@ PIX     *pix1, *pix2;
 /*!
  * \brief   pixDisplayLayersRGBA()
  *
- * \param[in]    pixs   cmap or 32 bpp rgba
- * \param[in]    val    32 bit unsigned color to use as background
- * \param[in]    maxw   max output image width; 0 for no scaling
+ * \param[in]    pixs cmap or 32 bpp rgba
+ * \param[in]    val 32 bit unsigned color to use as background
+ * \param[in]    maxw max output image width; 0 for no scaling
  * \return  pixd showing various image views, or NULL on error
  *
  * <pre>
@@ -2361,14 +2273,16 @@ PIX       *pix1, *pix2, *pixd;
 PIXA      *pixa;
 PIXCMAP   *cmap;
 
+    PROCNAME("pixDisplayLayersRGBA");
+
     if (!pixs)
-        return (PIX *)ERROR_PTR("pixs not defined", __func__, NULL);
+        return (PIX *)ERROR_PTR("pixs not defined", procName, NULL);
     cmap = pixGetColormap(pixs);
     if (!cmap && !(pixGetDepth(pixs) == 32 && pixGetSpp(pixs) == 4))
         return (PIX *)ERROR_PTR("pixs not cmap and not 32 bpp rgba",
-                                __func__, NULL);
+                                procName, NULL);
     if ((w = pixGetWidth(pixs)) == 0)
-        return (PIX *)ERROR_PTR("pixs width 0 !!", __func__, NULL);
+        return (PIX *)ERROR_PTR("pixs width 0 !!", procName, NULL);
 
     if (cmap)
         pix1 = pixRemoveColormap(pixs, REMOVE_CMAP_WITH_ALPHA);
@@ -2376,7 +2290,7 @@ PIXCMAP   *cmap;
         pix1 = pixCopy(NULL, pixs);
 
         /* Scale if necessary so the output width is not larger than maxw */
-    scalefact = (maxw == 0) ? 1.0f : L_MIN(1.0f, (l_float32)(maxw) / w);
+    scalefact = (maxw == 0) ? 1.0 : L_MIN(1.0, maxw / w);
     width = (l_int32)(scalefact * w);
 
     pixa = pixaCreate(3);
@@ -2400,9 +2314,9 @@ PIXCMAP   *cmap;
 /*!
  * \brief   pixCreateRGBImage()
  *
- * \param[in]   pixr   8 bpp red pix
- * \param[in]   pixg   8 bpp green pix
- * \param[in]   pixb   8 bpp blue pix
+ * \param[in]    pixr 8 bpp red pix
+ * \param[in]    pixg 8 bpp green pix
+ * \param[in]    pixb 8 bpp blue pix
  * \return  32 bpp pix, interleaved with 4 samples/pixel,
  *              or NULL on error
  *
@@ -2410,7 +2324,7 @@ PIXCMAP   *cmap;
  * Notes:
  *      (1) the 4th byte, sometimes called the "alpha channel",
  *          and which is often used for blending between different
- *          images, is left with 0 value (fully opaque).
+ *          images, is left with 0 value.
  *      (2) see Note (4) in pix.h for details on storage of
  *          8-bit samples within each 32-bit word.
  *      (3) This implementation, setting the r, g and b components
@@ -2428,24 +2342,26 @@ pixCreateRGBImage(PIX  *pixr,
 l_int32  wr, wg, wb, hr, hg, hb, dr, dg, db;
 PIX     *pixd;
 
+    PROCNAME("pixCreateRGBImage");
+
     if (!pixr)
-        return (PIX *)ERROR_PTR("pixr not defined", __func__, NULL);
+        return (PIX *)ERROR_PTR("pixr not defined", procName, NULL);
     if (!pixg)
-        return (PIX *)ERROR_PTR("pixg not defined", __func__, NULL);
+        return (PIX *)ERROR_PTR("pixg not defined", procName, NULL);
     if (!pixb)
-        return (PIX *)ERROR_PTR("pixb not defined", __func__, NULL);
+        return (PIX *)ERROR_PTR("pixb not defined", procName, NULL);
     pixGetDimensions(pixr, &wr, &hr, &dr);
     pixGetDimensions(pixg, &wg, &hg, &dg);
     pixGetDimensions(pixb, &wb, &hb, &db);
     if (dr != 8 || dg != 8 || db != 8)
-        return (PIX *)ERROR_PTR("input pix not all 8 bpp", __func__, NULL);
+        return (PIX *)ERROR_PTR("input pix not all 8 bpp", procName, NULL);
     if (wr != wg || wr != wb)
-        return (PIX *)ERROR_PTR("widths not the same", __func__, NULL);
+        return (PIX *)ERROR_PTR("widths not the same", procName, NULL);
     if (hr != hg || hr != hb)
-        return (PIX *)ERROR_PTR("heights not the same", __func__, NULL);
+        return (PIX *)ERROR_PTR("heights not the same", procName, NULL);
 
     if ((pixd = pixCreate(wr, hr, 32)) == NULL)
-        return (PIX *)ERROR_PTR("pixd not made", __func__, NULL);
+        return (PIX *)ERROR_PTR("pixd not made", procName, NULL);
     pixCopyResolution(pixd, pixr);
     pixSetRGBComponent(pixd, pixr, COLOR_RED);
     pixSetRGBComponent(pixd, pixg, COLOR_GREEN);
@@ -2458,9 +2374,9 @@ PIX     *pixd;
 /*!
  * \brief   pixGetRGBComponent()
  *
- * \param[in]   pixs   32 bpp, or colormapped
- * \param[in]   comp   one of {COLOR_RED, COLOR_GREEN, COLOR_BLUE,
- *                     L_ALPHA_CHANNEL}
+ * \param[in]    pixs 32 bpp, or colormapped
+ * \param[in]    comp one of {COLOR_RED, COLOR_GREEN, COLOR_BLUE,
+ *                    L_ALPHA_CHANNEL}
  * \return  pixd the selected 8 bpp component image of the
  *                    input 32 bpp image or NULL on error
  *
@@ -2483,19 +2399,21 @@ l_uint32  *lines, *lined;
 l_uint32  *datas, *datad;
 PIX       *pixd;
 
+    PROCNAME("pixGetRGBComponent");
+
     if (!pixs)
-        return (PIX *)ERROR_PTR("pixs not defined", __func__, NULL);
+        return (PIX *)ERROR_PTR("pixs not defined", procName, NULL);
     if (pixGetColormap(pixs))
         return pixGetRGBComponentCmap(pixs, comp);
     if (pixGetDepth(pixs) != 32)
-        return (PIX *)ERROR_PTR("pixs not 32 bpp", __func__, NULL);
+        return (PIX *)ERROR_PTR("pixs not 32 bpp", procName, NULL);
     if (comp != COLOR_RED && comp != COLOR_GREEN &&
         comp != COLOR_BLUE && comp != L_ALPHA_CHANNEL)
-        return (PIX *)ERROR_PTR("invalid comp", __func__, NULL);
+        return (PIX *)ERROR_PTR("invalid comp", procName, NULL);
 
     pixGetDimensions(pixs, &w, &h, NULL);
     if ((pixd = pixCreate(w, h, 8)) == NULL)
-        return (PIX *)ERROR_PTR("pixd not made", __func__, NULL);
+        return (PIX *)ERROR_PTR("pixd not made", procName, NULL);
     pixCopyResolution(pixd, pixs);
     wpls = pixGetWpl(pixs);
     wpld = pixGetWpl(pixd);
@@ -2517,9 +2435,9 @@ PIX       *pixd;
 /*!
  * \brief   pixSetRGBComponent()
  *
- * \param[in]   pixd   32 bpp
- * \param[in]   pixs   8 bpp
- * \param[in]   comp   one of the set: {COLOR_RED, COLOR_GREEN,
+ * \param[in]    pixd  32 bpp
+ * \param[in]    pixs  8 bpp
+ * \param[in]    comp  one of the set: {COLOR_RED, COLOR_GREEN,
  *                                      COLOR_BLUE, L_ALPHA_CHANNEL}
  * \return  0 if OK; 1 on error
  *
@@ -2531,7 +2449,7 @@ PIX       *pixd;
  *          need not be the same, but a warning is issued if they differ.
  * </pre>
  */
-l_ok
+l_int32
 pixSetRGBComponent(PIX     *pixd,
                    PIX     *pixs,
                    l_int32  comp)
@@ -2542,21 +2460,23 @@ l_int32    wpls, wpld;
 l_uint32  *lines, *lined;
 l_uint32  *datas, *datad;
 
+    PROCNAME("pixSetRGBComponent");
+
     if (!pixd)
-        return ERROR_INT("pixd not defined", __func__, 1);
+        return ERROR_INT("pixd not defined", procName, 1);
     if (!pixs)
-        return ERROR_INT("pixs not defined", __func__, 1);
+        return ERROR_INT("pixs not defined", procName, 1);
     if (pixGetDepth(pixd) != 32)
-        return ERROR_INT("pixd not 32 bpp", __func__, 1);
+        return ERROR_INT("pixd not 32 bpp", procName, 1);
     if (pixGetDepth(pixs) != 8)
-        return ERROR_INT("pixs not 8 bpp", __func__, 1);
+        return ERROR_INT("pixs not 8 bpp", procName, 1);
     if (comp != COLOR_RED && comp != COLOR_GREEN &&
         comp != COLOR_BLUE && comp != L_ALPHA_CHANNEL)
-        return ERROR_INT("invalid comp", __func__, 1);
+        return ERROR_INT("invalid comp", procName, 1);
     pixGetDimensions(pixs, &ws, &hs, NULL);
     pixGetDimensions(pixd, &wd, &hd, NULL);
     if (ws != wd || hs != hd)
-        L_WARNING("images sizes not equal\n", __func__);
+        L_WARNING("images sizes not equal\n", procName);
     w = L_MIN(ws, wd);
     h = L_MIN(hs, hd);
     if (comp == L_ALPHA_CHANNEL)
@@ -2581,8 +2501,8 @@ l_uint32  *datas, *datad;
 /*!
  * \brief   pixGetRGBComponentCmap()
  *
- * \param[in]   pixs   colormapped
- * \param[in]   comp   one of the set: {COLOR_RED, COLOR_GREEN, COLOR_BLUE}
+ * \param[in]    pixs  colormapped
+ * \param[in]    comp  one of the set: {COLOR_RED, COLOR_GREEN, COLOR_BLUE}
  * \return  pixd  the selected 8 bpp component image of the
  *                     input cmapped image, or NULL on error
  *
@@ -2595,7 +2515,7 @@ PIX *
 pixGetRGBComponentCmap(PIX     *pixs,
                        l_int32  comp)
 {
-l_int32     i, j, w, h, val, index, valid;
+l_int32     i, j, w, h, val, index;
 l_int32     wplc, wpld;
 l_uint32   *linec, *lined;
 l_uint32   *datac, *datad;
@@ -2603,31 +2523,26 @@ PIX        *pixc, *pixd;
 PIXCMAP    *cmap;
 RGBA_QUAD  *cta;
 
+    PROCNAME("pixGetRGBComponentCmap");
+
     if (!pixs)
-        return (PIX *)ERROR_PTR("pixs not defined", __func__, NULL);
+        return (PIX *)ERROR_PTR("pixs not defined", procName, NULL);
     if ((cmap = pixGetColormap(pixs)) == NULL)
-        return (PIX *)ERROR_PTR("pixs not cmapped", __func__, NULL);
+        return (PIX *)ERROR_PTR("pixs not cmapped", procName, NULL);
     if (comp == L_ALPHA_CHANNEL)
-        return (PIX *)ERROR_PTR("alpha in cmaps not supported", __func__, NULL);
+        return (PIX *)ERROR_PTR("alpha in cmaps not supported", procName, NULL);
     if (comp != COLOR_RED && comp != COLOR_GREEN && comp != COLOR_BLUE)
-        return (PIX *)ERROR_PTR("invalid comp", __func__, NULL);
+        return (PIX *)ERROR_PTR("invalid comp", procName, NULL);
 
         /* If not 8 bpp, make a cmapped 8 bpp pix */
     if (pixGetDepth(pixs) == 8)
         pixc = pixClone(pixs);
     else
         pixc = pixConvertTo8(pixs, TRUE);
-    pixcmapIsValid(cmap, pixc, &valid);
-    if (!valid) {
-        pixDestroy(&pixc);
-        return (PIX *)ERROR_PTR("invalid colormap", __func__, NULL);
-    }
 
     pixGetDimensions(pixs, &w, &h, NULL);
-    if ((pixd = pixCreate(w, h, 8)) == NULL) {
-        pixDestroy(&pixc);
-        return (PIX *)ERROR_PTR("pixd not made", __func__, NULL);
-    }
+    if ((pixd = pixCreateNoInit(w, h, 8)) == NULL)
+        return (PIX *)ERROR_PTR("pixd not made", procName, NULL);
     pixCopyResolution(pixd, pixs);
     wplc = pixGetWpl(pixc);
     wpld = pixGetWpl(pixd);
@@ -2667,10 +2582,10 @@ RGBA_QUAD  *cta;
 /*!
  * \brief   pixCopyRGBComponent()
  *
- * \param[in]   pixd   32 bpp
- * \param[in]   pixs   32 bpp
- * \param[in]   comp   one of the set: {COLOR_RED, COLOR_GREEN,
- *                                      COLOR_BLUE, L_ALPHA_CHANNEL}
+ * \param[in]    pixd 32 bpp
+ * \param[in]    pixs 32 bpp
+ * \param[in]    comp one of the set: {COLOR_RED, COLOR_GREEN,
+ *                                     COLOR_BLUE, L_ALPHA_CHANNEL}
  * \return  0 if OK; 1 on error
  *
  * <pre>
@@ -2679,7 +2594,7 @@ RGBA_QUAD  *cta;
  *          are usually the same, and a warning is issued if they differ.
  * </pre>
  */
-l_ok
+l_int32
 pixCopyRGBComponent(PIX     *pixd,
                     PIX     *pixs,
                     l_int32  comp)
@@ -2689,17 +2604,19 @@ l_int32    wpls, wpld;
 l_uint32  *lines, *lined;
 l_uint32  *datas, *datad;
 
+    PROCNAME("pixCopyRGBComponent");
+
     if (!pixd && pixGetDepth(pixd) != 32)
-        return ERROR_INT("pixd not defined or not 32 bpp", __func__, 1);
+        return ERROR_INT("pixd not defined or not 32 bpp", procName, 1);
     if (!pixs && pixGetDepth(pixs) != 32)
-        return ERROR_INT("pixs not defined or not 32 bpp", __func__, 1);
+        return ERROR_INT("pixs not defined or not 32 bpp", procName, 1);
     if (comp != COLOR_RED && comp != COLOR_GREEN &&
         comp != COLOR_BLUE && comp != L_ALPHA_CHANNEL)
-        return ERROR_INT("invalid component", __func__, 1);
+        return ERROR_INT("invalid component", procName, 1);
     pixGetDimensions(pixs, &ws, &hs, NULL);
     pixGetDimensions(pixd, &wd, &hd, NULL);
     if (ws != wd || hs != hd)
-        L_WARNING("images sizes not equal\n", __func__);
+        L_WARNING("images sizes not equal\n", procName);
     w = L_MIN(ws, wd);
     h = L_MIN(hs, hd);
     if (comp == L_ALPHA_CHANNEL)
@@ -2724,7 +2641,7 @@ l_uint32  *datas, *datad;
  * \brief   composeRGBPixel()
  *
  * \param[in]    rval, gval, bval
- * \param[out]   ppixel             32-bit pixel
+ * \param[out]   ppixel  32-bit pixel
  * \return  0 if OK; 1 on error
  *
  * <pre>
@@ -2738,18 +2655,19 @@ l_uint32  *datas, *datad;
  *            SET_DATA_BYTE(ppixel, COLOR_BLUE, bval);
  * </pre>
  */
-l_ok
+l_int32
 composeRGBPixel(l_int32    rval,
                 l_int32    gval,
                 l_int32    bval,
                 l_uint32  *ppixel)
 {
-    if (!ppixel)
-        return ERROR_INT("&pixel not defined", __func__, 1);
+    PROCNAME("composeRGBPixel");
 
-    *ppixel = ((l_uint32)rval << L_RED_SHIFT) |
-              ((l_uint32)gval << L_GREEN_SHIFT) |
-              ((l_uint32)bval << L_BLUE_SHIFT);
+    if (!ppixel)
+        return ERROR_INT("&pixel not defined", procName, 1);
+
+    *ppixel = (rval << L_RED_SHIFT) | (gval << L_GREEN_SHIFT) |
+              (bval << L_BLUE_SHIFT);
     return 0;
 }
 
@@ -2758,7 +2676,7 @@ composeRGBPixel(l_int32    rval,
  * \brief   composeRGBAPixel()
  *
  * \param[in]    rval, gval, bval, aval
- * \param[out]   ppixel                  32-bit pixel
+ * \param[out]   ppixel  32-bit pixel
  * \return  0 if OK; 1 on error
  *
  * <pre>
@@ -2768,20 +2686,20 @@ composeRGBPixel(l_int32    rval,
  *          with 0xff before shifting.
  * </pre>
  */
-l_ok
+l_int32
 composeRGBAPixel(l_int32    rval,
                  l_int32    gval,
                  l_int32    bval,
                  l_int32    aval,
                  l_uint32  *ppixel)
 {
-    if (!ppixel)
-        return ERROR_INT("&pixel not defined", __func__, 1);
+    PROCNAME("composeRGBAPixel");
 
-    *ppixel = ((l_uint32)rval << L_RED_SHIFT) |
-              ((l_uint32)gval << L_GREEN_SHIFT) |
-              ((l_uint32)bval << L_BLUE_SHIFT) |
-              aval;
+    if (!ppixel)
+        return ERROR_INT("&pixel not defined", procName, 1);
+
+    *ppixel = (rval << L_RED_SHIFT) | (gval << L_GREEN_SHIFT) |
+              (bval << L_BLUE_SHIFT) | aval;
     return 0;
 }
 
@@ -2789,10 +2707,10 @@ composeRGBAPixel(l_int32    rval,
 /*!
  * \brief   extractRGBValues()
  *
- * \param[in]    pixel   32 bit
- * \param[out]   prval   [optional] red component
- * \param[out]   pgval   [optional] green component
- * \param[out]   pbval   [optional] blue component
+ * \param[in]    pixel 32 bit
+ * \param[out]   prval [optional] red component
+ * \param[out]   pgval [optional] green component
+ * \param[out]   pbval [optional] blue component
  * \return  void
  *
  * <pre>
@@ -2812,17 +2730,18 @@ extractRGBValues(l_uint32  pixel,
     if (prval) *prval = (pixel >> L_RED_SHIFT) & 0xff;
     if (pgval) *pgval = (pixel >> L_GREEN_SHIFT) & 0xff;
     if (pbval) *pbval = (pixel >> L_BLUE_SHIFT) & 0xff;
+    return;
 }
 
 
 /*!
  * \brief   extractRGBAValues()
  *
- * \param[in]    pixel   32 bit
- * \param[out]   prval   [optional] red component
- * \param[out]   pgval   [optional] green component
- * \param[out]   pbval   [optional] blue component
- * \param[out]   paval   [optional] alpha component
+ * \param[in]    pixel 32 bit
+ * \param[out]   prval [optional] red component
+ * \param[out]   pgval [optional] green component
+ * \param[out]   pbval [optional] blue component
+ * \param[out]   paval [optional] alpha component
  * \return  void
  */
 void
@@ -2836,14 +2755,15 @@ extractRGBAValues(l_uint32  pixel,
     if (pgval) *pgval = (pixel >> L_GREEN_SHIFT) & 0xff;
     if (pbval) *pbval = (pixel >> L_BLUE_SHIFT) & 0xff;
     if (paval) *paval = (pixel >> L_ALPHA_SHIFT) & 0xff;
+    return;
 }
 
 
 /*!
  * \brief   extractMinMaxComponent()
  *
- * \param[in]   pixel   32 bpp RGB
- * \param[in]   type    L_CHOOSE_MIN or L_CHOOSE_MAX
+ * \param[in]    pixel 32 bpp RGB
+ * \param[in]    type L_CHOOSE_MIN or L_CHOOSE_MAX
  * \return  component in range [0 ... 255], or NULL on error
  */
 l_int32
@@ -2867,11 +2787,11 @@ l_int32  rval, gval, bval, val;
 /*!
  * \brief   pixGetRGBLine()
  *
- * \param[in]   pixs   32 bpp
- * \param[in]   row
- * \param[in]   bufr   array of red samples; size w bytes
- * \param[in]   bufg   array of green samples; size w bytes
- * \param[in]   bufb   array of blue samples; size w bytes
+ * \param[in]    pixs  32 bpp
+ * \param[in]    row
+ * \param[in]    bufr  array of red samples; size w bytes
+ * \param[in]    bufg  array of green samples; size w bytes
+ * \param[in]    bufb  array of blue samples; size w bytes
  * \return  0 if OK; 1 on error
  *
  * <pre>
@@ -2880,7 +2800,7 @@ l_int32  rval, gval, bval, val;
  *          into the given buffers.
  * </pre>
  */
-l_ok
+l_int32
 pixGetRGBLine(PIX      *pixs,
               l_int32   row,
               l_uint8  *bufr,
@@ -2891,16 +2811,18 @@ l_uint32  *lines;
 l_int32    j, w, h;
 l_int32    wpls;
 
+    PROCNAME("pixGetRGBLine");
+
     if (!pixs)
-        return ERROR_INT("pixs not defined", __func__, 1);
+        return ERROR_INT("pixs not defined", procName, 1);
     if (pixGetDepth(pixs) != 32)
-        return ERROR_INT("pixs not 32 bpp", __func__, 1);
+        return ERROR_INT("pixs not 32 bpp", procName, 1);
     if (!bufr || !bufg || !bufb)
-        return ERROR_INT("buffer not defined", __func__, 1);
+        return ERROR_INT("buffer not defined", procName, 1);
 
     pixGetDimensions(pixs, &w, &h, NULL);
     if (row < 0 || row >= h)
-        return ERROR_INT("row out of bounds", __func__, 1);
+        return ERROR_INT("row out of bounds", procName, 1);
     wpls = pixGetWpl(pixs);
     lines = pixGetData(pixs) + row * wpls;
 
@@ -2910,54 +2832,6 @@ l_int32    wpls;
         bufb[j] = GET_DATA_BYTE(lines + j, COLOR_BLUE);
     }
 
-    return 0;
-}
-
-
-/*-------------------------------------------------------------*
- *                   Raster line pixel setter                  *
- *-------------------------------------------------------------*/
-/*!
- * \brief   setLineDataVal()
- *
- * \param[in]    line    ptr to first word in raster line data
- * \param[in]    j       index of pixels into the raster line
- * \param[in]    d       depth of the pixel
- * \param[in]    val     pixel value to be set
- * \return  0 if OK, 1 on error
- *
- * <pre>
- * Notes:
- *      (1) This is a convenience function to set a pixel value in a
- *          raster line where the depth of the image can have different
- *          values (1, 2, 4, 8, 16 or 32).
- * </pre>
- */
-l_ok
-setLineDataVal(l_uint32  *line,
-               l_int32    j,
-               l_int32    d,
-               l_uint32   val)
-{
-    if (!line)
-        return ERROR_INT("line not defined", __func__, 1);
-    if (j < 0)
-        return ERROR_INT("j must be >= 0", __func__, 1);
-    if (d != 1 && d != 2 && d != 4 && d != 8 && d != 16 && d != 32)
-        return ERROR_INT("invalid d", __func__, 1);
-
-    if (d == 1)
-        SET_DATA_BIT_VAL(line, j, val);
-    else if (d == 2)
-        SET_DATA_DIBIT(line, j, val);
-    else if (d == 4)
-        SET_DATA_QBIT(line, j, val);
-    else if (d == 8)
-        SET_DATA_BYTE(line, j, val);
-    else if (d == 16)
-        SET_DATA_TWO_BYTES(line, j, val);
-    else  /* d == 32 */
-        *(line + j) = val;
     return 0;
 }
 
@@ -2997,6 +2871,8 @@ l_int32    i, j, h, wpl;
 l_uint32   word;
 PIX       *pixd;
 
+    PROCNAME("pixEndianByteSwapNew");
+
 #ifdef L_BIG_ENDIAN
 
     return pixClone(pixs);
@@ -3004,13 +2880,12 @@ PIX       *pixd;
 #else   /* L_LITTLE_ENDIAN */
 
     if (!pixs)
-        return (PIX *)ERROR_PTR("pixs not defined", __func__, NULL);
+        return (PIX *)ERROR_PTR("pixs not defined", procName, NULL);
 
     datas = pixGetData(pixs);
     wpl = pixGetWpl(pixs);
     h = pixGetHeight(pixs);
-    if ((pixd = pixCreateTemplate(pixs)) == NULL)
-        return (PIX *)ERROR_PTR("pixd not made", __func__, NULL);
+    pixd = pixCreateTemplate(pixs);
     datad = pixGetData(pixd);
     for (i = 0; i < h; i++) {
         for (j = 0; j < wpl; j++, datas++, datad++) {
@@ -3032,7 +2907,7 @@ PIX       *pixd;
 /*!
  * \brief   pixEndianByteSwap()
  *
- * \param[in]   pixs
+ * \param[in]    pixs
  * \return  0 if OK, 1 on error
  *
  * <pre>
@@ -3051,12 +2926,14 @@ PIX       *pixd;
  *          order when serialized, so no byte flipping is required.
  * </pre>
  */
-l_ok
+l_int32
 pixEndianByteSwap(PIX  *pixs)
 {
 l_uint32  *data;
 l_int32    i, j, h, wpl;
 l_uint32   word;
+
+    PROCNAME("pixEndianByteSwap");
 
 #ifdef L_BIG_ENDIAN
 
@@ -3065,7 +2942,7 @@ l_uint32   word;
 #else   /* L_LITTLE_ENDIAN */
 
     if (!pixs)
-        return ERROR_INT("pixs not defined", __func__, 1);
+        return ERROR_INT("pixs not defined", procName, 1);
 
     data = pixGetData(pixs);
     wpl = pixGetWpl(pixs);
@@ -3090,22 +2967,20 @@ l_uint32   word;
 /*!
  * \brief   lineEndianByteSwap()
  *
- * \param[in]  datad   dest byte array data, reordered on little-endians
- * \param[in]  datas   a src line of pix data)
- * \param[in]  wpl     number of 32 bit words in the line
- * \return  0 if OK, 1 on error
+ *      Input   datad (dest byte array data, reordered on little-endians)
+ *              datas (a src line of pix data)
+ *              wpl (number of 32 bit words in the line)
+ *      Return: 0 if OK, 1 on error
  *
- * <pre>
- * Notes:
+ *  Notes:
  *      (1) This is used on little-endian platforms to swap
  *          the bytes within each word in the line of image data.
  *          Bytes 0 <==> 3 and 1 <==> 2 are swapped in the dest
  *          byte array data8d, relative to the pix data in datas.
  *      (2) The bytes represent 8 bit pixel values.  They are swapped
- *          for little endians so that when the dest array datad
+ *          for little endians so that when the dest array (char *)datad
  *          is addressed by bytes, the pixels are chosen sequentially
  *          from left to right in the image.
- * </pre>
  */
 l_int32
 lineEndianByteSwap(l_uint32  *datad,
@@ -3115,12 +2990,14 @@ lineEndianByteSwap(l_uint32  *datad,
 l_int32   j;
 l_uint32  word;
 
+    PROCNAME("lineEndianByteSwap");
+
     if (!datad || !datas)
-        return ERROR_INT("datad and datas not both defined", __func__, 1);
+        return ERROR_INT("datad and datas not both defined", procName, 1);
 
 #ifdef L_BIG_ENDIAN
 
-    memcpy(datad, datas, 4 * wpl);
+    memcpy((char *)datad, (char *)datas, 4 * wpl);
     return 0;
 
 #else   /* L_LITTLE_ENDIAN */
@@ -3166,6 +3043,8 @@ l_int32    i, j, h, wpl;
 l_uint32   word;
 PIX       *pixd;
 
+    PROCNAME("pixEndianTwoByteSwapNew");
+
 #ifdef L_BIG_ENDIAN
 
     return pixClone(pixs);
@@ -3173,13 +3052,12 @@ PIX       *pixd;
 #else   /* L_LITTLE_ENDIAN */
 
     if (!pixs)
-        return (PIX *)ERROR_PTR("pixs not defined", __func__, NULL);
+        return (PIX *)ERROR_PTR("pixs not defined", procName, NULL);
 
     datas = pixGetData(pixs);
     wpl = pixGetWpl(pixs);
     h = pixGetHeight(pixs);
-    if ((pixd = pixCreateTemplate(pixs)) == NULL)
-        return (PIX *)ERROR_PTR("pixd not made", __func__, NULL);
+    pixd = pixCreateTemplate(pixs);
     datad = pixGetData(pixd);
     for (i = 0; i < h; i++) {
         for (j = 0; j < wpl; j++, datas++, datad++) {
@@ -3210,12 +3088,14 @@ PIX       *pixd;
  *          each of the 16-bit entities separately.
  * </pre>
  */
-l_ok
+l_int32
 pixEndianTwoByteSwap(PIX  *pixs)
 {
 l_uint32  *data;
 l_int32    i, j, h, wpl;
 l_uint32   word;
+
+    PROCNAME("pixEndianTwoByteSwap");
 
 #ifdef L_BIG_ENDIAN
 
@@ -3224,7 +3104,7 @@ l_uint32   word;
 #else   /* L_LITTLE_ENDIAN */
 
     if (!pixs)
-        return ERROR_INT("pixs not defined", __func__, 1);
+        return ERROR_INT("pixs not defined", procName, 1);
 
     data = pixGetData(pixs);
     wpl = pixGetWpl(pixs);
@@ -3249,9 +3129,9 @@ l_uint32   word;
 /*!
  * \brief   pixGetRasterData()
  *
- * \param[in]    pixs     1, 8, 32 bpp
- * \param[out]   pdata    raster data in memory
- * \param[out]   pnbytes  number of bytes in data string
+ * \param[in]    pixs 1, 8, 32 bpp
+ * \param[out]   pdata raster data in memory
+ * \param[out]   pnbytes number of bytes in data string
  * \return  0 if OK, 1 on error
  *
  * <pre>
@@ -3262,7 +3142,7 @@ l_uint32   word;
  *          required for flate encoding of pixels in a PostScript file.
  * </pre>
  */
-l_ok
+l_int32
 pixGetRasterData(PIX       *pixs,
                  l_uint8  **pdata,
                  size_t    *pnbytes)
@@ -3272,17 +3152,17 @@ l_int32    databpl;  /* bytes for each raster line in returned data */
 l_uint8   *line, *data;  /* packed data in returned array */
 l_uint32  *rline, *rdata;  /* data in pix raster */
 
+    PROCNAME("pixGetRasterData");
+
     if (pdata) *pdata = NULL;
     if (pnbytes) *pnbytes = 0;
     if (!pdata || !pnbytes)
-        return ERROR_INT("&data and &nbytes not both defined", __func__, 1);
+        return ERROR_INT("&data and &nbytes not both defined", procName, 1);
     if (!pixs)
-        return ERROR_INT("pixs not defined", __func__, 1);
+        return ERROR_INT("pixs not defined", procName, 1);
     pixGetDimensions(pixs, &w, &h, &d);
     if (d != 1 && d != 2 && d != 4 && d != 8 && d != 16 && d != 32)
-        return ERROR_INT("depth not in {1,2,4,8,16,32}", __func__, 1);
-
-    pixSetPadBits(pixs, 0);
+        return ERROR_INT("depth not in {1,2,4,8,16,32}", procName, 1);
     rdata = pixGetData(pixs);
     wpl = pixGetWpl(pixs);
     if (d == 1)
@@ -3295,11 +3175,10 @@ l_uint32  *rline, *rdata;  /* data in pix raster */
         databpl = w * (d / 8);
     else  /* d == 32 bpp rgb */
         databpl = 3 * w;
-    if ((data = (l_uint8 *)LEPT_CALLOC((size_t)databpl * h, sizeof(l_uint8)))
-            == NULL)
-        return ERROR_INT("data not allocated", __func__, 1);
+    if ((data = (l_uint8 *)LEPT_CALLOC(databpl * h, sizeof(l_uint8))) == NULL)
+        return ERROR_INT("data not allocated", procName, 1);
     *pdata = data;
-    *pnbytes = (size_t)databpl * h;
+    *pnbytes = databpl * h;
 
     for (i = 0; i < h; i++) {
          rline = rdata + i * wpl;
@@ -3325,85 +3204,36 @@ l_uint32  *rline, *rdata;  /* data in pix raster */
 
 
 /*-------------------------------------------------------------*
- *                Infer resolution from image size             *
- *-------------------------------------------------------------*/
-/*!
- * \brief   pixInferResolution()
- *
- * \param[in]    pix
- * \param[in]    longside    assumed max dimension, in inches
- * \param[out]   pres        resolution (ppi)
- * \return  0 if OK, 1 on error
- *
- * <pre>
- * Notes:
- *      (1) This finds the resolution, assuming that the longest side
- *          of the image is %longside.  On error, returns 300 ppi.
- *      (2) This is useful for computing resolution for generating pdfs,
- *          when the images are scanned from pages of known size.
- *          There, %longside is typically about 11.0.
- * </pre>
- */
-l_ok
-pixInferResolution(PIX       *pix,
-                   l_float32  longside,
-                   l_int32   *pres)
-{
-l_int32  w, h, maxdim, res;
-
-    if (!pres)
-        return ERROR_INT("&res not defined", __func__, 1);
-    *pres = 300;
-    if (!pix)
-        return ERROR_INT("pix not defined", __func__, 1);
-    if (longside <= 0.0)
-        return ERROR_INT("longside not > 0", __func__, 1);
-
-    pixGetDimensions(pix, &w, &h, NULL);
-    maxdim = L_MAX(w, h);
-    res = (l_int32)(maxdim / longside + 0.5);
-    res = L_MAX(res, 1);  /* don't let it be 0 */
-    if (res < 10)
-        L_WARNING("low inferred resolution: %d ppi\n", __func__, res);
-    if (res > 10000)
-        L_WARNING("high inferred resolution: %d ppi\n", __func__, res);
-    *pres = res;
-    return 0;
-}
-
-
-/*-------------------------------------------------------------*
  *                 Test alpha component opaqueness             *
  *-------------------------------------------------------------*/
 /*!
  * \brief   pixAlphaIsOpaque()
  *
- * \param[in]    pix       32 bpp, spp == 4
- * \param[out]   popaque   1 if spp == 4 and all alpha component
- *                         values are 255 (opaque); 0 otherwise
+ * \param[in]    pix 32 bpp, spp == 4
+ * \param[out]   popaque 1 if spp == 4 and all alpha component
+ *                       values are 255 (opaque); 0 otherwise
  * \return  0 if OK, 1 on error
- *
- * <pre>
- * Notes:
- *      1) On error, opaque is returned as 0 (FALSE).
- * </pre>
+ *      Notes:
+ *          1) On error, opaque is returned as 0 (FALSE).
  */
-l_ok
+l_int32
 pixAlphaIsOpaque(PIX      *pix,
                  l_int32  *popaque)
 {
 l_int32    w, h, wpl, i, j, alpha;
 l_uint32  *data, *line;
 
+    PROCNAME("pixAlphaIsOpaque");
+
     if (!popaque)
-        return ERROR_INT("&opaque not defined", __func__, 1);
+        return ERROR_INT("&opaque not defined", procName, 1);
     *popaque = FALSE;
     if (!pix)
-        return ERROR_INT("&pix not defined", __func__, 1);
+        return ERROR_INT("&pix not defined", procName, 1);
     if (pixGetDepth(pix) != 32)
-        return ERROR_INT("&pix not 32 bpp", __func__, 1);
+        return ERROR_INT("&pix not 32 bpp", procName, 1);
     if (pixGetSpp(pix) != 4)
-        return ERROR_INT("&pix not 4 spp", __func__, 1);
+        return ERROR_INT("&pix not 4 spp", procName, 1);
 
     data = pixGetData(pix);
     wpl = pixGetWpl(pix);
@@ -3428,9 +3258,9 @@ l_uint32  *data, *line;
 /*!
  * \brief   pixSetupByteProcessing()
  *
- * \param[in]    pix   8 bpp, no colormap
- * \param[out]   pw    [optional] width
- * \param[out]   ph    [optional] height
+ * \param[in]    pix 8 bpp, no colormap
+ * \param[out]   pw [optional] width
+ * \param[out]   ph [optional] height
  * \return  line ptr array, or NULL on error
  *
  * <pre>
@@ -3458,16 +3288,18 @@ pixSetupByteProcessing(PIX      *pix,
 {
 l_int32  w, h;
 
+    PROCNAME("pixSetupByteProcessing");
+
     if (pw) *pw = 0;
     if (ph) *ph = 0;
     if (!pix || pixGetDepth(pix) != 8)
         return (l_uint8 **)ERROR_PTR("pix not defined or not 8 bpp",
-                                     __func__, NULL);
+                                     procName, NULL);
     pixGetDimensions(pix, &w, &h, NULL);
     if (pw) *pw = w;
     if (ph) *ph = h;
     if (pixGetColormap(pix))
-        return (l_uint8 **)ERROR_PTR("pix has colormap", __func__, NULL);
+        return (l_uint8 **)ERROR_PTR("pix has colormap", procName, NULL);
 
     pixEndianByteSwap(pix);
     return (l_uint8 **)pixGetLinePtrs(pix, NULL);
@@ -3477,8 +3309,8 @@ l_int32  w, h;
 /*!
  * \brief   pixCleanupByteProcessing()
  *
- * \param[in]   pix        8 bpp, no colormap
- * \param[in]   lineptrs   ptrs to the beginning of each raster line of data
+ * \param[in]    pix 8 bpp, no colormap
+ * \param[in]    lineptrs ptrs to the beginning of each raster line of data
  * \return  0 if OK, 1 on error
  *
  * <pre>
@@ -3487,14 +3319,16 @@ l_int32  w, h;
  *          by pixSetupByteProcessing() has finished.
  * </pre>
  */
-l_ok
+l_int32
 pixCleanupByteProcessing(PIX      *pix,
                          l_uint8 **lineptrs)
 {
+    PROCNAME("pixCleanupByteProcessing");
+
     if (!pix)
-        return ERROR_INT("pix not defined", __func__, 1);
+        return ERROR_INT("pix not defined", procName, 1);
     if (!lineptrs)
-        return ERROR_INT("lineptrs not defined", __func__, 1);
+        return ERROR_INT("lineptrs not defined", procName, 1);
 
     pixEndianByteSwap(pix);
     LEPT_FREE(lineptrs);
@@ -3508,7 +3342,7 @@ pixCleanupByteProcessing(PIX      *pix,
 /*!
  * \brief   l_setAlphaMaskBorder()
  *
- * \param[in]    val1, val2     in [0.0 ... 1.0]
+ * \param[in]    val1, val2 in [0.0 ... 1.0]
  * \return  void
  *
  * <pre>
@@ -3531,8 +3365,8 @@ void
 l_setAlphaMaskBorder(l_float32  val1,
                      l_float32  val2)
 {
-    val1 = L_MAX(0.0f, L_MIN(1.0f, val1));
-    val2 = L_MAX(0.0f, L_MIN(1.0f, val2));
+    val1 = L_MAX(0.0, L_MIN(1.0, val1));
+    val2 = L_MAX(0.0, L_MIN(1.0, val2));
     AlphaMaskBorderVals[0] = val1;
     AlphaMaskBorderVals[1] = val2;
 }

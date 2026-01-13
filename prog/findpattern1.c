@@ -30,22 +30,16 @@
  *    findpattern1 filein patternfile fileout
  *
  *    This is setup with input parameters to generate a hit-miss
- *    Sel from 'patternfile' and use it on 'filein' at 300 ppi.
- *    For example, use char.tif of a "c" bitmap, taken from the
- *    the page image feyn.tif:
+ *    Sel from the instance char.tif of a "c" bitmap, from
+ *    the page image feyn.tif, scanned at 300 ppi:
  *
- *       findpattern1 feyn.tif char.tif /tmp/result.tif
+ *       findpattern1 feyn.tif char.tif junkcharout
  *
- *    This shows a number of different outputs, including a magnified
+ *    It shows a number of different outputs, including a magnified
  *    image of the Sel superimposed on the "c" bitmap.
  */
 
-#ifdef HAVE_CONFIG_H
-#include <config_auto.h>
-#endif  /* HAVE_CONFIG_H */
-
 #include "allheaders.h"
-#include "pix_internal.h"
 
     /* for pixGenerateSelWithRuns() */
 static const l_int32  NumHorLines = 11;
@@ -60,82 +54,75 @@ static const l_uint32  MissColor = 0x00ff8800;
 int main(int    argc,
          char **argv)
 {
-char     *filein, *fileout, *patternfile;
-l_int32   w, h, i, n;
-BOX      *box, *boxe;
-BOXA     *boxa1, *boxa2;
-PIX      *pixs, *pixp, *pixpe, *pix1, *pix2, *pix3, *pix4, *pixhmt;
-PIXCMAP  *cmap;
-SEL      *sel_2h, *sel;
+char        *filein, *fileout, *patternfile;
+l_int32      w, h, i, n;
+BOX         *box, *boxe;
+BOXA        *boxa1, *boxa2;
+PIX         *pixs, *pixp, *pixpe;
+PIX         *pixd, *pixt1, *pixt2, *pixhmt;
+SEL         *sel_2h, *sel;
+static char  mainName[] = "findpattern1";
 
     if (argc != 4)
         return ERROR_INT(" Syntax:  findpattern1 filein patternfile fileout",
-                         __func__, 1);
+                         mainName, 1);
+
     filein = argv[1];
     patternfile = argv[2];
     fileout = argv[3];
 
-    setLeptDebugOK(1);
-    lept_mkdir("lept/hmt");
-
     if ((pixs = pixRead(filein)) == NULL)
-        return ERROR_INT("pixs not made", __func__, 1);
+        return ERROR_INT("pixs not made", mainName, 1);
     if ((pixp = pixRead(patternfile)) == NULL)
-        return ERROR_INT("pixp not made", __func__, 1);
+        return ERROR_INT("pixp not made", mainName, 1);
     pixGetDimensions(pixp, &w, &h, NULL);
 
-        /* Generate the hit-miss Sel with runs */
+        /* generate the hit-miss Sel with runs */
     sel = pixGenerateSelWithRuns(pixp, NumHorLines, NumVertLines, 0,
                                 MinRunlength, 7, 7, 0, 0, &pixpe);
 
-        /* Display the Sel two ways */
+        /* display the Sel two ways */
     selWriteStream(stderr, sel);
-    pix1 = pixDisplayHitMissSel(pixpe, sel, 9, HitColor, MissColor);
-    pixDisplay(pix1, 200, 200);
-    pixWrite("/tmp/lept/hmt/pix1.png", pix1, IFF_PNG);
+    pixt1 = pixDisplayHitMissSel(pixpe, sel, 9, HitColor, MissColor);
+    pixDisplay(pixt1, 200, 200);
+    pixWrite("/tmp/junkpixt", pixt1, IFF_PNG);
 
-        /* Use the Sel to find all instances in the page */
+        /* use the Sel to find all instances in the page */
     startTimer();
     pixhmt = pixHMT(NULL, pixs, sel);
-    lept_stderr("Time to find patterns = %7.3f\n", stopTimer());
+    fprintf(stderr, "Time to find patterns = %7.3f\n", stopTimer());
 
-        /* Small erosion to remove noise; typically not necessary if
+        /* small erosion to remove noise; typically not necessary if
          * there are enough elements in the Sel */
     sel_2h = selCreateBrick(1, 2, 0, 0, SEL_HIT);
-    pix2 = pixErode(NULL, pixhmt, sel_2h);
+    pixt2 = pixErode(NULL, pixhmt, sel_2h);
 
-        /* Display the result visually by placing the Sel at each
+        /* display the result visually by placing the Sel at each
          * location found */
-    pix3 = pixDilate(NULL, pix2, sel);
-    cmap = pixcmapCreate(1);
-    pixcmapAddColor(cmap, 255, 255, 255);
-    pixcmapAddColor(cmap, 255, 0, 0);
-    pixSetColormap(pix3, cmap);
-    pixWrite(fileout, pix3, IFF_PNG);
+    pixd = pixDilate(NULL, pixt2, sel);
+    pixWrite(fileout, pixd, IFF_TIFF_G4);
 
-        /* Display output with a red outline around each located pattern */
-    boxa1 = pixConnCompBB(pix2, 8);
+        /* display outut with an outline around each located pattern */
+    boxa1 = pixConnCompBB(pixt2, 8);
     n = boxaGetCount(boxa1);
     boxa2 = boxaCreate(n);
-    pix4 = pixConvert1To2Cmap(pixs);
     for (i = 0; i < n; i++) {
         box = boxaGetBox(boxa1, i, L_COPY);
         boxe = boxCreate(box->x - w / 2, box->y - h / 2, w + 4, h + 4);
         boxaAddBox(boxa2, boxe, L_INSERT);
-        pixRenderBoxArb(pix4, boxe, 2, 255, 0, 0);
+        pixRenderBox(pixs, boxe, 4, L_FLIP_PIXELS);
         boxDestroy(&box);
     }
-    pixWrite("/tmp/lept/hmt/outline.png", pix4, IFF_PNG);
-    boxaWriteStderr(boxa2);
+    pixWrite("/tmp/junkoutline", pixs, IFF_TIFF_G4);
+    boxaWriteStream(stderr, boxa2);
 
     pixDestroy(&pixs);
     pixDestroy(&pixp);
     pixDestroy(&pixpe);
-    pixDestroy(&pix1);
-    pixDestroy(&pix2);
-    pixDestroy(&pix3);
-    pixDestroy(&pix4);
+    pixDestroy(&pixt1);
+    pixDestroy(&pixt2);
     pixDestroy(&pixhmt);
+    pixDestroy(&pixd);
     selDestroy(&sel);
     selDestroy(&sel_2h);
     boxaDestroy(&boxa1);

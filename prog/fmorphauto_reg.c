@@ -36,10 +36,6 @@
  *    Results must be identical for all operations.
  */
 
-#ifdef HAVE_CONFIG_H
-#include <config_auto.h>
-#endif  /* HAVE_CONFIG_H */
-
 #include "allheaders.h"
 
     /* defined in morph.c */
@@ -49,22 +45,23 @@ LEPT_DLL extern l_int32 MORPH_BC;
 int main(int    argc,
          char **argv)
 {
-l_int32  i, nsels, same, xorcount;
-char    *filein, *selname;
-PIX     *pixs, *pixs1, *pixt1, *pixt2, *pixt3, *pixt4;
-SEL     *sel;
-SELA    *sela;
+l_int32      i, nsels, same, xorcount;
+char        *filein, *selname;
+PIX         *pixs, *pixs1, *pixt1, *pixt2, *pixt3, *pixt4;
+SEL         *sel;
+SELA        *sela;
+static char  mainName[] = "fmorphauto_reg";
 
     if (argc != 2)
-        return ERROR_INT(" Syntax:  fmorphauto_reg filein", __func__, 1);
-    filein = argv[1];
-    setLeptDebugOK(1);
+        return ERROR_INT(" Syntax:  fmorphauto_reg filein", mainName, 1);
 
+    filein = argv[1];
     if ((pixs = pixRead(filein)) == NULL)
-        return ERROR_INT("pix not made", __func__, 1);
+        return ERROR_INT("pix not made", mainName, 1);
 
     sela = selaAddBasic(NULL);
     nsels = selaGetCount(sela);
+
     for (i = 0; i < nsels; i++)
     {
         sel = selaGetSel(sela, i);
@@ -82,12 +79,13 @@ SELA    *sela;
         pixZero(pixt4, &same);
 
         if (same == 1) {
-            lept_stderr("dilations are identical for sel %d (%s)\n",
-                        i, selname);
-        } else {
-            lept_stderr("dilations differ for sel %d (%s)\n", i, selname);
+            fprintf(stderr, "dilations are identical for sel %d (%s)\n",
+                    i, selname);
+        }
+        else {
+            fprintf(stderr, "dilations differ for sel %d (%s)\n", i, selname);
             pixCountPixels(pixt4, &xorcount, NULL);
-            lept_stderr("Number of pixels in XOR: %d\n", xorcount);
+            fprintf(stderr, "Number of pixels in XOR: %d\n", xorcount);
         }
 
         pixDestroy(&pixt1);
@@ -99,7 +97,7 @@ SELA    *sela;
             /*  ---------  erosion with asymmetric b.c  ----------*/
 
         resetMorphBoundaryCondition(ASYMMETRIC_MORPH_BC);
-        lept_stderr("MORPH_BC = %d ... ", MORPH_BC);
+        fprintf(stderr, "MORPH_BC = %d ... ", MORPH_BC);
         pixt1 = pixErode(NULL, pixs, sel);
 
         if (MORPH_BC == ASYMMETRIC_MORPH_BC)
@@ -113,11 +111,13 @@ SELA    *sela;
         pixZero(pixt4, &same);
 
         if (same == 1) {
-            lept_stderr("erosions are identical for sel %d (%s)\n", i, selname);
-        } else {
-            lept_stderr("erosions differ for sel %d (%s)\n", i, selname);
+            fprintf(stderr, "erosions are identical for sel %d (%s)\n",
+                    i, selname);
+        }
+        else {
+            fprintf(stderr, "erosions differ for sel %d (%s)\n", i, selname);
             pixCountPixels(pixt4, &xorcount, NULL);
-            lept_stderr("Number of pixels in XOR: %d\n", xorcount);
+            fprintf(stderr, "Number of pixels in XOR: %d\n", xorcount);
         }
 
         pixDestroy(&pixt1);
@@ -129,7 +129,7 @@ SELA    *sela;
             /*  ---------  erosion with symmetric b.c  ----------*/
 
         resetMorphBoundaryCondition(SYMMETRIC_MORPH_BC);
-        lept_stderr("MORPH_BC = %d ... ", MORPH_BC);
+        fprintf(stderr, "MORPH_BC = %d ... ", MORPH_BC);
         pixt1 = pixErode(NULL, pixs, sel);
 
         if (MORPH_BC == ASYMMETRIC_MORPH_BC)
@@ -143,11 +143,13 @@ SELA    *sela;
         pixZero(pixt4, &same);
 
         if (same == 1) {
-            lept_stderr("erosions are identical for sel %d (%s)\n", i, selname);
-        } else {
-            lept_stderr("erosions differ for sel %d (%s)\n", i, selname);
+            fprintf(stderr, "erosions are identical for sel %d (%s)\n",
+                    i, selname);
+        }
+        else {
+            fprintf(stderr, "erosions differ for sel %d (%s)\n", i, selname);
             pixCountPixels(pixt4, &xorcount, NULL);
-            lept_stderr("Number of pixels in XOR: %d\n", xorcount);
+            fprintf(stderr, "Number of pixels in XOR: %d\n", xorcount);
         }
 
         pixDestroy(&pixt1);

@@ -33,12 +33,14 @@
  *    !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
  *
  *    This tests reading and writing of images in webp format.
+ *         http://code.google.com/speed/webp/index.html
  *
  *    webp supports 32 bpp rgb and rgba.
  *    Lossy writing is slow; reading is fast, comparable to reading jpeg files.
  *    Lossless writing is extremely slow.
  */
 
+    /* Needed for HAVE_LIBWEBP and HAVE_LIBJPEG */
 #ifdef HAVE_CONFIG_H
 #include <config_auto.h>
 #endif /* HAVE_CONFIG_H */
@@ -56,23 +58,22 @@ int main(int    argc,
 {
 L_REGPARAMS  *rp;
 
+#if !HAVE_LIBWEBP
+    fprintf(stderr, "webpio is not enabled\n"
+            "libwebp is required for webpio_reg\n"
+            "See environ.h: #define HAVE_LIBWEBP\n"
+            "See prog/Makefile: link in -lwebp\n\n");
+    return 0;
+#endif  /* abort */
+
+        /* This test uses libjpeg */
+#if !HAVE_LIBJPEG
+    fprintf(stderr, "libjpeg is required for webpio_reg\n\n");
+    return 0;
+#endif  /* abort */
+
     if (regTestSetup(argc, argv, &rp))
         return 1;
-
-#if !HAVE_LIBJPEG
-    lept_stderr("libjpeg is required for webpio_reg\n\n");
-    regTestCleanup(rp);
-    return 0;
-#endif  /* abort */
-
-#if !HAVE_LIBWEBP
-    lept_stderr("webpio is not enabled\n"
-                "libwebp is required for webpio_reg\n"
-                "See environ.h: #define HAVE_LIBWEBP\n"
-                "See prog/Makefile: link in -lwebp\n\n");
-    regTestCleanup(rp);
-    return 0;
-#endif  /* abort */
 
     lept_rmdir("lept/webp");
     lept_mkdir("lept/webp");
@@ -100,15 +101,15 @@ PIX  *pixs, *pix1, *pix2;
 
     startTimer();
     pixs = pixRead(fname);
-    lept_stderr("Time to read jpg: %7.3f\n", stopTimer());
+    fprintf(stderr, "Time to read jpg: %7.3f\n", stopTimer());
     startTimer();
     snprintf(buf, sizeof(buf), "/tmp/lept/webp/webpio.%d.webp", rp->index + 1);
     pixWrite(buf, pixs, IFF_WEBP);
-    lept_stderr("Time to write webp: %7.3f\n", stopTimer());
+    fprintf(stderr, "Time to write webp: %7.3f\n", stopTimer());
     regTestCheckFile(rp, buf);
     startTimer();
     pix1 = pixRead(buf);
-    lept_stderr("Time to read webp: %7.3f\n", stopTimer());
+    fprintf(stderr, "Time to read webp: %7.3f\n", stopTimer());
     pix2 = pixConvertTo32(pixs);
     regTestCompareSimilarPix(rp, pix1, pix2, 20, 0.1, 0);
     pixDisplayWithTitle(pix1, 100, 100, "pix1", rp->display);
@@ -133,13 +134,13 @@ PIX       *pixs, *pix1;
     snprintf(buf, sizeof(buf), "/tmp/lept/webp/webpio.%d.webp", rp->index + 1);
     if (lossless) startTimer();
     pixWriteWebP("/tmp/lept/webp/junk.webp", pixs, quality, lossless);
-    if (lossless) lept_stderr("Lossless write: %7.3f sec\n", stopTimer());
+    if (lossless) fprintf(stderr, "Lossless write: %7.3f sec\n", stopTimer());
     pix1 = pixRead("/tmp/lept/webp/junk.webp");
     pixGetPSNR(pixs, pix1, 4, &psnr);
     if (lossless)
-        lept_stderr("lossless; psnr should be 1000: psnr = %7.3f\n", psnr);
+        fprintf(stderr, "lossless; psnr should be 1000: psnr = %7.3f\n", psnr);
     else
-        lept_stderr("qual = %d, psnr = %7.3f\n", quality, psnr);
+        fprintf(stderr, "qual = %d, psnr = %7.3f\n", quality, psnr);
     regTestCompareValues(rp, expected, psnr, delta);
     pixDestroy(&pixs);
     pixDestroy(&pix1);

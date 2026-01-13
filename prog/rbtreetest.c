@@ -31,10 +31,6 @@
  * CC0 1.0 waiver (http://creativecommons.org/publicdomain/zero/1.0/).
  */
 
-#ifdef HAVE_CONFIG_H
-#include <config_auto.h>
-#endif  /* HAVE_CONFIG_H */
-
 #include "allheaders.h"
 
 #define PRINT_FULL_TREE  0
@@ -47,8 +43,6 @@ l_int32    i;
 RB_TYPE    x, y;
 RB_TYPE   *pval;
 L_RBTREE  *t;
-
-    setLeptDebugOK(1);
 
     t = l_rbtreeCreate(L_INT_TYPE);
     l_rbtreePrint(stderr, t);
@@ -69,7 +63,7 @@ L_RBTREE  *t;
     }
 
         /* Count the nodes in the tree */
-    lept_stderr("count = %d\n", l_rbtreeGetCount(t));
+    fprintf(stderr, "count = %d\n", l_rbtreeGetCount(t));
 
 #if PRINT_FULL_TREE
     l_rbtreePrint(stderr, t);  /* very big */
@@ -78,7 +72,7 @@ L_RBTREE  *t;
         /* Destroy the tree and count the remaining nodes */
     l_rbtreeDestroy(&t);
     l_rbtreePrint(stderr, t);  /* should give an error message */
-    lept_stderr("count = %d\n", l_rbtreeGetCount(t));
+    fprintf(stderr, "count = %d\n", l_rbtreeGetCount(t));
 
         /* Build another tree */
     t = l_rbtreeCreate(L_INT_TYPE);
@@ -89,7 +83,7 @@ L_RBTREE  *t;
     }
 
         /* Count the nodes in the tree */
-    lept_stderr("count = %d\n", l_rbtreeGetCount(t));
+    fprintf(stderr, "count = %d\n", l_rbtreeGetCount(t));
 
         /* Delete lots of nodes randomly from the tree and recount.
          * Deleting 80,000 random points gets them all; deleting
@@ -102,7 +96,7 @@ L_RBTREE  *t;
 #endif  /* TRACE */
         l_rbtreeDelete(t, x);
     }
-    lept_stderr("count = %d\n", l_rbtreeGetCount(t));
+    fprintf(stderr, "count = %d\n", l_rbtreeGetCount(t));
     l_rbtreePrint(stderr, t);
     lept_free(t);
 

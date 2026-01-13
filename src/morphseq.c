@@ -51,10 +51,6 @@
  * </pre>
  */
 
-#ifdef HAVE_CONFIG_H
-#include <config_auto.h>
-#endif  /* HAVE_CONFIG_H */
-
 #include <string.h>
 #include "allheaders.h"
 
@@ -65,12 +61,12 @@
  * \brief   pixMorphSequence()
  *
  * \param[in]    pixs
- * \param[in]    sequence   string specifying sequence
- * \param[in]    dispsep    controls debug display results in the sequence:
- *                          0: no output
- *                          > 0: gives horizontal separation in pixels between
- *                               successive displays
- *                          < 0: pdf output; abs(dispsep) is used for naming
+ * \param[in]    sequence string specifying sequence
+ * \param[in]    dispsep controls debug display of each result in the sequence:
+ *                       0: no output
+ *                       > 0: gives horizontal separation in pixels between
+ *                            successive displays
+ *                       < 0: pdf output; abs(dispsep) is used for naming
  * \return  pixd, or NULL on error
  *
  * <pre>
@@ -140,25 +136,28 @@ pixMorphSequence(PIX         *pixs,
 {
 char    *rawop, *op;
 char     fname[256];
-l_int32  nops, i, j, nred, fact, w, h, x, border, pdfout;
+l_int32  nops, i, j, nred, fact, w, h, x, y, border, pdfout;
 l_int32  level[4];
 PIX     *pix1, *pix2;
 PIXA    *pixa;
 SARRAY  *sa;
 
+    PROCNAME("pixMorphSequence");
+
     if (!pixs)
-        return (PIX *)ERROR_PTR("pixs not defined", __func__, NULL);
+        return (PIX *)ERROR_PTR("pixs not defined", procName, NULL);
     if (!sequence)
-        return (PIX *)ERROR_PTR("sequence not defined", __func__, NULL);
+        return (PIX *)ERROR_PTR("sequence not defined", procName, NULL);
 
         /* Split sequence into individual operations */
     sa = sarrayCreate(0);
     sarraySplitString(sa, sequence, "+");
     nops = sarrayGetCount(sa);
     pdfout = (dispsep < 0) ? 1 : 0;
+
     if (!morphSequenceVerify(sa)) {
         sarrayDestroy(&sa);
-        return (PIX *)ERROR_PTR("sequence not valid", __func__, NULL);
+        return (PIX *)ERROR_PTR("sequence not valid", procName, NULL);
     }
 
         /* Parse and operate */
@@ -170,7 +169,7 @@ SARRAY  *sa;
     border = 0;
     pix1 = pixCopy(NULL, pixs);
     pix2 = NULL;
-    x = 0;
+    x = y = 0;
     for (i = 0; i < nops; i++) {
         rawop = sarrayGetString(sa, i, L_NOCOPY);
         op = stringRemoveChars(rawop, " \n\t");
@@ -229,7 +228,7 @@ SARRAY  *sa;
 
             /* Debug output */
         if (dispsep > 0) {
-            pixDisplay(pix1, x, 0);
+            pixDisplay(pix1, x, y);
             x += dispsep;
         }
         if (pdfout)
@@ -259,12 +258,12 @@ SARRAY  *sa;
  * \brief   pixMorphCompSequence()
  *
  * \param[in]    pixs
- * \param[in]    sequence   string specifying sequence
- * \param[in]    dispsep    controls debug display of results in the sequence:
- *                          0: no output
- *                          > 0: gives horizontal separation in pixels between
- *                               successive displays
- *                          < 0: pdf output; abs(dispsep) is used for naming
+ * \param[in]    sequence string specifying sequence
+ * \param[in]    dispsep controls debug display of each result in the sequence:
+ *                       0: no output
+ *                       > 0: gives horizontal separation in pixels between
+ *                            successive displays
+ *                       < 0: pdf output; abs(dispsep) is used for naming
  * \return  pixd, or NULL on error
  *
  * <pre>
@@ -305,16 +304,18 @@ pixMorphCompSequence(PIX         *pixs,
 {
 char    *rawop, *op;
 char     fname[256];
-l_int32  nops, i, j, nred, fact, w, h, x, border, pdfout;
+l_int32  nops, i, j, nred, fact, w, h, x, y, border, pdfout;
 l_int32  level[4];
 PIX     *pix1, *pix2;
 PIXA    *pixa;
 SARRAY  *sa;
 
+    PROCNAME("pixMorphCompSequence");
+
     if (!pixs)
-        return (PIX *)ERROR_PTR("pixs not defined", __func__, NULL);
+        return (PIX *)ERROR_PTR("pixs not defined", procName, NULL);
     if (!sequence)
-        return (PIX *)ERROR_PTR("sequence not defined", __func__, NULL);
+        return (PIX *)ERROR_PTR("sequence not defined", procName, NULL);
 
         /* Split sequence into individual operations */
     sa = sarrayCreate(0);
@@ -324,7 +325,7 @@ SARRAY  *sa;
 
     if (!morphSequenceVerify(sa)) {
         sarrayDestroy(&sa);
-        return (PIX *)ERROR_PTR("sequence not valid", __func__, NULL);
+        return (PIX *)ERROR_PTR("sequence not valid", procName, NULL);
     }
 
         /* Parse and operate */
@@ -336,7 +337,7 @@ SARRAY  *sa;
     border = 0;
     pix1 = pixCopy(NULL, pixs);
     pix2 = NULL;
-    x = 0;
+    x = y = 0;
     for (i = 0; i < nops; i++) {
         rawop = sarrayGetString(sa, i, L_NOCOPY);
         op = stringRemoveChars(rawop, " \n\t");
@@ -395,7 +396,7 @@ SARRAY  *sa;
 
             /* Debug output */
         if (dispsep > 0) {
-            pixDisplay(pix1, x, 0);
+            pixDisplay(pix1, x, y);
             x += dispsep;
         }
         if (pdfout)
@@ -425,12 +426,12 @@ SARRAY  *sa;
  * \brief   pixMorphSequenceDwa()
  *
  * \param[in]    pixs
- * \param[in]    sequence   string specifying sequence
- * \param[in]    dispsep    controls debug display of results in the sequence:
- *                          0: no output
- *                          > 0: gives horizontal separation in pixels between
- *                               successive displays
- *                          < 0: pdf output; abs(dispsep) is used for naming
+ * \param[in]    sequence string specifying sequence
+ * \param[in]    dispsep controls debug display of each result in the sequence:
+ *                       0: no output
+ *                       > 0: gives horizontal separation in pixels between
+ *                            successive displays
+ *                       < 0: pdf output; abs(dispsep) is used for naming
  * \return  pixd, or NULL on error
  *
  * <pre>
@@ -452,16 +453,18 @@ pixMorphSequenceDwa(PIX         *pixs,
 {
 char    *rawop, *op;
 char     fname[256];
-l_int32  nops, i, j, nred, fact, w, h, x, border, pdfout;
+l_int32  nops, i, j, nred, fact, w, h, x, y, border, pdfout;
 l_int32  level[4];
 PIX     *pix1, *pix2;
 PIXA    *pixa;
 SARRAY  *sa;
 
+    PROCNAME("pixMorphSequenceDwa");
+
     if (!pixs)
-        return (PIX *)ERROR_PTR("pixs not defined", __func__, NULL);
+        return (PIX *)ERROR_PTR("pixs not defined", procName, NULL);
     if (!sequence)
-        return (PIX *)ERROR_PTR("sequence not defined", __func__, NULL);
+        return (PIX *)ERROR_PTR("sequence not defined", procName, NULL);
 
         /* Split sequence into individual operations */
     sa = sarrayCreate(0);
@@ -471,7 +474,7 @@ SARRAY  *sa;
 
     if (!morphSequenceVerify(sa)) {
         sarrayDestroy(&sa);
-        return (PIX *)ERROR_PTR("sequence not valid", __func__, NULL);
+        return (PIX *)ERROR_PTR("sequence not valid", procName, NULL);
     }
 
         /* Parse and operate */
@@ -483,7 +486,7 @@ SARRAY  *sa;
     border = 0;
     pix1 = pixCopy(NULL, pixs);
     pix2 = NULL;
-    x = 0;
+    x = y = 0;
     for (i = 0; i < nops; i++) {
         rawop = sarrayGetString(sa, i, L_NOCOPY);
         op = stringRemoveChars(rawop, " \n\t");
@@ -542,7 +545,7 @@ SARRAY  *sa;
 
             /* Debug output */
         if (dispsep > 0) {
-            pixDisplay(pix1, x, 0);
+            pixDisplay(pix1, x, y);
             x += dispsep;
         }
         if (pdfout)
@@ -572,12 +575,12 @@ SARRAY  *sa;
  * \brief   pixMorphCompSequenceDwa()
  *
  * \param[in]    pixs
- * \param[in]    sequence   string specifying sequence
- * \param[in]    dispsep    controls debug display of results in the sequence:
- *                          0: no output
- *                          > 0: gives horizontal separation in pixels between
- *                               successive displays
- *                          < 0: pdf output; abs(dispsep) is used for naming
+ * \param[in]    sequence string specifying sequence
+ * \param[in]    dispsep controls debug display of each result in the sequence:
+ *                       0: no output
+ *                       > 0: gives horizontal separation in pixels between
+ *                            successive displays
+ *                       < 0: pdf output; abs(dispsep) is used for naming
  * \return  pixd, or NULL on error
  *
  * <pre>
@@ -599,16 +602,18 @@ pixMorphCompSequenceDwa(PIX         *pixs,
 {
 char    *rawop, *op;
 char     fname[256];
-l_int32  nops, i, j, nred, fact, w, h, x, border, pdfout;
+l_int32  nops, i, j, nred, fact, w, h, x, y, border, pdfout;
 l_int32  level[4];
 PIX     *pix1, *pix2;
 PIXA    *pixa;
 SARRAY  *sa;
 
+    PROCNAME("pixMorphCompSequenceDwa");
+
     if (!pixs)
-        return (PIX *)ERROR_PTR("pixs not defined", __func__, NULL);
+        return (PIX *)ERROR_PTR("pixs not defined", procName, NULL);
     if (!sequence)
-        return (PIX *)ERROR_PTR("sequence not defined", __func__, NULL);
+        return (PIX *)ERROR_PTR("sequence not defined", procName, NULL);
 
         /* Split sequence into individual operations */
     sa = sarrayCreate(0);
@@ -618,7 +623,7 @@ SARRAY  *sa;
 
     if (!morphSequenceVerify(sa)) {
         sarrayDestroy(&sa);
-        return (PIX *)ERROR_PTR("sequence not valid", __func__, NULL);
+        return (PIX *)ERROR_PTR("sequence not valid", procName, NULL);
     }
 
         /* Parse and operate */
@@ -630,7 +635,7 @@ SARRAY  *sa;
     border = 0;
     pix1 = pixCopy(NULL, pixs);
     pix2 = NULL;
-    x = 0;
+    x = y = 0;
     for (i = 0; i < nops; i++) {
         rawop = sarrayGetString(sa, i, L_NOCOPY);
         op = stringRemoveChars(rawop, " \n\t");
@@ -689,7 +694,7 @@ SARRAY  *sa;
 
             /* Debug output */
         if (dispsep > 0) {
-            pixDisplay(pix1, x, 0);
+            pixDisplay(pix1, x, y);
             x += dispsep;
         }
         if (pdfout)
@@ -718,7 +723,7 @@ SARRAY  *sa;
 /*!
  * \brief   morphSequenceVerify()
  *
- * \param[in]    sa    string array of operation sequence
+ * \param[in]    sa string array of operation sequence
  * \return  TRUE if valid; FALSE otherwise or on error
  *
  * <pre>
@@ -732,13 +737,15 @@ SARRAY  *sa;
 l_int32
 morphSequenceVerify(SARRAY  *sa)
 {
-char    *rawop, *op = NULL;
+char    *rawop, *op;
 l_int32  nops, i, j, nred, fact, valid, w, h, netred, border;
 l_int32  level[4];
 l_int32  intlogbase2[5] = {1, 2, 3, 0, 4};  /* of arg/4 */
 
+    PROCNAME("morphSequenceVerify");
+
     if (!sa)
-        return ERROR_INT("sa not defined", __func__, FALSE);
+        return ERROR_INT("sa not defined", procName, FALSE);
 
     nops = sarrayGetCount(sa);
     valid = TRUE;
@@ -758,24 +765,25 @@ l_int32  intlogbase2[5] = {1, 2, 3, 0, 4};  /* of arg/4 */
         case 'c':
         case 'C':
             if (sscanf(&op[1], "%d.%d", &w, &h) != 2) {
-                lept_stderr("*** op: %s invalid\n", op);
+                fprintf(stderr, "*** op: %s invalid\n", op);
                 valid = FALSE;
                 break;
             }
             if (w <= 0 || h <= 0) {
-                lept_stderr("*** op: %s; w = %d, h = %d; must both be > 0\n",
-                            op, w, h);
+                fprintf(stderr,
+                        "*** op: %s; w = %d, h = %d; must both be > 0\n",
+                        op, w, h);
                 valid = FALSE;
                 break;
             }
-/*            lept_stderr("op = %s; w = %d, h = %d\n", op, w, h); */
+/*            fprintf(stderr, "op = %s; w = %d, h = %d\n", op, w, h); */
             break;
         case 'r':
         case 'R':
             nred = strlen(op) - 1;
             netred += nred;
             if (nred < 1 || nred > 4) {
-                lept_stderr(
+                fprintf(stderr,
                         "*** op = %s; num reduct = %d; must be in {1,2,3,4}\n",
                         op, nred);
                 valid = FALSE;
@@ -784,65 +792,66 @@ l_int32  intlogbase2[5] = {1, 2, 3, 0, 4};  /* of arg/4 */
             for (j = 0; j < nred; j++) {
                 level[j] = op[j + 1] - '0';
                 if (level[j] < 1 || level[j] > 4) {
-                    lept_stderr("*** op = %s; level[%d] = %d is invalid\n",
-                                op, j, level[j]);
+                    fprintf(stderr, "*** op = %s; level[%d] = %d is invalid\n",
+                            op, j, level[j]);
                     valid = FALSE;
                     break;
                 }
             }
             if (!valid)
                 break;
-/*            lept_stderr("op = %s", op); */
+/*            fprintf(stderr, "op = %s", op); */
             for (j = 0; j < nred; j++) {
                 level[j] = op[j + 1] - '0';
-/*                lept_stderr(", level[%d] = %d", j, level[j]); */
+/*                fprintf(stderr, ", level[%d] = %d", j, level[j]); */
             }
-/*            lept_stderr("\n"); */
+/*            fprintf(stderr, "\n"); */
             break;
         case 'x':
         case 'X':
             if (sscanf(&op[1], "%d", &fact) != 1) {
-                lept_stderr("*** op: %s; fact invalid\n", op);
+                fprintf(stderr, "*** op: %s; fact invalid\n", op);
                 valid = FALSE;
                 break;
             }
             if (fact != 2 && fact != 4 && fact != 8 && fact != 16) {
-                lept_stderr("*** op = %s; invalid fact = %d\n", op, fact);
+                fprintf(stderr, "*** op = %s; invalid fact = %d\n", op, fact);
                 valid = FALSE;
                 break;
             }
             netred -= intlogbase2[fact / 4];
-/*            lept_stderr("op = %s; fact = %d\n", op, fact); */
+/*            fprintf(stderr, "op = %s; fact = %d\n", op, fact); */
             break;
         case 'b':
         case 'B':
             if (sscanf(&op[1], "%d", &fact) != 1) {
-                lept_stderr("*** op: %s; fact invalid\n", op);
+                fprintf(stderr, "*** op: %s; fact invalid\n", op);
                 valid = FALSE;
                 break;
             }
             if (i > 0) {
-                lept_stderr("*** op = %s; must be first op\n", op);
+                fprintf(stderr, "*** op = %s; must be first op\n", op);
                 valid = FALSE;
                 break;
             }
             if (fact < 1) {
-                lept_stderr("*** op = %s; invalid fact = %d\n", op, fact);
+                fprintf(stderr, "*** op = %s; invalid fact = %d\n", op, fact);
                 valid = FALSE;
                 break;
             }
             border = fact;
-/*            lept_stderr("op = %s; fact = %d\n", op, fact); */
+/*            fprintf(stderr, "op = %s; fact = %d\n", op, fact); */
             break;
         default:
-            lept_stderr("*** nonexistent op = %s\n", op);
+            fprintf(stderr, "*** nonexistent op = %s\n", op);
             valid = FALSE;
         }
         LEPT_FREE(op);
     }
 
     if (border != 0 && netred != 0) {
-        lept_stderr("*** op = %s; border added but net reduction not 0\n", op);
+        fprintf(stderr,
+                "*** op = %s; border added but net reduction not 0\n", op);
         valid = FALSE;
     }
     return valid;
@@ -856,14 +865,14 @@ l_int32  intlogbase2[5] = {1, 2, 3, 0, 4};  /* of arg/4 */
  * \brief   pixGrayMorphSequence()
  *
  * \param[in]    pixs
- * \param[in]    sequence   string specifying sequence
- * \param[in]    dispsep    controls debug display of results in the sequence:
- *                          0: no output
- *                          > 0: gives horizontal separation in pixels between
- *                               successive displays
- *                          < 0: pdf output; abs(dispsep) is used for naming
- * \param[in]    dispy      if dispsep > 0, this gives the y-value of the
- *                          UL corner for display; otherwise it is ignored
+ * \param[in]    sequence string specifying sequence
+ * \param[in]    dispsep controls debug display of each result in the sequence:
+ *                       0: no output
+ *                       > 0: gives horizontal separation in pixels between
+ *                            successive displays
+ *                       < 0: pdf output; abs(dispsep) is used for naming
+ * \param[in]    dispy if dispsep > 0, this gives the y-value of the
+ *                     UL corner for display; otherwise it is ignored
  * \return  pixd, or NULL on error
  *
  * <pre>
@@ -913,10 +922,12 @@ PIX     *pix1, *pix2;
 PIXA    *pixa;
 SARRAY  *sa;
 
+    PROCNAME("pixGrayMorphSequence");
+
     if (!pixs)
-        return (PIX *)ERROR_PTR("pixs not defined", __func__, NULL);
+        return (PIX *)ERROR_PTR("pixs not defined", procName, NULL);
     if (!sequence)
-        return (PIX *)ERROR_PTR("sequence not defined", __func__, NULL);
+        return (PIX *)ERROR_PTR("sequence not defined", procName, NULL);
 
         /* Split sequence into individual operations */
     sa = sarrayCreate(0);
@@ -940,45 +951,47 @@ SARRAY  *sa;
         case 'c':
         case 'C':
             if (sscanf(&op[1], "%d.%d", &w, &h) != 2) {
-                lept_stderr("*** op: %s invalid\n", op);
+                fprintf(stderr, "*** op: %s invalid\n", op);
                 valid = FALSE;
                 break;
             }
             if (w < 1 || (w & 1) == 0 || h < 1 || (h & 1) == 0 ) {
-                lept_stderr("*** op: %s; w = %d, h = %d; must both be odd\n",
-                            op, w, h);
+                fprintf(stderr,
+                        "*** op: %s; w = %d, h = %d; must both be odd\n",
+                        op, w, h);
                 valid = FALSE;
                 break;
             }
-/*            lept_stderr("op = %s; w = %d, h = %d\n", op, w, h); */
+/*            fprintf(stderr, "op = %s; w = %d, h = %d\n", op, w, h); */
             break;
         case 't':
         case 'T':
             if (op[1] != 'w' && op[1] != 'W' &&
                 op[1] != 'b' && op[1] != 'B') {
-                lept_stderr(
+                fprintf(stderr,
                         "*** op = %s; arg %c must be 'w' or 'b'\n", op, op[1]);
                 valid = FALSE;
                 break;
             }
             sscanf(&op[2], "%d.%d", &w, &h);
             if (w < 1 || (w & 1) == 0 || h < 1 || (h & 1) == 0 ) {
-                lept_stderr("*** op: %s; w = %d, h = %d; must both be odd\n",
-                            op, w, h);
+                fprintf(stderr,
+                        "*** op: %s; w = %d, h = %d; must both be odd\n",
+                        op, w, h);
                 valid = FALSE;
                 break;
             }
-/*            lept_stderr("op = %s", op); */
+/*            fprintf(stderr, "op = %s", op); */
             break;
         default:
-            lept_stderr("*** nonexistent op = %s\n", op);
+            fprintf(stderr, "*** nonexistent op = %s\n", op);
             valid = FALSE;
         }
         LEPT_FREE(op);
     }
     if (!valid) {
         sarrayDestroy(&sa);
-        return (PIX *)ERROR_PTR("sequence invalid", __func__, NULL);
+        return (PIX *)ERROR_PTR("sequence invalid", procName, NULL);
     }
 
         /* Parse and operate */
@@ -1062,14 +1075,14 @@ SARRAY  *sa;
  * \brief   pixColorMorphSequence()
  *
  * \param[in]    pixs
- * \param[in]    sequence   string specifying sequence
- * \param[in]    dispsep    controls debug display of results in the sequence:
- *                          0: no output
- *                          > 0: gives horizontal separation in pixels between
- *                               successive displays
- *                          < 0: pdf output; abs(dispsep) is used for naming
- * \param[in]    dispy      if dispsep > 0, this gives the y-value of the
- *                          UL corner for display; otherwise it is ignored
+ * \param[in]    sequence string specifying sequence
+ * \param[in]    dispsep controls debug display of each result in the sequence:
+ *                       0: no output
+ *                       > 0: gives horizontal separation in pixels between
+ *                            successive displays
+ *                       < 0: pdf output; abs(dispsep) is used for naming
+ * \param[in]    dispy if dispsep > 0, this gives the y-value of the
+ *                     UL corner for display; otherwise it is ignored
  * \return  pixd, or NULL on error
  *
  * <pre>
@@ -1114,10 +1127,12 @@ PIX     *pix1, *pix2;
 PIXA    *pixa;
 SARRAY  *sa;
 
+    PROCNAME("pixColorMorphSequence");
+
     if (!pixs)
-        return (PIX *)ERROR_PTR("pixs not defined", __func__, NULL);
+        return (PIX *)ERROR_PTR("pixs not defined", procName, NULL);
     if (!sequence)
-        return (PIX *)ERROR_PTR("sequence not defined", __func__, NULL);
+        return (PIX *)ERROR_PTR("sequence not defined", procName, NULL);
 
         /* Split sequence into individual operations */
     sa = sarrayCreate(0);
@@ -1141,27 +1156,28 @@ SARRAY  *sa;
         case 'c':
         case 'C':
             if (sscanf(&op[1], "%d.%d", &w, &h) != 2) {
-                lept_stderr("*** op: %s invalid\n", op);
+                fprintf(stderr, "*** op: %s invalid\n", op);
                 valid = FALSE;
                 break;
             }
             if (w < 1 || (w & 1) == 0 || h < 1 || (h & 1) == 0 ) {
-                lept_stderr("*** op: %s; w = %d, h = %d; must both be odd\n",
-                            op, w, h);
+                fprintf(stderr,
+                        "*** op: %s; w = %d, h = %d; must both be odd\n",
+                        op, w, h);
                 valid = FALSE;
                 break;
             }
-/*            lept_stderr("op = %s; w = %d, h = %d\n", op, w, h); */
+/*            fprintf(stderr, "op = %s; w = %d, h = %d\n", op, w, h); */
             break;
         default:
-            lept_stderr("*** nonexistent op = %s\n", op);
+            fprintf(stderr, "*** nonexistent op = %s\n", op);
             valid = FALSE;
         }
         LEPT_FREE(op);
     }
     if (!valid) {
         sarrayDestroy(&sa);
-        return (PIX *)ERROR_PTR("sequence invalid", __func__, NULL);
+        return (PIX *)ERROR_PTR("sequence invalid", procName, NULL);
     }
 
         /* Parse and operate */

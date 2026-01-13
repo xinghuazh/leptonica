@@ -31,15 +31,9 @@
  *    |=============================================================|
  *    |                         Important note                      |
  *    |=============================================================|
- *    | Some of these functions require I/O libraries such as       |
- *    | libtiff, libjpeg, and libz.  If you do not have these       |
- *    | libraries, some calls will fail.                            |
- *    |                                                             |
- *    | You can manually deactivate all PostScript writing by       |
- *    | setting this in environ.h:                                  |
- *    | \code                                                       |
+ *    | Some of these functions require libtiff, libjpeg and libz.  |
+ *    | If you do not have these libraries, you must set            |
  *    |     #define  USE_PSIO     0                                 |
- *    | \endcode                                                    |
  *    | in environ.h.  This will link psio2stub.c                   |
  *    |=============================================================|
  *
@@ -55,20 +49,20 @@
  *          l_int32              pixWriteStreamPS()
  *          char                *pixWriteStringPS()
  *          char                *generateUncompressedPS()
- *          static void          getScaledParametersPS()
- *          static l_int32       convertByteToHexAscii()
+ *          void                 getScaledParametersPS()
+ *          l_int32              convertByteToHexAscii()
  *
  *     For jpeg compressed images (use dct compression)
  *          l_int32              convertJpegToPSEmbed()
  *          l_int32              convertJpegToPS()
- *          static l_int32       convertJpegToPSString()
- *          static char         *generateJpegPS()
+ *          l_int32              convertJpegToPSString()
+ *          char                *generateJpegPS()
  *
  *     For g4 fax compressed images (use ccitt g4 compression)
  *          l_int32              convertG4ToPSEmbed()
  *          l_int32              convertG4ToPS()
- *          static l_int32       convertG4ToPSString()
- *          static char         *generateG4PS()
+ *          l_int32              convertG4ToPSString()
+ *          char                *generateG4PS()
  *
  *     For multipage tiff images
  *          l_int32              convertTiffMultipageToPS()
@@ -76,15 +70,15 @@
  *     For flate (gzip) compressed images (e.g., png)
  *          l_int32              convertFlateToPSEmbed()
  *          l_int32              convertFlateToPS()
- *          static l_int32       convertFlateToPSString()
- *          static char         *generateFlatePS()
+ *          l_int32              convertFlateToPSString()
+ *          char                *generateFlatePS()
  *
  *     Write to memory
  *          l_int32              pixWriteMemPS()
  *
  *     Converting resolution
  *          l_int32              getResLetterPage()
- *          static l_int32       getResA4Page()
+ *          l_int32              getResA4Page()
  *
  *     Setting flag for writing bounding box hint
  *          void                 l_psWriteBoundingBox()
@@ -92,10 +86,6 @@
  *  See psio1.c for higher-level functions and their usage.
  * </pre>
  */
-
-#ifdef HAVE_CONFIG_H
-#include <config_auto.h>
-#endif  /* HAVE_CONFIG_H */
 
 #include <string.h>
 #include "allheaders.h"
@@ -107,17 +97,17 @@
     /* Set default for writing bounding box hint */
 static l_int32  var_PS_WRITE_BOUNDING_BOX = 1;
 
-#define Bufsize 512
-static const l_int32  DefaultInputRes = 300;  /* typical scan res, ppi */
-static const l_int32  MinRes          = 5;
-static const l_int32  MaxRes          = 3000;
+static const l_int32  L_BUF_SIZE = 512;
+static const l_int32  DEFAULT_INPUT_RES   = 300;  /* typical scan res, ppi */
+static const l_int32  MIN_RES             = 5;
+static const l_int32  MAX_RES             = 3000;
 
     /* For computing resolution that fills page to desired amount */
-static const l_int32  LetterWidth  = 612;   /* points */
-static const l_int32  LetterHeight = 792;   /* points */
-static const l_int32  A4Width      = 595;   /* points */
-static const l_int32  A4Height     = 842;   /* points */
-static const l_float32  DefaultFillFraction = 0.95f;
+static const l_int32  LETTER_WIDTH            = 612;   /* points */
+static const l_int32  LETTER_HEIGHT           = 792;   /* points */
+static const l_int32  A4_WIDTH                = 595;   /* points */
+static const l_int32  A4_HEIGHT               = 842;   /* points */
+static const l_float32  DEFAULT_FILL_FRACTION = 0.95;
 
 #ifndef  NO_CONSOLE_IO
 #define  DEBUG_JPEG       0
@@ -135,34 +125,6 @@ static const l_float32  DefaultFillFraction = 0.95f;
  * where more than one image may be placed in an arbitrary location
  * on a page.  */
 
-    /* Static helper functions */
-static void getScaledParametersPS(BOX *box, l_int32 wpix, l_int32 hpix,
-                                  l_int32 res, l_float32 scale,
-                                  l_float32 *pxpt, l_float32 *pypt,
-                                  l_float32 *pwpt, l_float32 *phpt);
-static void convertByteToHexAscii(l_uint8 byteval, char *pnib1, char *pnib2);
-static l_ok convertJpegToPSString(const char *filein, char **poutstr,
-                                  l_int32 *pnbytes, l_int32 x, l_int32 y,
-                                  l_int32 res, l_float32 scale,
-                                  l_int32 pageno, l_int32 endpage);
-static char *generateJpegPS(const char *filein, L_COMP_DATA *cid,
-                            l_float32 xpt, l_float32 ypt, l_float32 wpt,
-                            l_float32 hpt, l_int32 pageno, l_int32 endpage);
-static l_ok convertG4ToPSString(const char *filein, char **poutstr,
-                                l_int32 *pnbytes, l_int32 x, l_int32 y,
-                                l_int32 res, l_float32 scale, l_int32 pageno,
-                                l_int32 maskflag, l_int32 endpage);
-static char *generateG4PS(const char *filein, L_COMP_DATA *cid, l_float32 xpt,
-                          l_float32 ypt, l_float32 wpt, l_float32 hpt,
-                          l_int32 maskflag, l_int32 pageno, l_int32 endpage);
-static l_ok convertFlateToPSString(const char *filein, char **poutstr,
-                                   l_int32 *pnbytes, l_int32 x, l_int32 y,
-                                   l_int32 res, l_float32 scale,
-                                   l_int32 pageno, l_int32 endpage);
-static char *generateFlatePS(const char *filein, L_COMP_DATA *cid,
-                             l_float32 xpt, l_float32 ypt, l_float32 wpt,
-                             l_float32 hpt, l_int32 pageno, l_int32 endpage);
-
 
 /*-------------------------------------------------------------*
  *                  For uncompressed images                    *
@@ -170,8 +132,8 @@ static char *generateFlatePS(const char *filein, L_COMP_DATA *cid,
 /*!
  * \brief   pixWritePSEmbed()
  *
- * \param[in]    filein    input file, all depths, colormap OK
- * \param[in]    fileout   output ps file
+ * \param[in]    filein input file, all depths, colormap OK
+ * \param[in]    fileout output ps file
  * \return  0 if OK, 1 on error
  *
  * <pre>
@@ -184,47 +146,49 @@ static char *generateFlatePS(const char *filein, L_COMP_DATA *cid,
  *          8.5 x 11.0 inch page.
  * </pre>
  */
-l_ok
+l_int32
 pixWritePSEmbed(const char  *filein,
                 const char  *fileout)
 {
-l_int32    w, h, ret;
+l_int32    w, h;
 l_float32  scale;
 FILE      *fp;
 PIX       *pix;
 
+    PROCNAME("pixWritePSEmbed");
+
     if (!filein)
-        return ERROR_INT("filein not defined", __func__, 1);
+        return ERROR_INT("filein not defined", procName, 1);
     if (!fileout)
-        return ERROR_INT("fileout not defined", __func__, 1);
+        return ERROR_INT("fileout not defined", procName, 1);
 
     if ((pix = pixRead(filein)) == NULL)
-        return ERROR_INT("image not read from file", __func__, 1);
+        return ERROR_INT("image not read from file", procName, 1);
     w = pixGetWidth(pix);
     h = pixGetHeight(pix);
     if (w * 11.0 > h * 8.5)
-        scale = 8.5f * 300.f / (l_float32)w;
+        scale = 8.5 * 300. / (l_float32)w;
     else
-        scale = 11.0f * 300.f / (l_float32)h;
+        scale = 11.0 * 300. / (l_float32)h;
 
     if ((fp = fopenWriteStream(fileout, "wb")) == NULL)
-        return ERROR_INT_1("file not opened for write", fileout, __func__, 1);
-    ret = pixWriteStreamPS(fp, pix, NULL, 0, scale);
+        return ERROR_INT("file not opened for write", procName, 1);
+    pixWriteStreamPS(fp, pix, NULL, 0, scale);
     fclose(fp);
 
     pixDestroy(&pix);
-    return ret;
+    return 0;
 }
 
 
 /*!
  * \brief   pixWriteStreamPS()
  *
- * \param[in]    fp      file stream
+ * \param[in]    fp file stream
  * \param[in]    pix
- * \param[in]    box     [optional]
- * \param[in]    res     can use 0 for default of 300 ppi
- * \param[in]    scale   to prevent scaling, use either 1.0 or 0.0
+ * \param[in]    box  [optional]
+ * \param[in]    res  can use 0 for default of 300 ppi
+ * \param[in]    scale to prevent scaling, use either 1.0 or 0.0
  * \return  0 if OK; 1 on error
  *
  * <pre>
@@ -235,7 +199,7 @@ PIX       *pix;
  *      (2) For details on use of parameters, see pixWriteStringPS().
  * </pre>
  */
-l_ok
+l_int32
 pixWriteStreamPS(FILE      *fp,
                  PIX       *pix,
                  BOX       *box,
@@ -246,22 +210,22 @@ char    *outstr;
 l_int32  length;
 PIX     *pixc;
 
+    PROCNAME("pixWriteStreamPS");
+
     if (!fp)
-        return (l_int32)ERROR_INT("stream not open", __func__, 1);
+        return (l_int32)ERROR_INT("stream not open", procName, 1);
     if (!pix)
-        return (l_int32)ERROR_INT("pix not defined", __func__, 1);
+        return (l_int32)ERROR_INT("pix not defined", procName, 1);
 
     if ((pixc = pixConvertForPSWrap(pix)) == NULL)
-        return (l_int32)ERROR_INT("pixc not made", __func__, 1);
+        return (l_int32)ERROR_INT("pixc not made", procName, 1);
 
-    if ((outstr = pixWriteStringPS(pixc, box, res, scale)) == NULL) {
-        pixDestroy(&pixc);
-        return (l_int32)ERROR_INT("outstr not made", __func__, 1);
-    }
+    outstr = pixWriteStringPS(pixc, box, res, scale);
     length = strlen(outstr);
     fwrite(outstr, 1, length, fp);
     LEPT_FREE(outstr);
     pixDestroy(&pixc);
+
     return 0;
 }
 
@@ -348,11 +312,13 @@ l_int32    wpl, psbpl, hexbytes, boxflag, bps;
 l_uint32  *line, *data;
 PIX       *pix;
 
+    PROCNAME("pixWriteStringPS");
+
     if (!pixs)
-        return (char *)ERROR_PTR("pixs not defined", __func__, NULL);
+        return (char *)ERROR_PTR("pixs not defined", procName, NULL);
 
     if ((pix = pixConvertForPSWrap(pixs)) == NULL)
-        return (char *)ERROR_PTR("pix not made", __func__, NULL);
+        return (char *)ERROR_PTR("pix not made", procName, NULL);
     pixGetDimensions(pix, &w, &h, &d);
 
         /* Get the factors by which PS scales and translates, in pts */
@@ -380,7 +346,7 @@ PIX       *pix;
     data = pixGetData(pix);
     hexbytes = 2 * psbpl * h;  /* size of ps hex array */
     if ((hexdata = (char *)LEPT_CALLOC(hexbytes + 1, sizeof(char))) == NULL)
-        return (char *)ERROR_PTR("hexdata not made", __func__, NULL);
+        return (char *)ERROR_PTR("hexdata not made", procName, NULL);
     if (d == 1 || d == 8) {
         for (i = 0, k = 0; i < h; i++) {
             line = data + i * wpl;
@@ -414,9 +380,9 @@ PIX       *pix;
 
     outstr = generateUncompressedPS(hexdata, w, h, d, psbpl, bps,
                                     xpt, ypt, wpt, hpt, boxflag);
-    pixDestroy(&pix);
     if (!outstr)
-        return (char *)ERROR_PTR("outstr not made", __func__, NULL);
+        return (char *)ERROR_PTR("outstr not made", procName, NULL);
+    pixDestroy(&pix);
     return outstr;
 }
 
@@ -425,15 +391,15 @@ PIX       *pix;
  * \brief   generateUncompressedPS()
  *
  * \param[in]    hexdata
- * \param[in]    w, h       raster image size in pixels
- * \param[in]    d          image depth in bpp; rgb is 32
- * \param[in]    psbpl      raster bytes/line, when packed to the byte boundary
- * \param[in]    bps        bits/sample: either 1 or 8
- * \param[in]    xpt, ypt   location of LL corner of image, in pts, relative
- *                          to the PostScript origin (0,0) at the LL corner
- *                          of the page
- * \param[in]    wpt, hpt   rendered image size in pts
- * \param[in]    boxflag    1 to print out bounding box hint; 0 to skip
+ * \param[in]    w, h  raster image size in pixels
+ * \param[in]    d image depth in bpp; rgb is 32
+ * \param[in]    psbpl raster bytes/line, when packed to the byte boundary
+ * \param[in]    bps bits/sample: either 1 or 8
+ * \param[in]    xpt, ypt location of LL corner of image, in pts, relative
+ *                    to the PostScript origin (0,0) at the LL corner
+ *                    of the page
+ * \param[in]    wpt, hpt rendered image size in pts
+ * \param[in]    boxflag 1 to print out bounding box hint; 0 to skip
  * \return  PS string, or NULL on error
  *
  * <pre>
@@ -455,26 +421,29 @@ generateUncompressedPS(char      *hexdata,
                        l_int32    boxflag)
 {
 char    *outstr;
-char     bigbuf[Bufsize];
+char     bigbuf[L_BUF_SIZE];
 SARRAY  *sa;
 
-    if (!hexdata)
-        return (char *)ERROR_PTR("hexdata not defined", __func__, NULL);
+    PROCNAME("generateUncompressedPS");
 
-    sa = sarrayCreate(0);
-    sarrayAddString(sa, "%!Adobe-PS", L_COPY);
+    if (!hexdata)
+        return (char *)ERROR_PTR("hexdata not defined", procName, NULL);
+
+    if ((sa = sarrayCreate(0)) == NULL)
+        return (char *)ERROR_PTR("sa not made", procName, NULL);
+    sarrayAddString(sa, (char *)"%!Adobe-PS", L_COPY);
     if (boxflag == 0) {
         snprintf(bigbuf, sizeof(bigbuf),
                  "%%%%BoundingBox: %7.2f %7.2f %7.2f %7.2f",
                  xpt, ypt, xpt + wpt, ypt + hpt);
         sarrayAddString(sa, bigbuf, L_COPY);
     } else {  /* boxflag == 1 */
-        sarrayAddString(sa, "gsave", L_COPY);
+        sarrayAddString(sa, (char *)"gsave", L_COPY);
     }
 
     if (d == 1)
         sarrayAddString(sa,
-              "{1 exch sub} settransfer    %invert binary", L_COPY);
+              (char *)"{1 exch sub} settransfer    %invert binary", L_COPY);
 
     snprintf(bigbuf, sizeof(bigbuf),
             "/bpl %d string def         %%bpl as a string", psbpl);
@@ -496,31 +465,32 @@ SARRAY  *sa;
     if (boxflag == 0) {
         if (d == 1 || d == 8)
             sarrayAddString(sa,
-                "{currentfile bpl readhexstring pop} image", L_COPY);
+                (char *)"{currentfile bpl readhexstring pop} image", L_COPY);
         else  /* d == 32 */
             sarrayAddString(sa,
-                "{currentfile bpl readhexstring pop} false 3 colorimage",
-                L_COPY);
+              (char *)"{currentfile bpl readhexstring pop} false 3 colorimage",
+              L_COPY);
     } else {  /* boxflag == 1 */
         if (d == 1 || d == 8)
             sarrayAddString(sa,
-                "{currentfile bpl readhexstring pop} bind image", L_COPY);
+              (char *)"{currentfile bpl readhexstring pop} bind image", L_COPY);
         else  /* d == 32 */
             sarrayAddString(sa,
-                "{currentfile bpl readhexstring pop} bind false 3 colorimage",
-                L_COPY);
+          (char *)"{currentfile bpl readhexstring pop} bind false 3 colorimage",
+                 L_COPY);
     }
 
     sarrayAddString(sa, hexdata, L_INSERT);
 
     if (boxflag == 0)
-        sarrayAddString(sa, "\nshowpage", L_COPY);
+        sarrayAddString(sa, (char *)"\nshowpage", L_COPY);
     else  /* boxflag == 1 */
-        sarrayAddString(sa, "\ngrestore", L_COPY);
+        sarrayAddString(sa, (char *)"\ngrestore", L_COPY);
 
-    outstr = sarrayToString(sa, 1);
+    if ((outstr = sarrayToString(sa, 1)) == NULL)
+        return (char *)ERROR_PTR("outstr not made", procName, NULL);
+
     sarrayDestroy(&sa);
-    if (!outstr) L_ERROR("outstr not made\n", __func__);
     return outstr;
 }
 
@@ -528,15 +498,16 @@ SARRAY  *sa;
 /*!
  * \brief   getScaledParametersPS()
  *
- * \param[in]    box     [optional] location of image in mils; x,y is LL corner
- * \param[in]    wpix    pix width in pixels
- * \param[in]    hpix    pix height in pixels
- * \param[in]    res     of printer; use 0 for default
- * \param[in]    scale   use 1.0 or 0.0 for no scaling
- * \param[out]   pxpt    location of llx in pts
- * \param[out]   pypt    location of lly in pts
- * \param[out]   pwpt    image width in pts
- * \param[out]   phpt    image height in pts
+ * \param[in]    box [optional] location of image in mils; with
+ *                   x,y being the LL corner
+ * \param[in]    wpix pix width in pixels
+ * \param[in]    hpix pix height in pixels
+ * \param[in]    res of printer; use 0 for default
+ * \param[in]    scale use 1.0 or 0.0 for no scaling
+ * \param[out]   pxpt location of llx in pts
+ * \param[out]   pypt location of lly in pts
+ * \param[out]   pwpt image width in pts
+ * \param[out]   phpt image height in pts
  * \return  void no arg checking
  *
  * <pre>
@@ -546,7 +517,7 @@ SARRAY  *sa;
  *      (3) If there is a box, the image is placed within it.
  * </pre>
  */
-static void
+void
 getScaledParametersPS(BOX        *box,
                       l_int32     wpix,
                       l_int32     hpix,
@@ -560,8 +531,10 @@ getScaledParametersPS(BOX        *box,
 l_int32    bx, by, bw, bh;
 l_float32  winch, hinch, xinch, yinch, fres;
 
+    PROCNAME("getScaledParametersPS");
+
     if (res == 0)
-        res = DefaultInputRes;
+        res = DEFAULT_INPUT_RES;
     fres = (l_float32)res;
 
         /* Allow the PS interpreter to scale the resolution */
@@ -573,45 +546,45 @@ l_float32  winch, hinch, xinch, yinch, fres;
     }
 
         /* Limit valid resolution interval */
-    if (res < MinRes || res > MaxRes) {
+    if (res < MIN_RES || res > MAX_RES) {
         L_WARNING("res %d out of bounds; using default res; no scaling\n",
-                  __func__, res);
-        res = DefaultInputRes;
+                  procName, res);
+        res = DEFAULT_INPUT_RES;
         fres = (l_float32)res;
     }
 
     if (!box) {  /* center on page */
         winch = (l_float32)wpix / fres;
         hinch = (l_float32)hpix / fres;
-        xinch = (8.5f - winch) / 2.f;
-        yinch = (11.0f - hinch) / 2.f;
+        xinch = (8.5 - winch) / 2.;
+        yinch = (11.0 - hinch) / 2.;
     } else {
         boxGetGeometry(box, &bx, &by, &bw, &bh);
         if (bw == 0)
             winch = (l_float32)wpix / fres;
         else
-            winch = (l_float32)bw / 1000.f;
+            winch = (l_float32)bw / 1000.;
         if (bh == 0)
             hinch = (l_float32)hpix / fres;
         else
-            hinch = (l_float32)bh / 1000.f;
-        xinch = (l_float32)bx / 1000.f;
-        yinch = (l_float32)by / 1000.f;
+            hinch = (l_float32)bh / 1000.;
+        xinch = (l_float32)bx / 1000.;
+        yinch = (l_float32)by / 1000.;
     }
 
     if (xinch < 0)
-        L_WARNING("left edge < 0.0 inch\n", __func__);
+        L_WARNING("left edge < 0.0 inch\n", procName);
     if (xinch + winch > 8.5)
-        L_WARNING("right edge > 8.5 inch\n", __func__);
+        L_WARNING("right edge > 8.5 inch\n", procName);
     if (yinch < 0.0)
-        L_WARNING("bottom edge < 0.0 inch\n", __func__);
+        L_WARNING("bottom edge < 0.0 inch\n", procName);
     if (yinch + hinch > 11.0)
-        L_WARNING("top edge > 11.0 inch\n", __func__);
+        L_WARNING("top edge > 11.0 inch\n", procName);
 
-    *pwpt = 72.f * winch;
-    *phpt = 72.f * hinch;
-    *pxpt = 72.f * xinch;
-    *pypt = 72.f * yinch;
+    *pwpt = 72. * winch;
+    *phpt = 72. * hinch;
+    *pxpt = 72. * xinch;
+    *pypt = 72. * yinch;
     return;
 }
 
@@ -619,11 +592,11 @@ l_float32  winch, hinch, xinch, yinch, fres;
 /*!
  * \brief   convertByteToHexAscii()
  *
- * \param[in]    byteval        input byte
- * \param[out]   pnib1, pnib2   two hex ascii characters
+ * \param[in]    byteval  input byte
+ * \param[out]   pnib1, pnib2  two hex ascii characters
  * \return  void
  */
-static void
+void
 convertByteToHexAscii(l_uint8  byteval,
                       char    *pnib1,
                       char    *pnib2)
@@ -640,6 +613,7 @@ l_uint8  nib;
         *pnib2 = '0' + nib;
     else
         *pnib2 = 'a' + (nib - 10);
+
     return;
 }
 
@@ -650,8 +624,8 @@ l_uint8  nib;
 /*!
  * \brief   convertJpegToPSEmbed()
  *
- * \param[in]    filein    input jpeg file
- * \param[in]    fileout   output ps file
+ * \param[in]    filein input jpeg file
+ * \param[in]    fileout output ps file
  * \return  0 if OK, 1 on error
  *
  * <pre>
@@ -664,23 +638,25 @@ l_uint8  nib;
  *          8.5 x 11.0 inch page.
  * </pre>
  */
-l_ok
+l_int32
 convertJpegToPSEmbed(const char  *filein,
                      const char  *fileout)
 {
 char         *outstr;
-l_int32       w, h, nbytes, ret;
+l_int32       w, h, nbytes;
 l_float32     xpt, ypt, wpt, hpt;
 L_COMP_DATA  *cid;
 
+    PROCNAME("convertJpegToPSEmbed");
+
     if (!filein)
-        return ERROR_INT("filein not defined", __func__, 1);
+        return ERROR_INT("filein not defined", procName, 1);
     if (!fileout)
-        return ERROR_INT("fileout not defined", __func__, 1);
+        return ERROR_INT("fileout not defined", procName, 1);
 
         /* Generate the ascii encoded jpeg data */
     if ((cid = l_generateJpegData(filein, 1)) == NULL)
-        return ERROR_INT("jpeg data not made", __func__, 1);
+        return ERROR_INT("jpeg data not made", procName, 1);
     w = cid->w;
     h = cid->h;
 
@@ -699,34 +675,33 @@ L_COMP_DATA  *cid;
         /* Generate the PS.
          * The bounding box information should be inserted (default). */
     outstr = generateJpegPS(NULL, cid, xpt, ypt, wpt, hpt, 1, 1);
-    l_CIDataDestroy(&cid);
     if (!outstr)
-        return ERROR_INT("outstr not made", __func__, 1);
+        return ERROR_INT("outstr not made", procName, 1);
     nbytes = strlen(outstr);
 
-    ret = l_binaryWrite(fileout, "w", outstr, nbytes);
+    if (l_binaryWrite(fileout, "w", outstr, nbytes))
+        return ERROR_INT("ps string not written to file", procName, 1);
     LEPT_FREE(outstr);
-    if (ret) L_ERROR("ps string not written to file\n", __func__);
-    return ret;
+    l_CIDataDestroy(&cid);
+    return 0;
 }
 
 
 /*!
  * \brief   convertJpegToPS()
  *
- * \param[in]    filein     input jpeg file
- * \param[in]    fileout    output ps file
- * \param[in]    operation  "w" for write; "a" for append
- * \param[in]    x, y       location of LL corner of image, in pixels, relative
- *                          to the PostScript origin (0,0) at the LL corner
- *                          of the page
- * \param[in]    res        resolution of the input image, in ppi;
- *                          use 0 for default
- * \param[in]    scale      scaling by printer; use 0.0 or 1.0 for no scaling
- * \param[in]    pageno     page number; must start with 1; you can use 0
- *                          if there is only one page
- * \param[in]    endpage    boolean: use TRUE if this is the last image to be
- *                          added to the page; FALSE otherwise
+ * \param[in]    filein input jpeg file
+ * \param[in]    fileout output ps file
+ * \param[in]    operation "w" for write; "a" for append
+ * \param[in]    x, y location of LL corner of image, in pixels, relative
+ *                    to the PostScript origin (0,0) at the LL corner
+ *                    of the page
+ * \param[in]    res resolution of the input image, in ppi; use 0 for default
+ * \param[in]    scale scaling by printer; use 0.0 or 1.0 for no scaling
+ * \param[in]    pageno page number; must start with 1; you can use 0
+ *                      if there is only one page
+ * \param[in]    endpage boolean: use TRUE if this is the last image to be
+ *                       added to the page; FALSE otherwise
  * \return  0 if OK, 1 on error
  *
  * <pre>
@@ -778,7 +753,7 @@ L_COMP_DATA  *cid;
  *          a page directory, which viewers use for navigation.
  * </pre>
  */
-l_ok
+l_int32
 convertJpegToPS(const char  *filein,
                 const char  *fileout,
                 const char  *operation,
@@ -792,21 +767,21 @@ convertJpegToPS(const char  *filein,
 char    *outstr;
 l_int32  nbytes;
 
+    PROCNAME("convertJpegToPS");
+
     if (!filein)
-        return ERROR_INT("filein not defined", __func__, 1);
+        return ERROR_INT("filein not defined", procName, 1);
     if (!fileout)
-        return ERROR_INT("fileout not defined", __func__, 1);
+        return ERROR_INT("fileout not defined", procName, 1);
     if (strcmp(operation, "w") && strcmp(operation, "a"))
-        return ERROR_INT("operation must be \"w\" or \"a\"", __func__, 1);
+        return ERROR_INT("operation must be \"w\" or \"a\"", procName, 1);
 
     if (convertJpegToPSString(filein, &outstr, &nbytes, x, y, res, scale,
                           pageno, endpage))
-        return ERROR_INT("ps string not made", __func__, 1);
+        return ERROR_INT("ps string not made", procName, 1);
 
-    if (l_binaryWrite(fileout, operation, outstr, nbytes)) {
-        LEPT_FREE(outstr);
-        return ERROR_INT("ps string not written to file", __func__, 1);
-    }
+    if (l_binaryWrite(fileout, operation, outstr, nbytes))
+        return ERROR_INT("ps string not written to file", procName, 1);
 
     LEPT_FREE(outstr);
     return 0;
@@ -818,19 +793,18 @@ l_int32  nbytes;
  *
  *      Generates PS string in jpeg format from jpeg file
  *
- * \param[in]    filein     input jpeg file
- * \param[out]   poutstr    PS string
- * \param[out]   pnbytes    number of bytes in PS string
- * \param[in]    x, y       location of LL corner of image, in pixels, relative
- *                          to the PostScript origin (0,0) at the LL corner
- *                           of the page
- * \param[in]    res        resolution of the input image, in ppi;
- *                          use 0 for default
- * \param[in]    scale      scaling by printer; use 0.0 or 1.0 for no scaling
- * \param[in]    pageno     page number; must start with 1; you can use 0
- *                          if there is only one page
- * \param[in]    endpage    boolean: use TRUE if this is the last image to be
- *                          added to the page; FALSE otherwise
+ * \param[in]    filein input jpeg file
+ * \param[out]   poutstr PS string
+ * \param[out]   pnbytes number of bytes in PS string
+ * \param[in]    x, y location of LL corner of image, in pixels, relative
+ *                    to the PostScript origin (0,0) at the LL corner
+ *                     of the page
+ * \param[in]    res resolution of the input image, in ppi; use 0 for default
+ * \param[in]    scale scaling by printer; use 0.0 or 1.0 for no scaling
+ * \param[in]    pageno page number; must start with 1; you can use 0
+ *                      if there is only one page
+ * \param[in]    endpage boolean: use TRUE if this is the last image to be
+ *                       added to the page; FALSE otherwise
  * \return  0 if OK, 1 on error
  *
  * <pre>
@@ -838,7 +812,7 @@ l_int32  nbytes;
  *      (1) For usage, see convertJpegToPS()
  * </pre>
  */
-static l_ok
+l_int32
 convertJpegToPSString(const char  *filein,
                       char       **poutstr,
                       l_int32     *pnbytes,
@@ -853,18 +827,20 @@ char         *outstr;
 l_float32     xpt, ypt, wpt, hpt;
 L_COMP_DATA  *cid;
 
+    PROCNAME("convertJpegToPSString");
+
     if (!poutstr)
-        return ERROR_INT("&outstr not defined", __func__, 1);
+        return ERROR_INT("&outstr not defined", procName, 1);
     if (!pnbytes)
-        return ERROR_INT("&nbytes not defined", __func__, 1);
+        return ERROR_INT("&nbytes not defined", procName, 1);
     *poutstr = NULL;
     *pnbytes = 0;
     if (!filein)
-        return ERROR_INT("filein not defined", __func__, 1);
+        return ERROR_INT("filein not defined", procName, 1);
 
         /* Generate the ascii encoded jpeg data */
     if ((cid = l_generateJpegData(filein, 1)) == NULL)
-        return ERROR_INT("jpeg data not made", __func__, 1);
+        return ERROR_INT("jpeg data not made", procName, 1);
 
         /* Get scaled location in pts.  Guess the input scan resolution
          * based on the input parameter %res, the resolution data in
@@ -875,37 +851,39 @@ L_COMP_DATA  *cid;
         if (cid->res > 0)
             res = cid->res;
         else
-            res = DefaultInputRes;
+            res = DEFAULT_INPUT_RES;
     }
 
         /* Get scaled location in pts */
     if (scale == 0.0)
         scale = 1.0;
-    xpt = scale * x * 72.f / res;
-    ypt = scale * y * 72.f / res;
-    wpt = scale * cid->w * 72.f / res;
-    hpt = scale * cid->h * 72.f / res;
+    if (res == 0)
+        res = DEFAULT_INPUT_RES;
+    xpt = scale * x * 72. / res;
+    ypt = scale * y * 72. / res;
+    wpt = scale * cid->w * 72. / res;
+    hpt = scale * cid->h * 72. / res;
 
     if (pageno == 0)
         pageno = 1;
 
 #if  DEBUG_JPEG
-    lept_stderr("w = %d, h = %d, bps = %d, spp = %d\n",
-                cid->w, cid->h, cid->bps, cid->spp);
-    lept_stderr("comp bytes = %ld, nbytes85 = %ld, ratio = %5.3f\n",
-                (unsigned long)cid->nbytescomp, (unsigned long)cid->nbytes85,
-                (l_float32)cid->nbytes85 / (l_float32)cid->nbytescomp);
-    lept_stderr("xpt = %7.2f, ypt = %7.2f, wpt = %7.2f, hpt = %7.2f\n",
-                xpt, ypt, wpt, hpt);
+    fprintf(stderr, "w = %d, h = %d, bps = %d, spp = %d\n",
+            cid->w, cid->h, cid->bps, cid->spp);
+    fprintf(stderr, "comp bytes = %ld, nbytes85 = %ld, ratio = %5.3f\n",
+            (unsigned long)cid->nbytescomp, (unsigned long)cid->nbytes85,
+           (l_float32)cid->nbytes85 / (l_float32)cid->nbytescomp);
+    fprintf(stderr, "xpt = %7.2f, ypt = %7.2f, wpt = %7.2f, hpt = %7.2f\n",
+             xpt, ypt, wpt, hpt);
 #endif   /* DEBUG_JPEG */
 
         /* Generate the PS */
     outstr = generateJpegPS(NULL, cid, xpt, ypt, wpt, hpt, pageno, endpage);
-    l_CIDataDestroy(&cid);
     if (!outstr)
-        return ERROR_INT("outstr not made", __func__, 1);
+        return ERROR_INT("outstr not made", procName, 1);
     *poutstr = outstr;
     *pnbytes = strlen(outstr);
+    l_CIDataDestroy(&cid);
     return 0;
 }
 
@@ -913,16 +891,16 @@ L_COMP_DATA  *cid;
 /*!
  * \brief   generateJpegPS()
  *
- * \param[in]    filein     [optional] input jpeg filename; can be null
- * \param[in]    cid        jpeg compressed image data
- * \param[in]    xpt, ypt   location of LL corner of image, in pts, relative
- *                          to the PostScript origin (0,0) at the LL corner
- *                          of the page
- * \param[in]    wpt, hpt   rendered image size in pts
- * \param[in]    pageno     page number; must start with 1; you can use 0
- *                          if there is only one page.
- * \param[in]    endpage    boolean: use TRUE if this is the last image to be
- *                          added to the page; FALSE otherwise
+ * \param[in]    filein [optional] input jpeg filename; can be null
+ * \param[in]    cid jpeg compressed image data
+ * \param[in]    xpt, ypt location of LL corner of image, in pts, relative
+ *                        to the PostScript origin (0,0) at the LL corner
+ *                        of the page
+ * \param[in]    wpt, hpt rendered image size in pts
+ * \param[in]    pageno page number; must start with 1; you can use 0
+ *                      if there is only one page.
+ * \param[in]    endpage boolean: use TRUE if this is the last image to be
+ *                       added to the page; FALSE otherwise
  * \return  PS string, or NULL on error
  *
  * <pre>
@@ -930,7 +908,7 @@ L_COMP_DATA  *cid;
  *      (1) Low-level function.
  * </pre>
  */
-static char *
+char *
 generateJpegPS(const char   *filein,
                L_COMP_DATA  *cid,
                l_float32     xpt,
@@ -942,25 +920,29 @@ generateJpegPS(const char   *filein,
 {
 l_int32  w, h, bps, spp;
 char    *outstr;
-char     bigbuf[Bufsize];
+char     bigbuf[L_BUF_SIZE];
 SARRAY  *sa;
 
+    PROCNAME("generateJpegPS");
+
     if (!cid)
-        return (char *)ERROR_PTR("jpeg data not defined", __func__, NULL);
+        return (char *)ERROR_PTR("jpeg data not defined", procName, NULL);
     w = cid->w;
     h = cid->h;
     bps = cid->bps;
     spp = cid->spp;
 
-    sa = sarrayCreate(50);
-    sarrayAddString(sa, "%!PS-Adobe-3.0", L_COPY);
-    sarrayAddString(sa, "%%Creator: leptonica", L_COPY);
+    if ((sa = sarrayCreate(50)) == NULL)
+        return (char *)ERROR_PTR("sa not made", procName, NULL);
+
+    sarrayAddString(sa, (char *)"%!PS-Adobe-3.0", L_COPY);
+    sarrayAddString(sa, (char *)"%%Creator: leptonica", L_COPY);
     if (filein)
         snprintf(bigbuf, sizeof(bigbuf), "%%%%Title: %s", filein);
     else
         snprintf(bigbuf, sizeof(bigbuf), "%%%%Title: Jpeg compressed PS");
     sarrayAddString(sa, bigbuf, L_COPY);
-    sarrayAddString(sa, "%%DocumentData: Clean7Bit", L_COPY);
+    sarrayAddString(sa, (char *)"%%DocumentData: Clean7Bit", L_COPY);
 
     if (var_PS_WRITE_BOUNDING_BOX == 1) {
         snprintf(bigbuf, sizeof(bigbuf),
@@ -969,15 +951,16 @@ SARRAY  *sa;
         sarrayAddString(sa, bigbuf, L_COPY);
     }
 
-    sarrayAddString(sa, "%%LanguageLevel: 2", L_COPY);
-    sarrayAddString(sa, "%%EndComments", L_COPY);
+    sarrayAddString(sa, (char *)"%%LanguageLevel: 2", L_COPY);
+    sarrayAddString(sa, (char *)"%%EndComments", L_COPY);
     snprintf(bigbuf, sizeof(bigbuf), "%%%%Page: %d %d", pageno, pageno);
     sarrayAddString(sa, bigbuf, L_COPY);
 
-    sarrayAddString(sa, "save", L_COPY);
+    sarrayAddString(sa, (char *)"save", L_COPY);
     sarrayAddString(sa,
-                    "/RawData currentfile /ASCII85Decode filter def", L_COPY);
-    sarrayAddString(sa, "/Data RawData << >> /DCTDecode filter def", L_COPY);
+           (char *)"/RawData currentfile /ASCII85Decode filter def", L_COPY);
+    sarrayAddString(sa,
+           (char *)"/Data RawData << >> /DCTDecode filter def", L_COPY);
 
     snprintf(bigbuf, sizeof(bigbuf),
         "%7.2f %7.2f translate         %%set image origin in pts", xpt, ypt);
@@ -988,13 +971,13 @@ SARRAY  *sa;
     sarrayAddString(sa, bigbuf, L_COPY);
 
     if (spp == 1)
-        sarrayAddString(sa, "/DeviceGray setcolorspace", L_COPY);
+        sarrayAddString(sa, (char *)"/DeviceGray setcolorspace", L_COPY);
     else if (spp == 3)
-        sarrayAddString(sa, "/DeviceRGB setcolorspace", L_COPY);
+        sarrayAddString(sa, (char *)"/DeviceRGB setcolorspace", L_COPY);
     else  /*spp == 4 */
-        sarrayAddString(sa, "/DeviceCMYK setcolorspace", L_COPY);
+        sarrayAddString(sa, (char *)"/DeviceCMYK setcolorspace", L_COPY);
 
-    sarrayAddString(sa, "{ << /ImageType 1", L_COPY);
+    sarrayAddString(sa, (char *)"{ << /ImageType 1", L_COPY);
     snprintf(bigbuf, sizeof(bigbuf), "     /Width %d", w);
     sarrayAddString(sa, bigbuf, L_COPY);
     snprintf(bigbuf, sizeof(bigbuf), "     /Height %d", h);
@@ -1002,24 +985,24 @@ SARRAY  *sa;
     snprintf(bigbuf, sizeof(bigbuf),
             "     /ImageMatrix [ %d 0 0 %d 0 %d ]", w, -h, h);
     sarrayAddString(sa, bigbuf, L_COPY);
-    sarrayAddString(sa, "     /DataSource Data", L_COPY);
+    sarrayAddString(sa, (char *)"     /DataSource Data", L_COPY);
     snprintf(bigbuf, sizeof(bigbuf), "     /BitsPerComponent %d", bps);
     sarrayAddString(sa, bigbuf, L_COPY);
 
     if (spp == 1)
-        sarrayAddString(sa, "     /Decode [0 1]", L_COPY);
+        sarrayAddString(sa, (char *)"     /Decode [0 1]", L_COPY);
     else if (spp == 3)
-        sarrayAddString(sa, "     /Decode [0 1 0 1 0 1]", L_COPY);
+        sarrayAddString(sa, (char *)"     /Decode [0 1 0 1 0 1]", L_COPY);
     else   /* spp == 4 */
-        sarrayAddString(sa, "     /Decode [0 1 0 1 0 1 0 1]", L_COPY);
+        sarrayAddString(sa, (char *)"     /Decode [0 1 0 1 0 1 0 1]", L_COPY);
 
-    sarrayAddString(sa, "  >> image", L_COPY);
-    sarrayAddString(sa, "  Data closefile", L_COPY);
-    sarrayAddString(sa, "  RawData flushfile", L_COPY);
+    sarrayAddString(sa, (char *)"  >> image", L_COPY);
+    sarrayAddString(sa, (char *)"  Data closefile", L_COPY);
+    sarrayAddString(sa, (char *)"  RawData flushfile", L_COPY);
     if (endpage == TRUE)
-        sarrayAddString(sa, "  showpage", L_COPY);
-    sarrayAddString(sa, "  restore", L_COPY);
-    sarrayAddString(sa, "} exec", L_COPY);
+        sarrayAddString(sa, (char *)"  showpage", L_COPY);
+    sarrayAddString(sa, (char *)"  restore", L_COPY);
+    sarrayAddString(sa, (char *)"} exec", L_COPY);
 
         /* Insert the ascii85 jpeg data; this is now owned by sa */
     sarrayAddString(sa, cid->data85, L_INSERT);
@@ -1038,8 +1021,8 @@ SARRAY  *sa;
 /*!
  * \brief   convertG4ToPSEmbed()
  *
- * \param[in]    filein    input tiff file
- * \param[in]    fileout   output ps file
+ * \param[in]    filein input tiff file
+ * \param[in]    fileout output ps file
  * \return  0 if OK, 1 on error
  *
  * <pre>
@@ -1054,22 +1037,24 @@ SARRAY  *sa;
  *      (4) We paint this through a mask, over whatever is below.
  * </pre>
  */
-l_ok
+l_int32
 convertG4ToPSEmbed(const char  *filein,
                    const char  *fileout)
 {
 char         *outstr;
-l_int32       w, h, nbytes, ret;
+l_int32       w, h, nbytes;
 l_float32     xpt, ypt, wpt, hpt;
 L_COMP_DATA  *cid;
 
+    PROCNAME("convertG4ToPSEmbed");
+
     if (!filein)
-        return ERROR_INT("filein not defined", __func__, 1);
+        return ERROR_INT("filein not defined", procName, 1);
     if (!fileout)
-        return ERROR_INT("fileout not defined", __func__, 1);
+        return ERROR_INT("fileout not defined", procName, 1);
 
     if ((cid = l_generateG4Data(filein, 1)) == NULL)
-        return ERROR_INT("g4 data not made", __func__, 1);
+        return ERROR_INT("g4 data not made", procName, 1);
     w = cid->w;
     h = cid->h;
 
@@ -1088,37 +1073,37 @@ L_COMP_DATA  *cid;
         /* Generate the PS, painting through the image mask.
          * The bounding box information should be inserted (default). */
     outstr = generateG4PS(NULL, cid, xpt, ypt, wpt, hpt, 1, 1, 1);
-    l_CIDataDestroy(&cid);
     if (!outstr)
-        return ERROR_INT("outstr not made", __func__, 1);
+        return ERROR_INT("outstr not made", procName, 1);
     nbytes = strlen(outstr);
 
-    ret = l_binaryWrite(fileout, "w", outstr, nbytes);
+    if (l_binaryWrite(fileout, "w", outstr, nbytes))
+        return ERROR_INT("ps string not written to file", procName, 1);
     LEPT_FREE(outstr);
-    if (ret) L_ERROR("ps string not written to file\n", __func__);
-    return ret;
+    l_CIDataDestroy(&cid);
+    return 0;
 }
 
 
 /*!
  * \brief   convertG4ToPS()
  *
- * \param[in]    filein     input tiff g4 file
- * \param[in]    fileout    output ps file
- * \param[in]    operation  "w" for write; "a" for append
- * \param[in]    x, y       location of LL corner of image, in pixels, relative
- *                          to the PostScript origin (0,0) at the LL corner
- *                          of the page
- * \param[in]    res        resolution of the input image, in ppi; typ. values
- *                          are 300 and 600; use 0 for automatic determination
- *                          based on image size
- * \param[in]    scale      scaling by printer; use 0.0 or 1.0 for no scaling
- * \param[in]    pageno     page number; must start with 1; you can use 0
- *                          if there is only one page.
- * \param[in]    maskflag   boolean: use TRUE if just painting through fg;
- *                          FALSE if painting both fg and bg.
- * \param[in]    endpage    boolean: use TRUE if this is the last image to be
- *                          added to the page; FALSE otherwise
+ * \param[in]    filein input tiff g4 file
+ * \param[in]    fileout output ps file
+ * \param[in]    operation "w" for write; "a" for append
+ * \param[in]    x, y location of LL corner of image, in pixels, relative
+ *                    to the PostScript origin (0,0) at the LL corner
+ *                    of the page
+ * \param[in]    res resolution of the input image, in ppi; typ. values
+ *                   are 300 and 600; use 0 for automatic determination
+ *                   based on image size
+ * \param[in]    scale scaling by printer; use 0.0 or 1.0 for no scaling
+ * \param[in]    pageno page number; must start with 1; you can use 0
+ *                      if there is only one page.
+ * \param[in]    maskflag boolean: use TRUE if just painting through fg;
+ *                        FALSE if painting both fg and bg.
+ * \param[in]    endpage boolean: use TRUE if this is the last image to be
+ *                       added to the page; FALSE otherwise
  * \return  0 if OK, 1 on error
  *
  * <pre>
@@ -1158,7 +1143,7 @@ L_COMP_DATA  *cid;
  *          a page directory, which viewers use for navigation.
  * </pre>
  */
-l_ok
+l_int32
 convertG4ToPS(const char  *filein,
               const char  *fileout,
               const char  *operation,
@@ -1171,23 +1156,25 @@ convertG4ToPS(const char  *filein,
               l_int32      endpage)
 {
 char    *outstr;
-l_int32  nbytes, ret;
+l_int32  nbytes;
+
+    PROCNAME("convertG4ToPS");
 
     if (!filein)
-        return ERROR_INT("filein not defined", __func__, 1);
+        return ERROR_INT("filein not defined", procName, 1);
     if (!fileout)
-        return ERROR_INT("fileout not defined", __func__, 1);
+        return ERROR_INT("fileout not defined", procName, 1);
     if (strcmp(operation, "w") && strcmp(operation, "a"))
-        return ERROR_INT("operation must be \"w\" or \"a\"", __func__, 1);
+        return ERROR_INT("operation must be \"w\" or \"a\"", procName, 1);
 
     if (convertG4ToPSString(filein, &outstr, &nbytes, x, y, res, scale,
                             pageno, maskflag, endpage))
-        return ERROR_INT("ps string not made", __func__, 1);
+        return ERROR_INT("ps string not made", procName, 1);
 
-    ret = l_binaryWrite(fileout, operation, outstr, nbytes);
+    if (l_binaryWrite(fileout, operation, outstr, nbytes))
+        return ERROR_INT("ps string not written to file", procName, 1);
+
     LEPT_FREE(outstr);
-    if (ret)
-        return ERROR_INT("ps string not written to file", __func__, 1);
     return 0;
 }
 
@@ -1195,22 +1182,22 @@ l_int32  nbytes, ret;
 /*!
  * \brief   convertG4ToPSString()
  *
- * \param[in]    filein     input tiff g4 file
- * \param[out]   poutstr    PS string
- * \param[out]   pnbytes    number of bytes in PS string
- * \param[in]    x, y       location of LL corner of image, in pixels, relative
- *                          to the PostScript origin (0,0) at the LL corner
- *                          of the page
- * \param[in]    res        resolution of the input image, in ppi; typ. values
- *                          are 300 and 600; use 0 for automatic determination
- *                          based on image size
- * \param[in]    scale      scaling by printer; use 0.0 or 1.0 for no scaling
- * \param[in]    pageno     page number; must start with 1; you can use 0
- *                          if there is only one page.
- * \param[in]    maskflag   boolean: use TRUE if just painting through fg;
- *                          FALSE if painting both fg and bg.
- * \param[in]    endpage    boolean: use TRUE if this is the last image to be
- *                          added to the page; FALSE otherwise
+ * \param[in]    filein input tiff g4 file
+ * \param[out]   poutstr PS string
+ * \param[out]   pnbytes number of bytes in PS string
+ * \param[in]    x, y location of LL corner of image, in pixels, relative
+ *                    to the PostScript origin (0,0) at the LL corner
+ *                    of the page
+ * \param[in]    res resolution of the input image, in ppi; typ. values
+ *                   are 300 and 600; use 0 for automatic determination
+ *                   based on image size
+ * \param[in]    scale scaling by printer; use 0.0 or 1.0 for no scaling
+ * \param[in]    pageno page number; must start with 1; you can use 0
+ *                      if there is only one page.
+ * \param[in]    maskflag boolean: use TRUE if just painting through fg;
+ *                        FALSE if painting both fg and bg.
+ * \param[in]    endpage boolean: use TRUE if this is the last image to be
+ *                       added to the page; FALSE otherwise
  * \return  0 if OK, 1 on error
  *
  * <pre>
@@ -1219,7 +1206,7 @@ l_int32  nbytes, ret;
  *      (2) For usage, see convertG4ToPS().
  * </pre>
  */
-static l_ok
+l_int32
 convertG4ToPSString(const char  *filein,
                     char       **poutstr,
                     l_int32     *pnbytes,
@@ -1235,17 +1222,19 @@ char         *outstr;
 l_float32     xpt, ypt, wpt, hpt;
 L_COMP_DATA  *cid;
 
+    PROCNAME("convertG4ToPSString");
+
     if (!poutstr)
-        return ERROR_INT("&outstr not defined", __func__, 1);
+        return ERROR_INT("&outstr not defined", procName, 1);
     if (!pnbytes)
-        return ERROR_INT("&nbytes not defined", __func__, 1);
+        return ERROR_INT("&nbytes not defined", procName, 1);
     *poutstr = NULL;
     *pnbytes = 0;
     if (!filein)
-        return ERROR_INT("filein not defined", __func__, 1);
+        return ERROR_INT("filein not defined", procName, 1);
 
     if ((cid = l_generateG4Data(filein, 1)) == NULL)
-        return ERROR_INT("g4 data not made", __func__, 1);
+        return ERROR_INT("g4 data not made", procName, 1);
 
         /* Get scaled location in pts.  Guess the input scan resolution
          * based on the input parameter %res, the resolution data in
@@ -1262,31 +1251,31 @@ L_COMP_DATA  *cid;
                 res = 600;
         }
     }
-    xpt = scale * x * 72.f / res;
-    ypt = scale * y * 72.f / res;
-    wpt = scale * cid->w * 72.f / res;
-    hpt = scale * cid->h * 72.f / res;
+    xpt = scale * x * 72. / res;
+    ypt = scale * y * 72. / res;
+    wpt = scale * cid->w * 72. / res;
+    hpt = scale * cid->h * 72. / res;
 
     if (pageno == 0)
         pageno = 1;
 
 #if  DEBUG_G4
-    lept_stderr("w = %d, h = %d, minisblack = %d\n",
-                cid->w, cid->h, cid->minisblack);
-    lept_stderr("comp bytes = %ld, nbytes85 = %ld\n",
-                (unsigned long)cid->nbytescomp, (unsigned long)cid->nbytes85);
-    lept_stderr("xpt = %7.2f, ypt = %7.2f, wpt = %7.2f, hpt = %7.2f\n",
-                xpt, ypt, wpt, hpt);
+    fprintf(stderr, "w = %d, h = %d, minisblack = %d\n",
+            cid->w, cid->h, cid->minisblack);
+    fprintf(stderr, "comp bytes = %ld, nbytes85 = %ld\n",
+            (unsigned long)cid->nbytescomp, (unsigned long)cid->nbytes85);
+    fprintf(stderr, "xpt = %7.2f, ypt = %7.2f, wpt = %7.2f, hpt = %7.2f\n",
+             xpt, ypt, wpt, hpt);
 #endif   /* DEBUG_G4 */
 
         /* Generate the PS */
     outstr = generateG4PS(NULL, cid, xpt, ypt, wpt, hpt,
                           maskflag, pageno, endpage);
-    l_CIDataDestroy(&cid);
     if (!outstr)
-        return ERROR_INT("outstr not made", __func__, 1);
+        return ERROR_INT("outstr not made", procName, 1);
     *poutstr = outstr;
     *pnbytes = strlen(outstr);
+    l_CIDataDestroy(&cid);
     return 0;
 }
 
@@ -1294,18 +1283,18 @@ L_COMP_DATA  *cid;
 /*!
  * \brief   generateG4PS()
  *
- * \param[in]    filein     [optional] input tiff g4 file; can be null
- * \param[in]    cid g4     compressed image data
- * \param[in]    xpt, ypt   location of LL corner of image, in pts, relative
- *                          to the PostScript origin (0,0) at the LL corner
- *                          of the page
- * \param[in]    wpt, hpt   rendered image size in pts
- * \param[in]    maskflag   boolean: use TRUE if just painting through fg;
- *                          FALSE if painting both fg and bg.
- * \param[in]    pageno     page number; must start with 1; you can use 0
- *                          if there is only one page.
- * \param[in]    endpage    boolean: use TRUE if this is the last image to be
- *                          added to the page; FALSE otherwise
+ * \param[in]    filein [optional] input tiff g4 file; can be null
+ * \param[in]    cid g4 compressed image data
+ * \param[in]    xpt, ypt location of LL corner of image, in pts, relative
+ *                        to the PostScript origin (0,0) at the LL corner
+ *                        of the page
+ * \param[in]    wpt, hpt rendered image size in pts
+ * \param[in]    maskflag boolean: use TRUE if just painting through fg;
+ *                        FALSE if painting both fg and bg.
+ * \param[in]    pageno page number; must start with 1; you can use 0
+ *                      if there is only one page.
+ * \param[in]    endpage boolean: use TRUE if this is the last image to be
+ *                       added to the page; FALSE otherwise
  * \return  PS string, or NULL on error
  *
  * <pre>
@@ -1313,7 +1302,7 @@ L_COMP_DATA  *cid;
  *      (1) Low-level function.
  * </pre>
  */
-static char *
+char *
 generateG4PS(const char   *filein,
              L_COMP_DATA  *cid,
              l_float32     xpt,
@@ -1326,23 +1315,27 @@ generateG4PS(const char   *filein,
 {
 l_int32  w, h;
 char    *outstr;
-char     bigbuf[Bufsize];
+char     bigbuf[L_BUF_SIZE];
 SARRAY  *sa;
 
+    PROCNAME("generateG4PS");
+
     if (!cid)
-        return (char *)ERROR_PTR("g4 data not defined", __func__, NULL);
+        return (char *)ERROR_PTR("g4 data not defined", procName, NULL);
     w = cid->w;
     h = cid->h;
 
-    sa = sarrayCreate(50);
-    sarrayAddString(sa, "%!PS-Adobe-3.0", L_COPY);
-    sarrayAddString(sa, "%%Creator: leptonica", L_COPY);
+    if ((sa = sarrayCreate(50)) == NULL)
+        return (char *)ERROR_PTR("sa not made", procName, NULL);
+
+    sarrayAddString(sa, (char *)"%!PS-Adobe-3.0", L_COPY);
+    sarrayAddString(sa, (char *)"%%Creator: leptonica", L_COPY);
     if (filein)
         snprintf(bigbuf, sizeof(bigbuf), "%%%%Title: %s", filein);
     else
         snprintf(bigbuf, sizeof(bigbuf), "%%%%Title: G4 compressed PS");
     sarrayAddString(sa, bigbuf, L_COPY);
-    sarrayAddString(sa, "%%DocumentData: Clean7Bit", L_COPY);
+    sarrayAddString(sa, (char *)"%%DocumentData: Clean7Bit", L_COPY);
 
     if (var_PS_WRITE_BOUNDING_BOX == 1) {
         snprintf(bigbuf, sizeof(bigbuf),
@@ -1351,13 +1344,13 @@ SARRAY  *sa;
         sarrayAddString(sa, bigbuf, L_COPY);
     }
 
-    sarrayAddString(sa, "%%LanguageLevel: 2", L_COPY);
-    sarrayAddString(sa, "%%EndComments", L_COPY);
+    sarrayAddString(sa, (char *)"%%LanguageLevel: 2", L_COPY);
+    sarrayAddString(sa, (char *)"%%EndComments", L_COPY);
     snprintf(bigbuf, sizeof(bigbuf), "%%%%Page: %d %d", pageno, pageno);
     sarrayAddString(sa, bigbuf, L_COPY);
 
-    sarrayAddString(sa, "save", L_COPY);
-    sarrayAddString(sa, "100 dict begin", L_COPY);
+    sarrayAddString(sa, (char *)"save", L_COPY);
+    sarrayAddString(sa, (char *)"100 dict begin", L_COPY);
 
     snprintf(bigbuf, sizeof(bigbuf),
         "%7.2f %7.2f translate         %%set image origin in pts", xpt, ypt);
@@ -1367,13 +1360,13 @@ SARRAY  *sa;
         "%7.2f %7.2f scale             %%set image size in pts", wpt, hpt);
     sarrayAddString(sa, bigbuf, L_COPY);
 
-    sarrayAddString(sa, "/DeviceGray setcolorspace", L_COPY);
+    sarrayAddString(sa, (char *)"/DeviceGray setcolorspace", L_COPY);
 
-    sarrayAddString(sa, "{", L_COPY);
+    sarrayAddString(sa, (char *)"{", L_COPY);
     sarrayAddString(sa,
-          "  /RawData currentfile /ASCII85Decode filter def", L_COPY);
-    sarrayAddString(sa, "  << ", L_COPY);
-    sarrayAddString(sa, "    /ImageType 1", L_COPY);
+          (char *)"  /RawData currentfile /ASCII85Decode filter def", L_COPY);
+    sarrayAddString(sa, (char *)"  << ", L_COPY);
+    sarrayAddString(sa, (char *)"    /ImageType 1", L_COPY);
     snprintf(bigbuf, sizeof(bigbuf), "    /Width %d", w);
     sarrayAddString(sa, bigbuf, L_COPY);
     snprintf(bigbuf, sizeof(bigbuf), "    /Height %d", h);
@@ -1381,39 +1374,39 @@ SARRAY  *sa;
     snprintf(bigbuf, sizeof(bigbuf),
              "    /ImageMatrix [ %d 0 0 %d 0 %d ]", w, -h, h);
     sarrayAddString(sa, bigbuf, L_COPY);
-    sarrayAddString(sa, "    /BitsPerComponent 1", L_COPY);
-    sarrayAddString(sa, "    /Interpolate true", L_COPY);
+    sarrayAddString(sa, (char *)"    /BitsPerComponent 1", L_COPY);
+    sarrayAddString(sa, (char *)"    /Interpolate true", L_COPY);
     if (cid->minisblack)
-        sarrayAddString(sa, "    /Decode [1 0]", L_COPY);
+        sarrayAddString(sa, (char *)"    /Decode [1 0]", L_COPY);
     else  /* miniswhite; typical for 1 bpp */
-        sarrayAddString(sa, "    /Decode [0 1]", L_COPY);
-    sarrayAddString(sa, "    /DataSource RawData", L_COPY);
-    sarrayAddString(sa, "        <<", L_COPY);
-    sarrayAddString(sa, "          /K -1", L_COPY);
+        sarrayAddString(sa, (char *)"    /Decode [0 1]", L_COPY);
+    sarrayAddString(sa, (char *)"    /DataSource RawData", L_COPY);
+    sarrayAddString(sa, (char *)"        <<", L_COPY);
+    sarrayAddString(sa, (char *)"          /K -1", L_COPY);
     snprintf(bigbuf, sizeof(bigbuf), "          /Columns %d", w);
     sarrayAddString(sa, bigbuf, L_COPY);
     snprintf(bigbuf, sizeof(bigbuf), "          /Rows %d", h);
     sarrayAddString(sa, bigbuf, L_COPY);
-    sarrayAddString(sa, "        >> /CCITTFaxDecode filter", L_COPY);
+    sarrayAddString(sa, (char *)"        >> /CCITTFaxDecode filter", L_COPY);
     if (maskflag == TRUE)  /* just paint through the fg */
-        sarrayAddString(sa, "  >> imagemask", L_COPY);
+        sarrayAddString(sa, (char *)"  >> imagemask", L_COPY);
     else  /* Paint full image */
-        sarrayAddString(sa, "  >> image", L_COPY);
-    sarrayAddString(sa, "  RawData flushfile", L_COPY);
+        sarrayAddString(sa, (char *)"  >> image", L_COPY);
+    sarrayAddString(sa, (char *)"  RawData flushfile", L_COPY);
     if (endpage == TRUE)
-        sarrayAddString(sa, "  showpage", L_COPY);
-    sarrayAddString(sa, "}", L_COPY);
+        sarrayAddString(sa, (char *)"  showpage", L_COPY);
+    sarrayAddString(sa, (char *)"}", L_COPY);
 
-    sarrayAddString(sa, "%%BeginData:", L_COPY);
-    sarrayAddString(sa, "exec", L_COPY);
+    sarrayAddString(sa, (char *)"%%BeginData:", L_COPY);
+    sarrayAddString(sa, (char *)"exec", L_COPY);
 
         /* Insert the ascii85 ccittg4 data; this is now owned by sa */
     sarrayAddString(sa, cid->data85, L_INSERT);
 
         /* Concat the trailing data */
-    sarrayAddString(sa, "%%EndData", L_COPY);
-    sarrayAddString(sa, "end", L_COPY);
-    sarrayAddString(sa, "restore", L_COPY);
+    sarrayAddString(sa, (char *)"%%EndData", L_COPY);
+    sarrayAddString(sa, (char *)"end", L_COPY);
+    sarrayAddString(sa, (char *)"restore", L_COPY);
 
     outstr = sarrayToString(sa, 1);
     sarrayDestroy(&sa);
@@ -1428,10 +1421,10 @@ SARRAY  *sa;
 /*!
  * \brief   convertTiffMultipageToPS()
  *
- * \param[in]    filein      input tiff multipage file
- * \param[in]    fileout     output ps file
- * \param[in]    fillfract   factor for filling 8.5 x 11 inch page;
- *                           use 0.0 for DefaultFillFraction
+ * \param[in]    filein input tiff multipage file
+ * \param[in]    fileout output ps file
+ * \param[in]    fillfract factor for filling 8.5 x 11 inch page;
+ *                      use 0.0 for DEFAULT_FILL_FRACTION
  * \return  0 if OK, 1 on error
  *
  * <pre>
@@ -1443,7 +1436,7 @@ SARRAY  *sa;
  *          aspect ratio.
  * </pre>
  */
-l_ok
+l_int32
 convertTiffMultipageToPS(const char  *filein,
                          const char  *fileout,
                          l_float32    fillfract)
@@ -1454,27 +1447,29 @@ l_float32  scale;
 PIX       *pix, *pixs;
 FILE      *fp;
 
+    PROCNAME("convertTiffMultipageToPS");
+
     if (!filein)
-        return ERROR_INT("filein not defined", __func__, 1);
+        return ERROR_INT("filein not defined", procName, 1);
     if (!fileout)
-        return ERROR_INT("fileout not defined", __func__, 1);
+        return ERROR_INT("fileout not defined", procName, 1);
 
     if ((fp = fopenReadStream(filein)) == NULL)
-        return ERROR_INT_1("file not found", filein, __func__, 1);
+        return ERROR_INT("file not found", procName, 1);
     istiff = fileFormatIsTiff(fp);
     if (!istiff) {
         fclose(fp);
-        return ERROR_INT_1("file not tiff format", filein, __func__, 1);
+        return ERROR_INT("file not tiff format", procName, 1);
     }
     tiffGetCount(fp, &npages);
     fclose(fp);
 
     if (fillfract == 0.0)
-        fillfract = DefaultFillFraction;
+        fillfract = DEFAULT_FILL_FRACTION;
 
     for (i = 0; i < npages; i++) {
         if ((pix = pixReadTiff(filein, i)) == NULL)
-            return ERROR_INT_1("pix not made", filein, __func__, 1);
+            return ERROR_INT("pix not made", procName, 1);
 
         pixGetDimensions(pix, &w, &h, NULL);
         if (w == 1728 && h < w)   /* it's a std res fax */
@@ -1507,8 +1502,8 @@ FILE      *fp;
 /*!
  * \brief   convertFlateToPSEmbed()
  *
- * \param[in]    filein    input file -- any format
- * \param[in]    fileout   output ps file
+ * \param[in]    filein input file -- any format
+ * \param[in]    fileout output ps file
  * \return  0 if OK, 1 on error
  *
  * <pre>
@@ -1521,22 +1516,24 @@ FILE      *fp;
  *          8.5 x 11.0 inch page.
  * </pre>
  */
-l_ok
+l_int32
 convertFlateToPSEmbed(const char  *filein,
                       const char  *fileout)
 {
 char         *outstr;
-l_int32       w, h, nbytes, ret;
+l_int32       w, h, nbytes;
 l_float32     xpt, ypt, wpt, hpt;
 L_COMP_DATA  *cid;
 
+    PROCNAME("convertFlateToPSEmbed");
+
     if (!filein)
-        return ERROR_INT("filein not defined", __func__, 1);
+        return ERROR_INT("filein not defined", procName, 1);
     if (!fileout)
-        return ERROR_INT("fileout not defined", __func__, 1);
+        return ERROR_INT("fileout not defined", procName, 1);
 
     if ((cid = l_generateFlateData(filein, 1)) == NULL)
-        return ERROR_INT("flate data not made", __func__, 1);
+        return ERROR_INT("flate data not made", procName, 1);
     w = cid->w;
     h = cid->h;
 
@@ -1555,34 +1552,33 @@ L_COMP_DATA  *cid;
         /* Generate the PS.
          * The bounding box information should be inserted (default). */
     outstr = generateFlatePS(NULL, cid, xpt, ypt, wpt, hpt, 1, 1);
-    l_CIDataDestroy(&cid);
     if (!outstr)
-        return ERROR_INT("outstr not made", __func__, 1);
+        return ERROR_INT("outstr not made", procName, 1);
     nbytes = strlen(outstr);
 
-    ret = l_binaryWrite(fileout, "w", outstr, nbytes);
+    if (l_binaryWrite(fileout, "w", outstr, nbytes))
+        return ERROR_INT("ps string not written to file", procName, 1);
     LEPT_FREE(outstr);
-    if (ret) L_ERROR("ps string not written to file\n", __func__);
-    return ret;
+    l_CIDataDestroy(&cid);
+    return 0;
 }
 
 
 /*!
  * \brief   convertFlateToPS()
  *
- * \param[in]    filein    input file -- any format
- * \param[in]    fileout    output ps file
- * \param[in]    operation  "w" for write; "a" for append
- * \param[in]    x, y       location of LL corner of image, in pixels, relative
- *                          to the PostScript origin (0,0) at the LL corner
- *                          of the page
- * \param[in]    res        resolution of the input image, in ppi;
- *                          use 0 for default
- * \param[in]    scale      scaling by printer; use 0.0 or 1.0 for no scaling
- * \param[in]    pageno     page number; must start with 1; you can use 0
- *                          if there is only one page.
- * \param[in]    endpage    boolean: use TRUE if this is the last image to be
- *                          added to the page; FALSE otherwise
+ * \param[in]    filein input file -- any format
+ * \param[in]    fileout output ps file
+ * \param[in]    operation "w" for write; "a" for append
+ * \param[in]    x, y location of LL corner of image, in pixels, relative
+ *                    to the PostScript origin (0,0) at the LL corner
+ *                    of the page
+ * \param[in]    res resolution of the input image, in ppi; use 0 for default
+ * \param[in]    scale scaling by printer; use 0.0 or 1.0 for no scaling
+ * \param[in]    pageno page number; must start with 1; you can use 0
+ *                      if there is only one page.
+ * \param[in]    endpage boolean: use TRUE if this is the last image to be
+ *                       added to the page; FALSE otherwise
  * \return  0 if OK, 1 on error
  *
  * <pre>
@@ -1633,7 +1629,7 @@ L_COMP_DATA  *cid;
  *          a page directory, which viewers use for navigation.
  * </pre>
  */
-l_ok
+l_int32
 convertFlateToPS(const char  *filein,
                  const char  *fileout,
                  const char  *operation,
@@ -1645,23 +1641,26 @@ convertFlateToPS(const char  *filein,
                  l_int32      endpage)
 {
 char    *outstr;
-l_int32  nbytes, ret;
+l_int32  nbytes;
+
+    PROCNAME("convertFlateToPS");
 
     if (!filein)
-        return ERROR_INT("filein not defined", __func__, 1);
+        return ERROR_INT("filein not defined", procName, 1);
     if (!fileout)
-        return ERROR_INT("fileout not defined", __func__, 1);
+        return ERROR_INT("fileout not defined", procName, 1);
     if (strcmp(operation, "w") && strcmp(operation, "a"))
-        return ERROR_INT("operation must be \"w\" or \"a\"", __func__, 1);
+        return ERROR_INT("operation must be \"w\" or \"a\"", procName, 1);
 
     if (convertFlateToPSString(filein, &outstr, &nbytes, x, y, res, scale,
                                pageno, endpage))
-        return ERROR_INT("ps string not made", __func__, 1);
+        return ERROR_INT("ps string not made", procName, 1);
 
-    ret = l_binaryWrite(fileout, operation, outstr, nbytes);
+    if (l_binaryWrite(fileout, operation, outstr, nbytes))
+        return ERROR_INT("ps string not written to file", procName, 1);
+
     LEPT_FREE(outstr);
-    if (ret) L_ERROR("ps string not written to file\n", __func__);
-    return ret;
+    return 0;
 }
 
 
@@ -1670,19 +1669,18 @@ l_int32  nbytes, ret;
  *
  *      Generates level 3 PS string in flate compressed format.
  *
- * \param[in]    filein    input image file
- * \param[out]   poutstr   PS string
- * \param[out]   pnbytes   number of bytes in PS string
- * \param[in]    x, y      location of LL corner of image, in pixels, relative
- *                         to the PostScript origin (0,0) at the LL corner
- *                         of the page
- * \param[in]    res       resolution of the input image, in ppi;
- *                         use 0 for default
- * \param[in]    scale     scaling by printer; use 0.0 or 1.0 for no scaling
- * \param[in]    pageno    page number; must start with 1; you can use 0
- *                         if there is only one page.
- * \param[in]    endpage   boolean: use TRUE if this is the last image to be
- *                         added to the page; FALSE otherwise
+ * \param[in]    filein input image file
+ * \param[out]   poutstr PS string
+ * \param[out]   pnbytes number of bytes in PS string
+ * \param[in]    x, y location of LL corner of image, in pixels, relative
+ *                    to the PostScript origin (0,0) at the LL corner
+ *                    of the page
+ * \param[in]    res resolution of the input image, in ppi; use 0 for default
+ * \param[in]    scale scaling by printer; use 0.0 or 1.0 for no scaling
+ * \param[in]    pageno page number; must start with 1; you can use 0
+ *                      if there is only one page.
+ * \param[in]    endpage boolean: use TRUE if this is the last image to be
+ *                       added to the page; FALSE otherwise
  * \return  0 if OK, 1 on error
  *
  * <pre>
@@ -1698,7 +1696,7 @@ l_int32  nbytes, ret;
  *  Usage:  See convertFlateToPS()
  * </pre>
  */
-static l_ok
+l_int32
 convertFlateToPSString(const char  *filein,
                        char       **poutstr,
                        l_int32     *pnbytes,
@@ -1713,17 +1711,19 @@ char         *outstr;
 l_float32     xpt, ypt, wpt, hpt;
 L_COMP_DATA  *cid;
 
+    PROCNAME("convertFlateToPSString");
+
     if (!poutstr)
-        return ERROR_INT("&outstr not defined", __func__, 1);
+        return ERROR_INT("&outstr not defined", procName, 1);
     if (!pnbytes)
-        return ERROR_INT("&nbytes not defined", __func__, 1);
+        return ERROR_INT("&nbytes not defined", procName, 1);
     *pnbytes = 0;
     *poutstr = NULL;
     if (!filein)
-        return ERROR_INT("filein not defined", __func__, 1);
+        return ERROR_INT("filein not defined", procName, 1);
 
     if ((cid = l_generateFlateData(filein, 1)) == NULL)
-        return ERROR_INT("flate data not made", __func__, 1);
+        return ERROR_INT("flate data not made", procName, 1);
 
         /* Get scaled location in pts.  Guess the input scan resolution
          * based on the input parameter %res, the resolution data in
@@ -1734,33 +1734,33 @@ L_COMP_DATA  *cid;
         if (cid->res > 0)
             res = cid->res;
         else
-            res = DefaultInputRes;
+            res = DEFAULT_INPUT_RES;
     }
-    xpt = scale * x * 72.f / res;
-    ypt = scale * y * 72.f / res;
-    wpt = scale * cid->w * 72.f / res;
-    hpt = scale * cid->h * 72.f / res;
+    xpt = scale * x * 72. / res;
+    ypt = scale * y * 72. / res;
+    wpt = scale * cid->w * 72. / res;
+    hpt = scale * cid->h * 72. / res;
 
     if (pageno == 0)
         pageno = 1;
 
 #if  DEBUG_FLATE
-    lept_stderr("w = %d, h = %d, bps = %d, spp = %d\n",
-                cid->w, cid->h, cid->bps, cid->spp);
-    lept_stderr("uncomp bytes = %ld, comp bytes = %ld, nbytes85 = %ld\n",
-                (unsigned long)cid->nbytes, (unsigned long)cid->nbytescomp,
-                (unsigned long)cid->nbytes85);
-    lept_stderr("xpt = %7.2f, ypt = %7.2f, wpt = %7.2f, hpt = %7.2f\n",
-                xpt, ypt, wpt, hpt);
+    fprintf(stderr, "w = %d, h = %d, bps = %d, spp = %d\n",
+            cid->w, cid->h, cid->bps, cid->spp);
+    fprintf(stderr, "uncomp bytes = %ld, comp bytes = %ld, nbytes85 = %ld\n",
+            (unsigned long)cid->nbytes, (unsigned long)cid->nbytescomp,
+            (unsigned long)cid->nbytes85);
+    fprintf(stderr, "xpt = %7.2f, ypt = %7.2f, wpt = %7.2f, hpt = %7.2f\n",
+             xpt, ypt, wpt, hpt);
 #endif   /* DEBUG_FLATE */
 
         /* Generate the PS */
     outstr = generateFlatePS(NULL, cid, xpt, ypt, wpt, hpt, pageno, endpage);
-    l_CIDataDestroy(&cid);
     if (!outstr)
-        return ERROR_INT("outstr not made", __func__, 1);
+        return ERROR_INT("outstr not made", procName, 1);
     *poutstr = outstr;
     *pnbytes = strlen(outstr);
+    l_CIDataDestroy(&cid);
     return 0;
 }
 
@@ -1768,19 +1768,19 @@ L_COMP_DATA  *cid;
 /*!
  * \brief   generateFlatePS()
  *
- * \param[in]    filein      [optional] input filename; can be null
- * \param[in]    cid         flate compressed image data
- * \param[in]    xpt, ypt    location of LL corner of image, in pts, relative
- *                           to the PostScript origin (0,0) at the LL corner
- *                           of the page
- * \param[in]    wpt, hpt    rendered image size in pts
- * \param[in]    pageno      page number; must start with 1; you can use 0
- *                           if there is only one page
- * \param[in]    endpage     boolean: use TRUE if this is the last image to be
- *                           added to the page; FALSE otherwise
+ * \param[in]    filein [optional] input filename; can be null
+ * \param[in]    cid flate compressed image data
+ * \param[in]    xpt, ypt location of LL corner of image, in pts, relative
+ *                        to the PostScript origin (0,0) at the LL corner
+ *                        of the page
+ * \param[in]    wpt, hpt rendered image size in pts
+ * \param[in]    pageno page number; must start with 1; you can use 0
+ *                      if there is only one page
+ * \param[in]    endpage boolean: use TRUE if this is the last image to be
+ *                       added to the page; FALSE otherwise
  * \return  PS string, or NULL on error
  */
-static char *
+char *
 generateFlatePS(const char   *filein,
                 L_COMP_DATA  *cid,
                 l_float32     xpt,
@@ -1792,25 +1792,29 @@ generateFlatePS(const char   *filein,
 {
 l_int32  w, h, bps, spp;
 char    *outstr;
-char     bigbuf[Bufsize];
+char     bigbuf[L_BUF_SIZE];
 SARRAY  *sa;
 
+    PROCNAME("generateFlatePS");
+
     if (!cid)
-        return (char *)ERROR_PTR("flate data not defined", __func__, NULL);
+        return (char *)ERROR_PTR("flate data not defined", procName, NULL);
     w = cid->w;
     h = cid->h;
     bps = cid->bps;
     spp = cid->spp;
 
-    sa = sarrayCreate(50);
-    sarrayAddString(sa, "%!PS-Adobe-3.0 EPSF-3.0", L_COPY);
-    sarrayAddString(sa, "%%Creator: leptonica", L_COPY);
+    if ((sa = sarrayCreate(50)) == NULL)
+        return (char *)ERROR_PTR("sa not made", procName, NULL);
+
+    sarrayAddString(sa, (char *)"%!PS-Adobe-3.0 EPSF-3.0", L_COPY);
+    sarrayAddString(sa, (char *)"%%Creator: leptonica", L_COPY);
     if (filein)
         snprintf(bigbuf, sizeof(bigbuf), "%%%%Title: %s", filein);
     else
         snprintf(bigbuf, sizeof(bigbuf), "%%%%Title: Flate compressed PS");
     sarrayAddString(sa, bigbuf, L_COPY);
-    sarrayAddString(sa, "%%DocumentData: Clean7Bit", L_COPY);
+    sarrayAddString(sa, (char *)"%%DocumentData: Clean7Bit", L_COPY);
 
     if (var_PS_WRITE_BOUNDING_BOX == 1) {
         snprintf(bigbuf, sizeof(bigbuf),
@@ -1819,12 +1823,12 @@ SARRAY  *sa;
         sarrayAddString(sa, bigbuf, L_COPY);
     }
 
-    sarrayAddString(sa, "%%LanguageLevel: 3", L_COPY);
-    sarrayAddString(sa, "%%EndComments", L_COPY);
+    sarrayAddString(sa, (char *)"%%LanguageLevel: 3", L_COPY);
+    sarrayAddString(sa, (char *)"%%EndComments", L_COPY);
     snprintf(bigbuf, sizeof(bigbuf), "%%%%Page: %d %d", pageno, pageno);
     sarrayAddString(sa, bigbuf, L_COPY);
 
-    sarrayAddString(sa, "save", L_COPY);
+    sarrayAddString(sa, (char *)"save", L_COPY);
     snprintf(bigbuf, sizeof(bigbuf),
            "%7.2f %7.2f translate         %%set image origin in pts", xpt, ypt);
     sarrayAddString(sa, bigbuf, L_COPY);
@@ -1839,21 +1843,21 @@ SARRAY  *sa;
                  "[ /Indexed /DeviceRGB %d          %%set colormap type/size",
                  cid->ncolors - 1);
         sarrayAddString(sa, bigbuf, L_COPY);
-        sarrayAddString(sa, "  <~", L_COPY);
+        sarrayAddString(sa, (char *)"  <~", L_COPY);
         sarrayAddString(sa, cid->cmapdata85, L_INSERT);
-        sarrayAddString(sa, "  ] setcolorspace", L_COPY);
+        sarrayAddString(sa, (char *)"  ] setcolorspace", L_COPY);
     } else if (spp == 1) {
-        sarrayAddString(sa, "/DeviceGray setcolorspace", L_COPY);
+        sarrayAddString(sa, (char *)"/DeviceGray setcolorspace", L_COPY);
     } else {  /* spp == 3 */
-        sarrayAddString(sa, "/DeviceRGB setcolorspace", L_COPY);
+        sarrayAddString(sa, (char *)"/DeviceRGB setcolorspace", L_COPY);
     }
 
     sarrayAddString(sa,
-                    "/RawData currentfile /ASCII85Decode filter def", L_COPY);
+              (char *)"/RawData currentfile /ASCII85Decode filter def", L_COPY);
     sarrayAddString(sa,
-                    "/Data RawData << >> /FlateDecode filter def", L_COPY);
+              (char *)"/Data RawData << >> /FlateDecode filter def", L_COPY);
 
-    sarrayAddString(sa, "{ << /ImageType 1", L_COPY);
+    sarrayAddString(sa, (char *)"{ << /ImageType 1", L_COPY);
     snprintf(bigbuf, sizeof(bigbuf), "     /Width %d", w);
     sarrayAddString(sa, bigbuf, L_COPY);
     snprintf(bigbuf, sizeof(bigbuf), "     /Height %d", h);
@@ -1865,24 +1869,24 @@ SARRAY  *sa;
     sarrayAddString(sa, bigbuf, L_COPY);
 
     if (cid->cmapdata85) {
-        sarrayAddString(sa, "     /Decode [0 255]", L_COPY);
+        sarrayAddString(sa, (char *)"     /Decode [0 255]", L_COPY);
     } else if (spp == 1) {
         if (bps == 1)  /* miniswhite photometry */
-            sarrayAddString(sa, "     /Decode [1 0]", L_COPY);
+            sarrayAddString(sa, (char *)"     /Decode [1 0]", L_COPY);
         else  /* bps > 1 */
-            sarrayAddString(sa, "     /Decode [0 1]", L_COPY);
+            sarrayAddString(sa, (char *)"     /Decode [0 1]", L_COPY);
     } else {  /* spp == 3 */
-        sarrayAddString(sa, "     /Decode [0 1 0 1 0 1]", L_COPY);
+        sarrayAddString(sa, (char *)"     /Decode [0 1 0 1 0 1]", L_COPY);
     }
 
-    sarrayAddString(sa, "     /DataSource Data", L_COPY);
-    sarrayAddString(sa, "  >> image", L_COPY);
-    sarrayAddString(sa, "  Data closefile", L_COPY);
-    sarrayAddString(sa, "  RawData flushfile", L_COPY);
+    sarrayAddString(sa, (char *)"     /DataSource Data", L_COPY);
+    sarrayAddString(sa, (char *)"  >> image", L_COPY);
+    sarrayAddString(sa, (char *)"  Data closefile", L_COPY);
+    sarrayAddString(sa, (char *)"  RawData flushfile", L_COPY);
     if (endpage == TRUE)
-        sarrayAddString(sa, "  showpage", L_COPY);
-    sarrayAddString(sa, "  restore", L_COPY);
-    sarrayAddString(sa, "} exec", L_COPY);
+        sarrayAddString(sa, (char *)"  showpage", L_COPY);
+    sarrayAddString(sa, (char *)"  restore", L_COPY);
+    sarrayAddString(sa, (char *)"} exec", L_COPY);
 
         /* Insert the ascii85 gzipped data; this is now owned by sa */
     sarrayAddString(sa, cid->data85, L_INSERT);
@@ -1902,12 +1906,12 @@ SARRAY  *sa;
 /*!
  * \brief   pixWriteMemPS()
  *
- * \param[out]   pdata    data of tiff compressed image
- * \param[out]   psize    size of returned data
+ * \param[out]   pdata data of tiff compressed image
+ * \param[out]   psize size of returned data
  * \param[in]    pix
- * \param[in]    box      [optional]
- * \param[in]    res      can use 0 for default of 300 ppi
- * \param[in]    scale    to prevent scaling, use either 1.0 or 0.0
+ * \param[in]    box  [optional]
+ * \param[in]    res  can use 0 for default of 300 ppi
+ * \param[in]    scale to prevent scaling, use either 1.0 or 0.0
  * \return  0 if OK, 1 on error
  *
  * <pre>
@@ -1917,7 +1921,7 @@ SARRAY  *sa;
  *          writes uncompressed image data to memory.
  * </pre>
  */
-l_ok
+l_int32
 pixWriteMemPS(l_uint8  **pdata,
               size_t    *psize,
               PIX       *pix,
@@ -1925,12 +1929,14 @@ pixWriteMemPS(l_uint8  **pdata,
               l_int32    res,
               l_float32  scale)
 {
+    PROCNAME("pixWriteMemPS");
+
     if (!pdata)
-        return ERROR_INT("&data not defined", __func__, 1 );
+        return ERROR_INT("&data not defined", procName, 1 );
     if (!psize)
-        return ERROR_INT("&size not defined", __func__, 1 );
+        return ERROR_INT("&size not defined", procName, 1 );
     if (!pix)
-        return ERROR_INT("&pix not defined", __func__, 1 );
+        return ERROR_INT("&pix not defined", procName, 1 );
 
     *pdata = (l_uint8 *)pixWriteStringPS(pix, box, res, scale);
     *psize = strlen((char *)(*pdata));
@@ -1944,11 +1950,11 @@ pixWriteMemPS(l_uint8  **pdata,
 /*!
  * \brief   getResLetterPage()
  *
- * \param[in]    w           image width, pixels
- * \param[in]    h           image height, pixels
- * \param[in]    fillfract   fraction in linear dimension of full page,
- *                           not to be exceeded; use 0 for default
- * \return  resolution
+ * \param[in]    w image width, pixels
+ * \param[in]    h image height, pixels
+ * \param[in]    fillfract fraction in linear dimension of full page, not
+ *                         to be exceeded; use 0 for default
+ * \return  0 if OK, 1 on error
  */
 l_int32
 getResLetterPage(l_int32    w,
@@ -1958,9 +1964,9 @@ getResLetterPage(l_int32    w,
 l_int32  resw, resh, res;
 
     if (fillfract == 0.0)
-        fillfract = DefaultFillFraction;
-    resw = (l_int32)((w * 72.) / (LetterWidth * fillfract));
-    resh = (l_int32)((h * 72.) / (LetterHeight * fillfract));
+        fillfract = DEFAULT_FILL_FRACTION;
+    resw = (l_int32)((w * 72.) / (LETTER_WIDTH * fillfract));
+    resh = (l_int32)((h * 72.) / (LETTER_HEIGHT * fillfract));
     res = L_MAX(resw, resh);
     return res;
 }
@@ -1969,11 +1975,11 @@ l_int32  resw, resh, res;
 /*!
  * \brief   getResA4Page()
  *
- * \param[in]    w           image width, pixels
- * \param[in]    h           image height, pixels
- * \param[in]    fillfract   fraction in linear dimension of full page,
- *                           not to be exceeded; use 0 for default
- * \return  resolution
+ * \param[in]    w image width, pixels
+ * \param[in]    h image height, pixels
+ * \param[in]    fillfract fraction in linear dimension of full page, not
+ *                        to be exceeded; use 0 for default
+ * \return  0 if OK, 1 on error
  */
 l_int32
 getResA4Page(l_int32    w,
@@ -1983,9 +1989,9 @@ getResA4Page(l_int32    w,
 l_int32  resw, resh, res;
 
     if (fillfract == 0.0)
-        fillfract = DefaultFillFraction;
-    resw = (l_int32)((w * 72.) / (A4Width * fillfract));
-    resh = (l_int32)((h * 72.) / (A4Height * fillfract));
+        fillfract = DEFAULT_FILL_FRACTION;
+    resw = (l_int32)((w * 72.) / (A4_WIDTH * fillfract));
+    resh = (l_int32)((h * 72.) / (A4_HEIGHT * fillfract));
     res = L_MAX(resw, resh);
     return res;
 }

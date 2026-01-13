@@ -37,38 +37,35 @@
  *      Works on palette images of 2, 4 and 8 bpp
  */
 
-#ifdef HAVE_CONFIG_H
-#include <config_auto.h>
-#endif  /* HAVE_CONFIG_H */
-
 #include "allheaders.h"
 
 int main(int    argc,
          char **argv)
 {
-char     *filein, *fileout;
-l_int32   type, numcolors;
-PIX      *pixs, *pixd;
-PIXCMAP  *cmap;
+char        *filein, *fileout;
+l_int32      type, numcolors;
+PIX         *pixs, *pixd;
+PIXCMAP     *cmap;
+static char  mainName[] = "removecmap";
 
     if (argc != 4)
         return ERROR_INT("Syntax:  removecmap filein type fileout",
-                         __func__, 1);
+                         mainName, 1);
+
     filein = argv[1];
     type = atoi(argv[2]);
     fileout = argv[3];
-    setLeptDebugOK(1);
 
     if ((pixs = pixRead(filein)) == NULL)
-        return ERROR_INT("pixs not made", __func__, 1);
+        return ERROR_INT("pixs not made", mainName, 1);
 
-    lept_stderr(" depth = %d\n", pixGetDepth(pixs));
+    fprintf(stderr, " depth = %d\n", pixGetDepth(pixs));
     if ((cmap = pixGetColormap(pixs)) != NULL) {
         numcolors = pixcmapGetCount(cmap);
         pixcmapWriteStream(stderr, cmap);
-        lept_stderr(" colormap found; num colors = %d\n", numcolors);
+        fprintf(stderr, " colormap found; num colors = %d\n", numcolors);
     } else {
-        lept_stderr(" no colormap\n");
+        fprintf(stderr, " no colormap\n");
     }
 
     pixd = pixRemoveColormap(pixs, type);

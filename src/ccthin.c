@@ -35,10 +35,6 @@
  * </pre>
  */
 
-#ifdef HAVE_CONFIG_H
-#include <config_auto.h>
-#endif  /* HAVE_CONFIG_H */
-
 #include "allheaders.h"
 
     /* ------------------------------------------------------------
@@ -56,11 +52,11 @@
 /*!
  * \brief   pixaThinConnected()
  *
- * \param[in]   pixas          of 1 bpp pix
- * \param[in]   type           L_THIN_FG, L_THIN_BG
- * \param[in]   connectivity   4 or 8
- * \param[in]   maxiters       max number of iters allowed;
- *                             use 0 to iterate until completion
+ * \param[in]    pixas  of 1 bpp pix
+ * \param[in]    type L_THIN_FG, L_THIN_BG
+ * \param[in]    connectivity 4 or 8
+ * \param[in]    maxiters max number of iters allowed; use 0 to iterate
+ *                        until completion
  * \return  pixds, or NULL on error
  *
  * <pre>
@@ -74,22 +70,24 @@ pixaThinConnected(PIXA    *pixas,
                   l_int32  connectivity,
                   l_int32  maxiters)
 {
-l_int32  i, n, d, same;
+l_int32  i, n, d;
 PIX     *pix1, *pix2;
 PIXA    *pixad;
 SELA    *sela;
 
+    PROCNAME("pixaThinConnected");
+
     if (!pixas)
-        return (PIXA *)ERROR_PTR("pixas not defined", __func__, NULL);
+        return (PIXA *)ERROR_PTR("pixas not defined", procName, NULL);
     if (type != L_THIN_FG && type != L_THIN_BG)
-        return (PIXA *)ERROR_PTR("invalid fg/bg type", __func__, NULL);
+        return (PIXA *)ERROR_PTR("invalid fg/bg type", procName, NULL);
     if (connectivity != 4 && connectivity != 8)
-        return (PIXA *)ERROR_PTR("connectivity not 4 or 8", __func__, NULL);
+        return (PIXA *)ERROR_PTR("connectivity not 4 or 8", procName, NULL);
     if (maxiters == 0) maxiters = 10000;
 
-    pixaVerifyDepth(pixas, &same, &d);
+    pixaVerifyDepth(pixas, &d);
     if (d != 1)
-        return (PIXA *)ERROR_PTR("pix are not all 1 bpp", __func__, NULL);
+        return (PIXA *)ERROR_PTR("pix are not all 1 bpp", procName, NULL);
 
     if (connectivity == 4)
         sela = selaMakeThinSets(1, 0);
@@ -113,11 +111,11 @@ SELA    *sela;
 /*!
  * \brief   pixThinConnected()
  *
- * \param[in]   pixs           1 bpp
- * \param[in]   type           L_THIN_FG, L_THIN_BG
- * \param[in]   connectivity   4 or 8
- * \param[in]   maxiters       max number of iters allowed;
- *                             use 0 to iterate until completion
+ * \param[in]    pixs 1 bpp
+ * \param[in]    type L_THIN_FG, L_THIN_BG
+ * \param[in]    connectivity 4 or 8
+ * \param[in]    maxiters max number of iters allowed; use 0 to iterate
+ *                        until completion
  * \return  pixd, or NULL on error
  *
  * <pre>
@@ -165,14 +163,16 @@ pixThinConnected(PIX     *pixs,
 PIX   *pixd;
 SELA  *sela;
 
+    PROCNAME("pixThinConnected");
+
     if (!pixs)
-        return (PIX *)ERROR_PTR("pixs not defined", __func__, NULL);
+        return (PIX *)ERROR_PTR("pixs not defined", procName, NULL);
     if (pixGetDepth(pixs) != 1)
-        return (PIX *)ERROR_PTR("pixs not 1 bpp", __func__, NULL);
+        return (PIX *)ERROR_PTR("pixs not 1 bpp", procName, NULL);
     if (type != L_THIN_FG && type != L_THIN_BG)
-        return (PIX *)ERROR_PTR("invalid fg/bg type", __func__, NULL);
+        return (PIX *)ERROR_PTR("invalid fg/bg type", procName, NULL);
     if (connectivity != 4 && connectivity != 8)
-        return (PIX *)ERROR_PTR("connectivity not 4 or 8", __func__, NULL);
+        return (PIX *)ERROR_PTR("connectivity not 4 or 8", procName, NULL);
     if (maxiters == 0) maxiters = 10000;
 
     if (connectivity == 4)
@@ -190,11 +190,11 @@ SELA  *sela;
 /*!
  * \brief   pixThinConnectedBySet()
  *
- * \param[in]   pixs       1 bpp
- * \param[in]   type       L_THIN_FG, L_THIN_BG
- * \param[in]   sela       of Sels for parallel composite HMTs
- * \param[in]   maxiters   max number of iters allowed;
- *                         use 0 to iterate until completion
+ * \param[in]    pixs 1 bpp
+ * \param[in]    type L_THIN_FG, L_THIN_BG
+ * \param[in]    sela of Sels for parallel composite HMTs
+ * \param[in]    maxiters max number of iters allowed; use 0 to iterate
+ *                        until completion
  * \return  pixd, or NULL on error
  *
  * <pre>
@@ -228,14 +228,16 @@ PIX    **pixhmt;  /* array owned by pixahmt; do not destroy! */
 PIX     *pix1, *pix2, *pixd;
 SEL     *sel, *selr;
 
+    PROCNAME("pixThinConnectedBySet");
+
     if (!pixs)
-        return (PIX *)ERROR_PTR("pixs not defined", __func__, NULL);
+        return (PIX *)ERROR_PTR("pixs not defined", procName, NULL);
     if (pixGetDepth(pixs) != 1)
-        return (PIX *)ERROR_PTR("pixs not 1 bpp", __func__, NULL);
+        return (PIX *)ERROR_PTR("pixs not 1 bpp", procName, NULL);
     if (type != L_THIN_FG && type != L_THIN_BG)
-        return (PIX *)ERROR_PTR("invalid fg/bg type", __func__, NULL);
+        return (PIX *)ERROR_PTR("invalid fg/bg type", procName, NULL);
     if (!sela)
-        return (PIX *)ERROR_PTR("sela not defined", __func__, NULL);
+        return (PIX *)ERROR_PTR("sela not defined", procName, NULL);
     if (maxiters == 0) maxiters = 10000;
 
         /* Set up array of temp pix to hold hmts */
@@ -248,7 +250,7 @@ SEL     *sel, *selr;
     pixhmt = pixaGetPixArray(pixahmt);
     if (!pixhmt) {
         pixaDestroy(&pixahmt);
-        return (PIX *)ERROR_PTR("pixhmt array not made", __func__, NULL);
+        return (PIX *)ERROR_PTR("pixhmt array not made", procName, NULL);
     }
 
         /* Set up initial image for fg thinning */
@@ -274,7 +276,7 @@ SEL     *sel, *selr;
         pixEqual(pixd, pix1, &same);
         pixDestroy(&pix1);
         if (same) {
-/*            L_INFO("%d iterations to completion\n", __func__, i); */
+/*            L_INFO("%d iterations to completion\n", procName, i); */
             break;
         }
     }
@@ -309,8 +311,8 @@ SEL     *sel, *selr;
 /*!
  * \brief   selaMakeThinSets()
  *
- * \param[in]   index   into specific sets
- * \param[in]   debug   1 to output display of sela
+ * \param[in]    index  into specific sets
+ * \param[in]    debug  1 to output display of sela
  * \return  sela, or NULL on error
  *
  * <pre>
@@ -342,8 +344,10 @@ selaMakeThinSets(l_int32  index,
 SEL   *sel;
 SELA  *sela1, *sela2, *sela3;
 
+    PROCNAME("selaMakeThinSets");
+
     if (index < 1 || index > 11)
-        return (SELA *)ERROR_PTR("invalid index", __func__, NULL);
+        return (SELA *)ERROR_PTR("invalid index", procName, NULL);
 
     sela2 = selaCreate(4);
     switch(index)
@@ -466,3 +470,4 @@ SELA  *sela1, *sela2, *sela3;
     selaDestroy(&sela1);
     return sela2;
 }
+

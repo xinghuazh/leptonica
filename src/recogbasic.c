@@ -34,8 +34,6 @@
  *         L_RECOG            *recogCreateFromPixaNoFinish()
  *         L_RECOG            *recogCreate()
  *         void                recogDestroy()
- *
- *      Recog accessors
  *         l_int32             recogGetCount()
  *         l_int32             recogSetParams()
  *         static l_int32      recogGetCharsetSize()
@@ -186,24 +184,21 @@
  * </pre>
  */
 
-#ifdef HAVE_CONFIG_H
-#include <config_auto.h>
-#endif  /* HAVE_CONFIG_H */
-
 #include <string.h>
 #include "allheaders.h"
 
-static const l_int32    MaxExamplesInClass = 256;
+static const l_int32  INITIAL_PTR_ARRAYSIZE = 20;  /* n'import quoi */
+static const l_int32  MAX_EXAMPLES_IN_CLASS = 256;
 
     /* Default recog parameters that can be changed */
-static const l_int32    DefaultCharsetType = L_ARABIC_NUMERALS;
-static const l_int32    DefaultMinNopad = 1;
-static const l_float32  DefaultMaxWHRatio = 3.0f;  /* max allowed w/h
+static const l_int32    DEFAULT_CHARSET_TYPE = L_ARABIC_NUMERALS;
+static const l_int32    DEFAULT_MIN_NOPAD = 1;
+static const l_float32  DEFAULT_MAX_WH_RATIO = 3.0;  /* max allowed w/h
                                     ratio for a component to be split  */
-static const l_float32  DefaultMaxHTRatio = 2.6f;  /* max allowed ratio of
+static const l_float32  DEFAULT_MAX_HT_RATIO = 2.6;  /* max allowed ratio of
                                max/min unscaled averaged template heights  */
-static const l_int32    DefaultThreshold = 150;  /* for binarization */
-static const l_int32    DefaultMaxYShift = 1;  /* for identification */
+static const l_int32    DEFAULT_THRESHOLD = 150;  /* for binarization */
+static const l_int32    DEFAULT_MAXYSHIFT = 1;  /* for identification */
 
     /* Static functions */
 static l_int32 recogGetCharsetSize(l_int32 type);
@@ -217,12 +212,12 @@ static l_int32 recogAddAllSamples(L_RECOG **precog, PIXAA *paa, l_int32 debug);
 /*!
  * \brief   recogCreateFromRecog()
  *
- * \param[in]    recs        source recog with arbitrary input parameters
- * \param[in]    scalew      scale all widths to this; use 0 otherwise
- * \param[in]    scaleh      scale all heights to this; use 0 otherwise
- * \param[in]    linew       width of normalized strokes; use 0 to skip
- * \param[in]    threshold   for binarization; typically ~128
- * \param[in]    maxyshift   from nominal centroid alignment; default is 1
+ * \param[in]    recs source recog with arbitrary input parameters
+ * \param[in]    scalew  scale all widths to this; use 0 otherwise
+ * \param[in]    scaleh  scale all heights to this; use 0 otherwise
+ * \param[in]    linew   width of normalized strokes; use 0 to skip
+ * \param[in]    threshold for binarization; typically ~128
+ * \param[in]    maxyshift from nominal centroid alignment; default is 1
  * \return  recd, or NULL on error
  *
  * <pre>
@@ -234,18 +229,20 @@ static l_int32 recogAddAllSamples(L_RECOG **precog, PIXAA *paa, l_int32 debug);
  * </pre>
  */
 L_RECOG *
-recogCreateFromRecog(L_RECOG  *recs,
-                     l_int32   scalew,
-                     l_int32   scaleh,
-                     l_int32   linew,
-                     l_int32   threshold,
-                     l_int32   maxyshift)
+recogCreateFromRecog(L_RECOG     *recs,
+                     l_int32      scalew,
+                     l_int32      scaleh,
+                     l_int32      linew,
+                     l_int32      threshold,
+                     l_int32      maxyshift)
 {
 L_RECOG  *recd;
 PIXA     *pixa;
 
+    PROCNAME("recogCreateFromRecog");
+
     if (!recs)
-        return (L_RECOG *)ERROR_PTR("recs not defined", __func__, NULL);
+        return (L_RECOG *)ERROR_PTR("recs not defined", procName, NULL);
 
     pixa = recogExtractPixa(recs);
     recd = recogCreateFromPixa(pixa, scalew, scaleh, linew, threshold,
@@ -258,12 +255,12 @@ PIXA     *pixa;
 /*!
  * \brief   recogCreateFromPixa()
  *
- * \param[in]    pixa         of labeled, 1 bpp images
- * \param[in]    scalew       scale all widths to this; use 0 otherwise
- * \param[in]    scaleh       scale all heights to this; use 0 otherwise
- * \param[in]    linew        width of normalized strokes; use 0 to skip
- * \param[in]    threshold    for binarization; typically ~150
- * \param[in]    maxyshift    from nominal centroid alignment; default is 1
+ * \param[in]    pixa of labeled, 1 bpp images
+ * \param[in]    scalew  scale all widths to this; use 0 otherwise
+ * \param[in]    scaleh  scale all heights to this; use 0 otherwise
+ * \param[in]    linew   width of normalized strokes; use 0 to skip
+ * \param[in]    threshold for binarization; typically ~150
+ * \param[in]    maxyshift from nominal centroid alignment; default is 1
  * \return  recog, or NULL on error
  *
  * <pre>
@@ -288,17 +285,19 @@ recogCreateFromPixa(PIXA    *pixa,
 {
 L_RECOG  *recog;
 
+    PROCNAME("recogCreateFromPixa");
+
     if (!pixa)
-        return (L_RECOG *)ERROR_PTR("pixa not defined", __func__, NULL);
+        return (L_RECOG *)ERROR_PTR("pixa not defined", procName, NULL);
 
     recog = recogCreateFromPixaNoFinish(pixa, scalew, scaleh, linew,
                                         threshold, maxyshift);
     if (!recog)
-        return (L_RECOG *)ERROR_PTR("recog not made", __func__, NULL);
+        return (L_RECOG *)ERROR_PTR("recog not made", procName, NULL);
 
     recogTrainingFinished(&recog, 1, -1, -1.0);
     if (!recog)
-        return (L_RECOG *)ERROR_PTR("bad templates", __func__, NULL);
+        return (L_RECOG *)ERROR_PTR("bad templates", procName, NULL);
     return recog;
 }
 
@@ -306,12 +305,12 @@ L_RECOG  *recog;
 /*!
  * \brief   recogCreateFromPixaNoFinish()
  *
- * \param[in]    pixa         of labeled, 1 bpp images
- * \param[in]    scalew       scale all widths to this; use 0 otherwise
- * \param[in]    scaleh       scale all heights to this; use 0 otherwise
- * \param[in]    linew        width of normalized strokes; use 0 to skip
- * \param[in]    threshold    for binarization; typically ~150
- * \param[in]    maxyshift    from nominal centroid alignment; default is 1
+ * \param[in]    pixa of labeled, 1 bpp images
+ * \param[in]    scalew  scale all widths to this; use 0 otherwise
+ * \param[in]    scaleh  scale all heights to this; use 0 otherwise
+ * \param[in]    linew   width of normalized strokes; use 0 to skip
+ * \param[in]    threshold for binarization; typically ~150
+ * \param[in]    maxyshift from nominal centroid alignment; default is 1
  * \return  recog, or NULL on error
  *
  * <pre>
@@ -331,35 +330,36 @@ recogCreateFromPixaNoFinish(PIXA    *pixa,
                             l_int32  maxyshift)
 {
 char     *text;
-l_int32   full, n, i, ntext, same, maxd;
+l_int32   full, n, i, ntext;
 PIX      *pix;
 L_RECOG  *recog;
 
+    PROCNAME("recogCreateFromPixaNoFinish");
+
     if (!pixa)
-        return (L_RECOG *)ERROR_PTR("pixa not defined", __func__, NULL);
-    pixaVerifyDepth(pixa, &same, &maxd);
-    if (maxd > 1)
-        return (L_RECOG *)ERROR_PTR("not all pix are 1 bpp", __func__, NULL);
+        return (L_RECOG *)ERROR_PTR("pixa not defined", procName, NULL);
+    if (pixaVerifyDepth(pixa, NULL) != 1)
+        return (L_RECOG *)ERROR_PTR("not all pix are 1 bpp", procName, NULL);
 
     pixaIsFull(pixa, &full, NULL);
     if (!full)
-        return (L_RECOG *)ERROR_PTR("not all pix are present", __func__, NULL);
+        return (L_RECOG *)ERROR_PTR("not all pix are present", procName, NULL);
 
     n = pixaGetCount(pixa);
     pixaCountText(pixa, &ntext);
     if (ntext == 0)
-        return (L_RECOG *)ERROR_PTR("no pix have text strings", __func__, NULL);
+        return (L_RECOG *)ERROR_PTR("no pix have text strings", procName, NULL);
     if (ntext < n)
-        L_ERROR("%d text strings < %d pix\n", __func__, ntext, n);
+        L_ERROR("%d text strings < %d pix\n", procName, ntext, n);
 
     recog = recogCreate(scalew, scaleh, linew, threshold, maxyshift);
     if (!recog)
-        return (L_RECOG *)ERROR_PTR("recog not made", __func__, NULL);
+        return (L_RECOG *)ERROR_PTR("recog not made", procName, NULL);
     for (i = 0; i < n; i++) {
         pix = pixaGetPix(pixa, i, L_CLONE);
         text = pixGetText(pix);
         if (!text || strlen(text) == 0) {
-            L_ERROR("pix[%d] has no text\n", __func__, i);
+            L_ERROR("pix[%d] has no text\n", procName, i);
             pixDestroy(&pix);
             continue;
         }
@@ -374,11 +374,11 @@ L_RECOG  *recog;
 /*!
  * \brief   recogCreate()
  *
- * \param[in]    scalew       scale all widths to this; use 0 otherwise
- * \param[in]    scaleh       scale all heights to this; use 0 otherwise
- * \param[in]    linew        width of normalized strokes; use 0 to skip
- * \param[in]    threshold    for binarization; typically ~128; 0 for default
- * \param[in]    maxyshift    from nominal centroid alignment; default is 1
+ * \param[in]    scalew  scale all widths to this; use 0 otherwise
+ * \param[in]    scaleh  scale all heights to this; use 0 otherwise
+ * \param[in]    linew   width of normalized strokes; use 0 to skip
+ * \param[in]    threshold for binarization; typically ~128; 0 for default
+ * \param[in]    maxyshift from nominal centroid alignment; default is 1
  * \return  recog, or NULL on error
  *
  * <pre>
@@ -402,34 +402,37 @@ L_RECOG  *recog;
  * </pre>
  */
 L_RECOG *
-recogCreate(l_int32  scalew,
-            l_int32  scaleh,
-            l_int32  linew,
-            l_int32  threshold,
-            l_int32  maxyshift)
+recogCreate(l_int32      scalew,
+            l_int32      scaleh,
+            l_int32      linew,
+            l_int32      threshold,
+            l_int32      maxyshift)
 {
 L_RECOG  *recog;
 
+    PROCNAME("recogCreate");
+
     if (scalew < 0 || scaleh < 0)
-        return (L_RECOG *)ERROR_PTR("invalid scalew or scaleh", __func__, NULL);
+        return (L_RECOG *)ERROR_PTR("invalid scalew or scaleh", procName, NULL);
     if (linew > 10)
-        return (L_RECOG *)ERROR_PTR("invalid linew > 10", __func__, NULL);
-    if (threshold == 0) threshold = DefaultThreshold;
+        return (L_RECOG *)ERROR_PTR("invalid linew > 10", procName, NULL);
+    if (threshold == 0) threshold = DEFAULT_THRESHOLD;
     if (threshold < 0 || threshold > 255) {
-        L_WARNING("invalid threshold; using default\n", __func__);
-        threshold = DefaultThreshold;
+        L_WARNING("invalid threshold; using default\n", procName);
+        threshold = DEFAULT_THRESHOLD;
     }
     if (maxyshift < 0 || maxyshift > 2) {
-         L_WARNING("invalid maxyshift; using default value\n", __func__);
-         maxyshift = DefaultMaxYShift;
+         L_WARNING("invalid maxyshift; using default value\n", procName);
+         maxyshift = DEFAULT_MAXYSHIFT;
     } else if (maxyshift == 0) {
          L_WARNING("Using maxyshift = 0; faster, worse correlation results\n",
-                   __func__);
+                   procName);
     } else if (maxyshift == 2) {
-         L_WARNING("Using maxyshift = 2; slower\n", __func__);
+         L_WARNING("Using maxyshift = 2; slower\n", procName);
     }
 
-    recog = (L_RECOG *)LEPT_CALLOC(1, sizeof(L_RECOG));
+    if ((recog = (L_RECOG *)LEPT_CALLOC(1, sizeof(L_RECOG))) == NULL)
+        return (L_RECOG *)ERROR_PTR("rec not made", procName, NULL);
     recog->templ_use = L_USE_ALL_TEMPLATES;  /* default */
     recog->threshold = threshold;
     recog->scalew = scalew;
@@ -439,7 +442,7 @@ L_RECOG  *recog;
     recogSetParams(recog, 1, -1, -1.0, -1.0);
     recog->bmf = bmfCreate(NULL, 6);
     recog->bmf_size = 6;
-    recog->maxarraysize = MaxExamplesInClass;
+    recog->maxarraysize = MAX_EXAMPLES_IN_CLASS;
 
         /* Generate the LUTs */
     recog->centtab = makePixelCentroidTab8();
@@ -465,7 +468,7 @@ L_RECOG  *recog;
 /*!
  * \brief   recogDestroy()
  *
- * \param[in,out]   precog    will be set to null before returning
+ * \param[in,out]   precog will be set to null before returning
  * \return  void
  */
 void
@@ -473,8 +476,10 @@ recogDestroy(L_RECOG  **precog)
 {
 L_RECOG  *recog;
 
+    PROCNAME("recogDestroy");
+
     if (!precog) {
-        L_WARNING("ptr address is null\n", __func__);
+        L_WARNING("ptr address is null\n", procName);
         return;
     }
 
@@ -509,12 +514,10 @@ L_RECOG  *recog;
     recogDestroyDid(recog);
     LEPT_FREE(recog);
     *precog = NULL;
+    return;
 }
 
 
-/*------------------------------------------------------------------------*
- *                              Recog accessors                           *
- *------------------------------------------------------------------------*/
 /*!
  * \brief   recogGetCount()
  *
@@ -524,8 +527,10 @@ L_RECOG  *recog;
 l_int32
 recogGetCount(L_RECOG  *recog)
 {
+    PROCNAME("recogGetCount");
+
     if (!recog)
-        return ERROR_INT("recog not defined", __func__, 0);
+        return ERROR_INT("recog not defined", procName, 0);
     return recog->setsize;
 }
 
@@ -533,15 +538,15 @@ recogGetCount(L_RECOG  *recog)
 /*!
  * \brief   recogSetParams()
  *
- * \param[in]    recog          to be padded, if necessary
- * \param[in]    type           type of char set; -1 for default;
- *                              see enum in recog.h
- * \param[in]    min_nopad      min number in a class without padding;
- *                              use -1 for default
- * \param[in]    max_wh_ratio   max width/height ratio allowed for splitting;
- *                              use -1.0 for default
- * \param[in]    max_ht_ratio   max of max/min averaged template height ratio;
- *                              use -1.0 for default
+ * \param[in]    recog         to be padded, if necessary
+ * \param[in]    type          type of char set; -1 for default;
+ *                               see enum in recog.h
+ * \param[in]    min_nopad     min number in a class without padding;
+ *                               use -1 for default
+ * \param[in]    max_wh_ratio  max width/height ratio allowed for splitting;
+ *                               use -1.0 for default
+ * \param[in]    max_ht_ratio  max of max/min averaged template height ratio;
+ *                               use -1.0 for default
  * \return       0 if OK, 1 on error
  *
  * <pre>
@@ -557,23 +562,26 @@ recogGetCount(L_RECOG  *recog)
  *          the templates do not satisfy it.
  * </pre>
  */
-l_ok
+l_int32
 recogSetParams(L_RECOG   *recog,
                l_int32    type,
                l_int32    min_nopad,
                l_float32  max_wh_ratio,
                l_float32  max_ht_ratio)
 {
-    if (!recog)
-        return ERROR_INT("recog not defined", __func__, 1);
 
-    recog->charset_type = (type >= 0) ? type : DefaultCharsetType;
+    PROCNAME("recogSetParams");
+
+    if (!recog)
+        return ERROR_INT("recog not defined", procName, 1);
+
+    recog->charset_type = (type >= 0) ? type : DEFAULT_CHARSET_TYPE;
     recog->charset_size = recogGetCharsetSize(recog->charset_type);
-    recog->min_nopad = (min_nopad >= 0) ? min_nopad : DefaultMinNopad;
+    recog->min_nopad = (min_nopad >= 0) ? min_nopad : DEFAULT_MIN_NOPAD;
     recog->max_wh_ratio = (max_wh_ratio > 0.0) ? max_wh_ratio :
-                          DefaultMaxWHRatio;
+                          DEFAULT_MAX_WH_RATIO;
     recog->max_ht_ratio = (max_ht_ratio > 1.0) ? max_ht_ratio :
-                          DefaultMaxHTRatio;
+                          DEFAULT_MAX_HT_RATIO;
     return 0;
 }
 
@@ -581,12 +589,14 @@ recogSetParams(L_RECOG   *recog,
 /*!
  * \brief   recogGetCharsetSize()
  *
- * \param[in]    type     of charset
+ * \param[in]    type of charset
  * \return  size of charset, or 0 if unknown or on error
  */
 static l_int32
 recogGetCharsetSize(l_int32  type)
 {
+    PROCNAME("recogGetCharsetSize");
+
     switch (type) {
     case L_UNKNOWN:
         return 0;
@@ -601,9 +611,10 @@ recogGetCharsetSize(l_int32  type)
     case L_UC_ALPHA:
         return 26;
     default:
-        L_ERROR("invalid charset_type %d\n", __func__, type);
+        L_ERROR("invalid charset_type %d\n", procName, type);
+        return 0;
     }
-    return 0;
+    return 0;  /* shouldn't happen */
 }
 
 
@@ -613,10 +624,10 @@ recogGetCharsetSize(l_int32  type)
 /*!
  * \brief   recogGetClassIndex()
  *
- * \param[in]    recog     with LUT's pre-computed
- * \param[in]    val       integer value; can be up to 4 bytes for UTF-8
- * \param[in]    text      text from which %val was derived; used if not found
- * \param[out]   pindex    index into dna_tochar
+ * \param[in]    recog with LUT's pre-computed
+ * \param[in]    val integer value; can be up to 3 bytes for UTF-8
+ * \param[in]    text text from which %val was derived; used if not found
+ * \param[out]   pindex index into dna_tochar
  * \return  0 if found; 1 if not found and added; 2 on error.
  *
  * <pre>
@@ -642,13 +653,15 @@ recogGetClassIndex(L_RECOG  *recog,
 {
 l_int32  i, n, ival;
 
+    PROCNAME("recogGetClassIndex");
+
     if (!pindex)
-        return ERROR_INT("&index not defined", __func__, 2);
+        return ERROR_INT("&index not defined", procName, 2);
     *pindex = -1;
     if (!recog)
-        return ERROR_INT("recog not defined", __func__, 2);
+        return ERROR_INT("recog not defined", procName, 2);
     if (!text)
-        return ERROR_INT("text not defined", __func__, 2);
+        return ERROR_INT("text not defined", procName, 2);
 
         /* Search existing characters */
     n = l_dnaGetCount(recog->dna_tochar);
@@ -673,11 +686,11 @@ l_int32  i, n, ival;
  * \brief   recogStringToIndex()
  *
  * \param[in]    recog
- * \param[in]    text     text string for some class
- * \param[out]   pindex   index for that class; -1 if not found
+ * \param[in]    text text string for some class
+ * \param[out]   pindex index for that class; -1 if not found
  * \return  0 if OK, 1 on error not finding the string is an error
  */
-l_ok
+l_int32
 recogStringToIndex(L_RECOG  *recog,
                    char     *text,
                    l_int32  *pindex)
@@ -685,20 +698,22 @@ recogStringToIndex(L_RECOG  *recog,
 char    *charstr;
 l_int32  i, n, diff;
 
+    PROCNAME("recogStringtoIndex");
+
     if (!pindex)
-        return ERROR_INT("&index not defined", __func__, 1);
+        return ERROR_INT("&index not defined", procName, 1);
     *pindex = -1;
     if (!recog)
-        return ERROR_INT("recog not defined", __func__, 1);
+        return ERROR_INT("recog not defined", procName, 1);
     if (!text)
-        return ERROR_INT("text not defined", __func__, 1);
+        return ERROR_INT("text not defined", procName, 1);
 
         /* Search existing characters */
     n = recog->setsize;
     for (i = 0; i < n; i++) {
         recogGetClassString(recog, i, &charstr);
         if (!charstr) {
-            L_ERROR("string not found for index %d\n", __func__, i);
+            L_ERROR("string not found for index %d\n", procName, i);
             continue;
         }
         diff = strcmp(text, charstr);
@@ -716,9 +731,9 @@ l_int32  i, n, diff;
  * \brief   recogGetClassString()
  *
  * \param[in]    recog
- * \param[in]    index       into array of char types
- * \param[out]   pcharstr    string representation;
- *                           returns an empty string on error
+ * \param[in]    index into array of char types
+ * \param[out]   pcharstr string representation;
+ *                        returns an empty string on error
  * \return  0 if found, 1 on error
  *
  * <pre>
@@ -733,14 +748,16 @@ recogGetClassString(L_RECOG  *recog,
                     l_int32   index,
                     char    **pcharstr)
 {
+    PROCNAME("recogGetClassString");
+
     if (!pcharstr)
-        return ERROR_INT("&charstr not defined", __func__, 1);
+        return ERROR_INT("&charstr not defined", procName, 1);
     *pcharstr = stringNew("");
     if (!recog)
-        return ERROR_INT("recog not defined", __func__, 2);
+        return ERROR_INT("recog not defined", procName, 2);
 
     if (index < 0 || index >= recog->setsize)
-        return ERROR_INT("invalid index", __func__, 1);
+        return ERROR_INT("invalid index", procName, 1);
     LEPT_FREE(*pcharstr);
     *pcharstr = sarrayGetString(recog->sa_text, index, L_COPY);
     return 0;
@@ -750,38 +767,39 @@ recogGetClassString(L_RECOG  *recog,
 /*!
  * \brief   l_convertCharstrToInt()
  *
- * \param[in]    str     input string representing one UTF-8 character;
- *                       not more than 4 bytes
- * \param[out]   pval    integer value for the input.  Think of it
- *                       as a 1-to-1 hash code.
+ * \param[in]    str input string representing one UTF-8 character;
+ *                   not more than 4 bytes
+ * \param[out]   pval integer value for the input.  Think of it
+ *                    as a 1-to-1 hash code.
  * \return  0 if OK, 1 on error
  */
-l_ok
+l_int32
 l_convertCharstrToInt(const char  *str,
                       l_int32     *pval)
 {
-l_int32   size;
-l_uint32  val;
+l_int32  size, val;
+
+    PROCNAME("l_convertCharstrToInt");
 
     if (!pval)
-        return ERROR_INT("&val not defined", __func__, 1);
+        return ERROR_INT("&val not defined", procName, 1);
     *pval = 0;
     if (!str)
-        return ERROR_INT("str not defined", __func__, 1);
+        return ERROR_INT("str not defined", procName, 1);
     size = strlen(str);
     if (size == 0)
-        return ERROR_INT("empty string", __func__, 1);
+        return ERROR_INT("empty string", procName, 1);
     if (size > 4)
-        return ERROR_INT("invalid string: > 4 bytes", __func__, 1);
+        return ERROR_INT("invalid string: > 4 bytes", procName, 1);
 
-    val = (l_uint8)str[0];
+    val = (l_int32)str[0];
     if (size > 1)
-        val = (val << 8) + (l_uint8)str[1];
+        val = (val << 8) + (l_int32)str[1];
     if (size > 2)
-        val = (val << 8) + (l_uint8)str[2];
+        val = (val << 8) + (l_int32)str[2];
     if (size > 3)
-        val = (val << 8) + (l_uint8)str[3];
-    *pval = (l_int32)(val & 0x7fffffff);
+        val = (val << 8) + (l_int32)str[3];
+    *pval = val;
     return 0;
 }
 
@@ -820,16 +838,16 @@ recogRead(const char  *filename)
 FILE     *fp;
 L_RECOG  *recog;
 
+    PROCNAME("recogRead");
+
     if (!filename)
-        return (L_RECOG *)ERROR_PTR("filename not defined", __func__, NULL);
+        return (L_RECOG *)ERROR_PTR("filename not defined", procName, NULL);
     if ((fp = fopenReadStream(filename)) == NULL)
-        return (L_RECOG *)ERROR_PTR_1("stream not opened",
-                                      filename, __func__, NULL);
+        return (L_RECOG *)ERROR_PTR("stream not opened", procName, NULL);
 
     if ((recog = recogReadStream(fp)) == NULL) {
         fclose(fp);
-        return (L_RECOG *)ERROR_PTR_1("recog not read",
-                                      filename, __func__, NULL);
+        return (L_RECOG *)ERROR_PTR("recog not read", procName, NULL);
     }
 
     fclose(fp);
@@ -840,7 +858,7 @@ L_RECOG  *recog;
 /*!
  * \brief   recogReadStream()
  *
- * \param[in]    fp     file stream
+ * \param[in]    fp file stream
  * \return  recog, or NULL on error
  */
 L_RECOG *
@@ -853,60 +871,62 @@ PIXAA    *paa;
 L_RECOG  *recog;
 SARRAY   *sa_text;
 
+    PROCNAME("recogReadStream");
+
     if (!fp)
-        return (L_RECOG *)ERROR_PTR("stream not defined", __func__, NULL);
+        return (L_RECOG *)ERROR_PTR("stream not defined", procName, NULL);
 
     if (fscanf(fp, "\nRecog Version %d\n", &version) != 1)
-        return (L_RECOG *)ERROR_PTR("not a recog file", __func__, NULL);
+        return (L_RECOG *)ERROR_PTR("not a recog file", procName, NULL);
     if (version != RECOG_VERSION_NUMBER)
-        return (L_RECOG *)ERROR_PTR("invalid recog version", __func__, NULL);
+        return (L_RECOG *)ERROR_PTR("invalid recog version", procName, NULL);
     if (fscanf(fp, "Size of character set = %d\n", &setsize) != 1)
-        return (L_RECOG *)ERROR_PTR("setsize not read", __func__, NULL);
+        return (L_RECOG *)ERROR_PTR("setsize not read", procName, NULL);
     if (fscanf(fp, "Binarization threshold = %d\n", &threshold) != 1)
-        return (L_RECOG *)ERROR_PTR("binary thresh not read", __func__, NULL);
+        return (L_RECOG *)ERROR_PTR("binary thresh not read", procName, NULL);
     if (fscanf(fp, "Maxyshift = %d\n", &maxyshift) != 1)
-        return (L_RECOG *)ERROR_PTR("maxyshift not read", __func__, NULL);
+        return (L_RECOG *)ERROR_PTR("maxyshift not read", procName, NULL);
     if (fscanf(fp, "Scale to width = %d\n", &scalew) != 1)
-        return (L_RECOG *)ERROR_PTR("width not read", __func__, NULL);
+        return (L_RECOG *)ERROR_PTR("width not read", procName, NULL);
     if (fscanf(fp, "Scale to height = %d\n", &scaleh) != 1)
-        return (L_RECOG *)ERROR_PTR("height not read", __func__, NULL);
+        return (L_RECOG *)ERROR_PTR("height not read", procName, NULL);
     if (fscanf(fp, "Normalized line width = %d\n", &linew) != 1)
-        return (L_RECOG *)ERROR_PTR("line width not read", __func__, NULL);
+        return (L_RECOG *)ERROR_PTR("line width not read", procName, NULL);
     if ((recog = recogCreate(scalew, scaleh, linew, threshold,
                              maxyshift)) == NULL)
-        return (L_RECOG *)ERROR_PTR("recog not made", __func__, NULL);
+        return (L_RECOG *)ERROR_PTR("recog not made", procName, NULL);
 
-    if (fscanf(fp, "\nLabels for character set:\n") == -1) {
+    if (fscanf(fp, "\nLabels for character set:\n") != 0) {
         recogDestroy(&recog);
-        return (L_RECOG *)ERROR_PTR("label intro not read", __func__, NULL);
+        return (L_RECOG *)ERROR_PTR("label intro not read", procName, NULL);
     }
     l_dnaDestroy(&recog->dna_tochar);
     if ((dna_tochar = l_dnaReadStream(fp)) == NULL) {
         recogDestroy(&recog);
-        return (L_RECOG *)ERROR_PTR("dna_tochar not read", __func__, NULL);
+        return (L_RECOG *)ERROR_PTR("dna_tochar not read", procName, NULL);
     }
     recog->dna_tochar = dna_tochar;
     sarrayDestroy(&recog->sa_text);
     if ((sa_text = sarrayReadStream(fp)) == NULL) {
         recogDestroy(&recog);
-        return (L_RECOG *)ERROR_PTR("sa_text not read", __func__, NULL);
+        return (L_RECOG *)ERROR_PTR("sa_text not read", procName, NULL);
     }
     recog->sa_text = sa_text;
 
-    if (fscanf(fp, "\nPixaa of all samples in the training set:\n") == -1) {
+    if (fscanf(fp, "\nPixaa of all samples in the training set:\n") != 0) {
         recogDestroy(&recog);
-        return (L_RECOG *)ERROR_PTR("pixaa intro not read", __func__, NULL);
+        return (L_RECOG *)ERROR_PTR("pixaa intro not read", procName, NULL);
     }
     if ((paa = pixaaReadStream(fp)) == NULL) {
         recogDestroy(&recog);
-        return (L_RECOG *)ERROR_PTR("pixaa not read", __func__, NULL);
+        return (L_RECOG *)ERROR_PTR("pixaa not read", procName, NULL);
     }
     recog->setsize = setsize;
     nc = pixaaGetCount(paa, NULL);
     if (nc != setsize) {
         recogDestroy(&recog);
         pixaaDestroy(&paa);
-        L_ERROR("(setsize = %d) != (paa count = %d)\n", __func__,
+        L_ERROR("(setsize = %d) != (paa count = %d)\n", procName,
                      setsize, nc);
         return NULL;
     }
@@ -914,7 +934,7 @@ SARRAY   *sa_text;
     recogAddAllSamples(&recog, paa, 0);  /* this finishes */
     pixaaDestroy(&paa);
     if (!recog)
-        return (L_RECOG *)ERROR_PTR("bad templates", __func__, NULL);
+        return (L_RECOG *)ERROR_PTR("bad templates", procName, NULL);
     return recog;
 }
 
@@ -922,8 +942,8 @@ SARRAY   *sa_text;
 /*!
  * \brief   recogReadMem()
  *
- * \param[in]    data    serialization of recog (not ascii)
- * \param[in]    size    of data in bytes
+ * \param[in]    data  serialization of recog (not ascii)
+ * \param[in]    size  of data in bytes
  * \return  recog, or NULL on error
  */
 L_RECOG *
@@ -933,14 +953,16 @@ recogReadMem(const l_uint8  *data,
 FILE     *fp;
 L_RECOG  *recog;
 
+    PROCNAME("recogReadMem");
+
     if (!data)
-        return (L_RECOG *)ERROR_PTR("data not defined", __func__, NULL);
+        return (L_RECOG *)ERROR_PTR("data not defined", procName, NULL);
     if ((fp = fopenReadFromMemory(data, size)) == NULL)
-        return (L_RECOG *)ERROR_PTR("stream not opened", __func__, NULL);
+        return (L_RECOG *)ERROR_PTR("stream not opened", procName, NULL);
 
     recog = recogReadStream(fp);
     fclose(fp);
-    if (!recog) L_ERROR("recog not read\n", __func__);
+    if (!recog) L_ERROR("recog not read\n", procName);
     return recog;
 }
 
@@ -961,25 +983,26 @@ L_RECOG  *recog;
  *          first place.  See the notes in recogRead() for the rationale.
  * </pre>
  */
-l_ok
+l_int32
 recogWrite(const char  *filename,
            L_RECOG     *recog)
 {
 l_int32  ret;
 FILE    *fp;
 
+    PROCNAME("recogWrite");
+
     if (!filename)
-        return ERROR_INT("filename not defined", __func__, 1);
+        return ERROR_INT("filename not defined", procName, 1);
     if (!recog)
-        return ERROR_INT("recog not defined", __func__, 1);
+        return ERROR_INT("recog not defined", procName, 1);
 
     if ((fp = fopenWriteStream(filename, "wb")) == NULL)
-        return ERROR_INT_1("stream not opened", filename, __func__, 1);
+        return ERROR_INT("stream not opened", procName, 1);
     ret = recogWriteStream(fp, recog);
     fclose(fp);
     if (ret)
-        return ERROR_INT_1("recog not written to stream",
-                           filename, __func__, 1);
+        return ERROR_INT("recog not written to stream", procName, 1);
     return 0;
 }
 
@@ -987,18 +1010,20 @@ FILE    *fp;
 /*!
  * \brief   recogWriteStream()
  *
- * \param[in]    fp      file stream opened for "wb"
+ * \param[in]    fp file stream opened for "wb"
  * \param[in]    recog
  * \return  0 if OK, 1 on error
  */
-l_ok
+l_int32
 recogWriteStream(FILE     *fp,
                  L_RECOG  *recog)
 {
+    PROCNAME("recogWriteStream");
+
     if (!fp)
-        return ERROR_INT("stream not defined", __func__, 1);
+        return ERROR_INT("stream not defined", procName, 1);
     if (!recog)
-        return ERROR_INT("recog not defined", __func__, 1);
+        return ERROR_INT("recog not defined", procName, 1);
 
     fprintf(fp, "\nRecog Version %d\n", RECOG_VERSION_NUMBER);
     fprintf(fp, "Size of character set = %d\n", recog->setsize);
@@ -1020,8 +1045,8 @@ recogWriteStream(FILE     *fp,
 /*!
  * \brief   recogWriteMem()
  *
- * \param[out]   pdata    data of serialized recog (not ascii)
- * \param[out]   psize    size of returned data
+ * \param[out]   pdata data of serialized recog (not ascii)
+ * \param[out]   psize size of returned data
  * \param[in]    recog
  * \return  0 if OK, 1 on error
  *
@@ -1030,7 +1055,7 @@ recogWriteStream(FILE     *fp,
  *      (1) Serializes a recog in memory and puts the result in a buffer.
  * </pre>
  */
-l_ok
+l_int32
 recogWriteMem(l_uint8  **pdata,
               size_t    *psize,
               L_RECOG   *recog)
@@ -1038,36 +1063,35 @@ recogWriteMem(l_uint8  **pdata,
 l_int32  ret;
 FILE    *fp;
 
+    PROCNAME("recogWriteMem");
+
     if (pdata) *pdata = NULL;
     if (psize) *psize = 0;
     if (!pdata)
-        return ERROR_INT("&data not defined", __func__, 1);
+        return ERROR_INT("&data not defined", procName, 1);
     if (!psize)
-        return ERROR_INT("&size not defined", __func__, 1);
+        return ERROR_INT("&size not defined", procName, 1);
     if (!recog)
-        return ERROR_INT("recog not defined", __func__, 1);
+        return ERROR_INT("recog not defined", procName, 1);
 
 #if HAVE_FMEMOPEN
     if ((fp = open_memstream((char **)pdata, psize)) == NULL)
-        return ERROR_INT("stream not opened", __func__, 1);
+        return ERROR_INT("stream not opened", procName, 1);
     ret = recogWriteStream(fp, recog);
-    fputc('\0', fp);
-    fclose(fp);
-    if (*psize > 0) *psize = *psize - 1;
 #else
-    L_INFO("no fmemopen API --> work-around: write to temp file\n", __func__);
+    L_INFO("work-around: writing to a temp file\n", procName);
   #ifdef _WIN32
     if ((fp = fopenWriteWinTempfile()) == NULL)
-        return ERROR_INT("tmpfile stream not opened", __func__, 1);
+        return ERROR_INT("tmpfile stream not opened", procName, 1);
   #else
     if ((fp = tmpfile()) == NULL)
-        return ERROR_INT("tmpfile stream not opened", __func__, 1);
+        return ERROR_INT("tmpfile stream not opened", procName, 1);
   #endif  /* _WIN32 */
     ret = recogWriteStream(fp, recog);
     rewind(fp);
     *pdata = l_binaryReadStream(fp, psize);
-    fclose(fp);
 #endif  /* HAVE_FMEMOPEN */
+    fclose(fp);
     return ret;
 }
 
@@ -1088,8 +1112,10 @@ FILE    *fp;
 PIXA *
 recogExtractPixa(L_RECOG  *recog)
 {
+    PROCNAME("recogExtractPixa");
+
     if (!recog)
-        return (PIXA *)ERROR_PTR("recog not defined", __func__, NULL);
+        return (PIXA *)ERROR_PTR("recog not defined", procName, NULL);
 
     recogAddCharstrLabels(recog);
     return pixaaFlattenToPixa(recog->pixaa_u, NULL, L_CLONE);
@@ -1111,8 +1137,10 @@ PIX     *pix;
 PIXA    *pixa;
 PIXAA   *paa;
 
+    PROCNAME("recogAddCharstrLabels");
+
     if (!recog)
-        return ERROR_INT("recog not defined", __func__, 1);
+        return ERROR_INT("recog not defined", procName, 1);
 
         /* Add the labels to each unscaled pix */
     paa = recog->pixaa_u;
@@ -1136,8 +1164,8 @@ PIXAA   *paa;
 /*!
  * \brief   recogAddAllSamples()
  *
- * \param[in]    precog    addr of recog
- * \param[in]    paa       pixaa from previously trained recog
+ * \param[in]    precog  addr of recog
+ * \param[in]    paa     pixaa from previously trained recog
  * \param[in]    debug
  * \return  0 if OK, 1 on error
  *
@@ -1163,14 +1191,15 @@ PIX      *pix;
 PIXA     *pixa, *pixa1;
 L_RECOG  *recog;
 
+    PROCNAME("recogAddAllSamples");
+
     if (!precog)
-        return ERROR_INT("&recog not defined", __func__, 1);
+        return ERROR_INT("&recog not defined", procName, 1);
     if ((recog = *precog) == NULL)
-        return ERROR_INT("recog not defined", __func__, 1);
+        return ERROR_INT("recog not defined", procName, 1);
     if (!paa) {
         recogDestroy(&recog);
-        *precog = NULL;
-        return ERROR_INT("paa not defined", __func__, 1);
+        return ERROR_INT("paa not defined", procName, 1);
     }
 
     nc = pixaaGetCount(paa, NULL);
@@ -1182,7 +1211,7 @@ L_RECOG  *recog;
         pixaaAddPixa(recog->pixaa_u, pixa1, L_INSERT);
         for (j = 0; j < ns; j++) {
             pix = pixaGetPix(pixa, j, L_CLONE);
-            if (debug) lept_stderr("pix[%d,%d]: text = %s\n", i, j, text);
+            if (debug) fprintf(stderr, "pix[%d,%d]: text = %s\n", i, j, text);
             pixaaAddPix(recog->pixaa_u, i, pix, NULL, L_INSERT);
         }
         pixaDestroy(&pixa);
@@ -1191,6 +1220,6 @@ L_RECOG  *recog;
     recogTrainingFinished(&recog, 0, -1, -1.0);  /* For second parameter,
                                              see comment in recogRead() */
     if (!recog)
-        return ERROR_INT("bad templates; recog destroyed", __func__, 1);
+        return ERROR_INT("bad templates; recog destroyed", procName, 1);
     return 0;
 }

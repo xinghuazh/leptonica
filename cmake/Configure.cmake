@@ -63,12 +63,15 @@ set(include_files_list
     sys/stat.h
     sys/types.h
     unistd.h
+
+    openjpeg-2.0/openjpeg.h
+    openjpeg-2.1/openjpeg.h
+    openjpeg-2.2/openjpeg.h
 )
 check_includes(include_files_list)
 
 set(functions_list
     fmemopen
-    fstatat
 )
 check_functions(functions_list)
 
@@ -94,7 +97,7 @@ if (JPEG_FOUND)
     set(HAVE_LIBJPEG 1)
 endif()
 
-if (OPENJPEG_SUPPORT)
+if (JP2K_FOUND)
     set(HAVE_LIBJP2K 1)
 endif()
 
@@ -106,9 +109,8 @@ if (TIFF_FOUND)
     set(HAVE_LIBTIFF 1)
 endif()
 
-if (LIBWEBP_SUPPORT)
+if (WEBP_FOUND)
     set(HAVE_LIBWEBP 1)
-    set(HAVE_LIBWEBP_ANIM 1)
 endif()
 
 if (ZLIB_FOUND)
@@ -134,11 +136,20 @@ file(APPEND ${AUTOCONFIG_SRC} "
 /* Define to 1 if you have libwebp. */
 #cmakedefine HAVE_LIBWEBP 1
 
-/* Define to 1 if you have libwebpmux. */
-#cmakedefine HAVE_LIBWEBP_ANIM 1
-
 /* Define to 1 if you have zlib. */
 #cmakedefine HAVE_LIBZ 1
+
+#ifdef HAVE_OPENJPEG_2_0_OPENJPEG_H
+#define LIBJP2K_HEADER <openjpeg-2.0/openjpeg.h>
+#endif
+
+#ifdef HAVE_OPENJPEG_2_1_OPENJPEG_H
+#define LIBJP2K_HEADER <openjpeg-2.1/openjpeg.h>
+#endif
+
+#ifdef HAVE_OPENJPEG_2_2_OPENJPEG_H
+#define LIBJP2K_HEADER <openjpeg-2.2/openjpeg.h>
+#endif
 ")
 
 ########################################

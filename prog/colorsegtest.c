@@ -49,10 +49,6 @@
  *      180 6 0 6     (3 colors)
  */
 
-#ifdef HAVE_CONFIG_H
-#include <config_auto.h>
-#endif  /* HAVE_CONFIG_H */
-
 #include "allheaders.h"
 
 static const l_int32    MAX_DIST      = 120;
@@ -64,9 +60,10 @@ static const l_int32    FINAL_COLORS  = 15;
 int main(int    argc,
          char **argv)
 {
-l_int32  max_dist, max_colors, sel_size, final_colors;
-PIX     *pixs, *pixd, *pixt;
-char    *filein, *fileout;
+l_int32      max_dist, max_colors, sel_size, final_colors;
+PIX         *pixs, *pixd, *pixt;
+char        *filein, *fileout;
+static char  mainName[] = "colorsegtest";
 
     if (argc != 3 && argc != 7)
         return ERROR_INT(
@@ -75,7 +72,8 @@ char    *filein, *fileout;
             " Default values are: max_dist = 120\n"
             "                     max_colors = 15\n"
             "                     sel_size = 4\n"
-            "                     final_colors = 15\n", __func__, 1);
+            "                     final_colors = 15\n", mainName, 1);
+
     filein = argv[1];
     fileout = argv[2];
     if (argc == 3) {  /* use default values */
@@ -90,15 +88,14 @@ char    *filein, *fileout;
         sel_size = atoi(argv[5]);
         final_colors = atoi(argv[6]);
     }
-    setLeptDebugOK(1);
 
     if ((pixs = pixRead(filein)) == NULL)
-        return ERROR_INT("pixs not made", __func__, 1);
+        return ERROR_INT("pixs not made", mainName, 1);
     startTimer();
     pixt = pixRemoveColormap(pixs, REMOVE_CMAP_BASED_ON_SRC);
     pixd = pixColorSegment(pixt, max_dist, max_colors, sel_size,
                            final_colors, 1);
-    lept_stderr("Time to segment: %7.3f sec\n", stopTimer());
+    fprintf(stderr, "Time to segment: %7.3f sec\n", stopTimer());
     pixWrite(fileout, pixd, IFF_PNG);
 
     pixDestroy(&pixs);

@@ -42,9 +42,8 @@
  *           l_int32     pixAddGrayColormap8()
  *           PIX        *pixAddMinimalGrayColormap8()
  *
- *      Conversion from RGB color to 8 bit gray
+ *      Conversion from RGB color to grayscale
  *           PIX        *pixConvertRGBToLuminance()
- *           PIX        *pixConvertRGBToGrayGeneral()
  *           PIX        *pixConvertRGBToGray()
  *           PIX        *pixConvertRGBToGrayFast()
  *           PIX        *pixConvertRGBToGrayMinMax()
@@ -96,22 +95,13 @@
  *           PIX        *pixConvert8To16()
  *
  *      Top-level conversion to 1 bpp
- *           PIX        *pixConvertTo1Adaptive()
  *           PIX        *pixConvertTo1()
  *           PIX        *pixConvertTo1BySampling()
- *
- *      Top-level conversion to 2 bpp
- *           PIX        *pixConvertTo2()
- *           PIX        *pixConvert8To2()
- *
- *      Top-level conversion to 4 bpp
- *           PIX        *pixConvertTo4()
- *           PIX        *pixConvert8To4()
  *
  *      Top-level conversion to 8 bpp
  *           PIX        *pixConvertTo8()
  *           PIX        *pixConvertTo8BySampling()
- *           PIX        *pixConvertTo8Colormap()
+ *           PIX        *pixConvertTo8Color()
  *
  *      Top-level conversion to 16 bpp
  *           PIX        *pixConvertTo16()
@@ -151,12 +141,10 @@
  *
  *      Setting neutral point for min/max boost conversion to gray
  *          void         l_setNeutralBoostVal()
+ *
+ *      *** indicates implicit assumption about RGB component ordering
  * </pre>
  */
-
-#ifdef HAVE_CONFIG_H
-#include <config_auto.h>
-#endif  /* HAVE_CONFIG_H */
 
 #include <string.h>
 #include <math.h>
@@ -179,10 +167,10 @@ static l_int32  var_NEUTRAL_BOOST_VAL = 180;
 /*!
  * \brief   pixThreshold8()
  *
- * \param[in]    pixs       8 bpp grayscale
- * \param[in]    d          destination depth: 1, 2, 4 or 8
- * \param[in]    nlevels    number of levels to be used for colormap
- * \param[in]    cmapflag   1 if makes colormap; 0 otherwise
+ * \param[in]    pixs 8 bpp grayscale
+ * \param[in]    d destination depth: 1, 2, 4 or 8
+ * \param[in]    nlevels number of levels to be used for colormap
+ * \param[in]    cmapflag 1 if makes colormap; 0 otherwise
  * \return  pixd thresholded with standard dest thresholds,
  *              or NULL on error
  *
@@ -215,12 +203,14 @@ pixThreshold8(PIX     *pixs,
 PIX       *pixd;
 PIXCMAP   *cmap;
 
+    PROCNAME("pixThreshold8");
+
     if (!pixs)
-        return (PIX *)ERROR_PTR("pixs not defined", __func__, NULL);
+        return (PIX *)ERROR_PTR("pixs not defined", procName, NULL);
     if (pixGetDepth(pixs) != 8)
-        return (PIX *)ERROR_PTR("pixs not 8 bpp", __func__, NULL);
+        return (PIX *)ERROR_PTR("pixs not 8 bpp", procName, NULL);
     if (cmapflag && nlevels < 2)
-        return (PIX *)ERROR_PTR("nlevels must be at least 2", __func__, NULL);
+        return (PIX *)ERROR_PTR("nlevels must be at least 2", procName, NULL);
 
     switch (d) {
     case 1:
@@ -240,11 +230,11 @@ PIXCMAP   *cmap;
         pixd = pixThresholdOn8bpp(pixs, nlevels, cmapflag);
         break;
     default:
-        return (PIX *)ERROR_PTR("d must be in {1,2,4,8}", __func__, NULL);
+        return (PIX *)ERROR_PTR("d must be in {1,2,4,8}", procName, NULL);
     }
 
     if (!pixd)
-        return (PIX *)ERROR_PTR("pixd not made", __func__, NULL);
+        return (PIX *)ERROR_PTR("pixd not made", procName, NULL);
     pixCopyInputFormat(pixd, pixs);
     return pixd;
 }
@@ -256,13 +246,13 @@ PIXCMAP   *cmap;
 /*!
  * \brief   pixRemoveColormapGeneral()
  *
- * \param[in]    pixs      any depth, with or without colormap
- * \param[in]    type      REMOVE_CMAP_TO_BINARY,
- *                         REMOVE_CMAP_TO_GRAYSCALE,
- *                         REMOVE_CMAP_TO_FULL_COLOR,
- *                         REMOVE_CMAP_WITH_ALPHA,
- *                         REMOVE_CMAP_BASED_ON_SRC
- * \param[in]    ifnocmap  L_CLONE, L_COPY
+ * \param[in]    pixs any depth, with or without colormap
+ * \param[in]    type REMOVE_CMAP_TO_BINARY,
+ *                    REMOVE_CMAP_TO_GRAYSCALE,
+ *                    REMOVE_CMAP_TO_FULL_COLOR,
+ *                    REMOVE_CMAP_WITH_ALPHA,
+ *                    REMOVE_CMAP_BASED_ON_SRC
+ * \param[in]    ifnocmap L_CLONE, L_COPY
  * \return  pixd always a new pix; without colormap, or NULL on error
  *
  * <pre>
@@ -277,10 +267,12 @@ pixRemoveColormapGeneral(PIX     *pixs,
                          l_int32  type,
                          l_int32  ifnocmap)
 {
+    PROCNAME("pixRemoveColormapGeneral");
+
     if (!pixs)
-        return (PIX *)ERROR_PTR("pixs not defined", __func__, NULL);
+        return (PIX *)ERROR_PTR("pixs not defined", procName, NULL);
     if (ifnocmap != L_CLONE && ifnocmap != L_COPY)
-        return (PIX *)ERROR_PTR("invalid value for ifnocmap", __func__, NULL);
+        return (PIX *)ERROR_PTR("invalid value for ifnocmap", procName, NULL);
 
     if (pixGetColormap(pixs))
         return pixRemoveColormap(pixs, type);
@@ -295,12 +287,12 @@ pixRemoveColormapGeneral(PIX     *pixs,
 /*!
  * \brief   pixRemoveColormap()
  *
- * \param[in]    pixs   see restrictions below
- * \param[in]    type   REMOVE_CMAP_TO_BINARY,
- *                      REMOVE_CMAP_TO_GRAYSCALE,
- *                      REMOVE_CMAP_TO_FULL_COLOR,
- *                      REMOVE_CMAP_WITH_ALPHA,
- *                      REMOVE_CMAP_BASED_ON_SRC
+ * \param[in]    pixs see restrictions below
+ * \param[in]    type REMOVE_CMAP_TO_BINARY,
+ *                    REMOVE_CMAP_TO_GRAYSCALE,
+ *                    REMOVE_CMAP_TO_FULL_COLOR,
+ *                    REMOVE_CMAP_WITH_ALPHA,
+ *                    REMOVE_CMAP_BASED_ON_SRC
  * \return  pixd without colormap, or NULL on error
  *
  * <pre>
@@ -325,41 +317,39 @@ pixRemoveColormap(PIX     *pixs,
                   l_int32  type)
 {
 l_int32    sval, rval, gval, bval, val0, val1;
-l_int32    i, j, k, w, h, d, wpls, wpld, ncolors, nalloc, count;
+l_int32    i, j, k, w, h, d, wpls, wpld, ncolors, count;
 l_int32    opaque, colorfound, blackwhite;
-l_int32   *rmap, *gmap, *bmap, *amap;
-l_uint32  *datas, *lines, *datad, *lined, *lut, *graymap;
+l_int32   *rmap, *gmap, *bmap, *amap, *graymap;
+l_uint32  *datas, *lines, *datad, *lined, *lut;
 l_uint32   sword, dword;
 PIXCMAP   *cmap;
 PIX       *pixd;
 
+    PROCNAME("pixRemoveColormap");
+
     if (!pixs)
-        return (PIX *)ERROR_PTR("pixs not defined", __func__, NULL);
+        return (PIX *)ERROR_PTR("pixs not defined", procName, NULL);
     if ((cmap = pixGetColormap(pixs)) == NULL)
         return pixClone(pixs);
+
     if (type != REMOVE_CMAP_TO_BINARY &&
         type != REMOVE_CMAP_TO_GRAYSCALE &&
         type != REMOVE_CMAP_TO_FULL_COLOR &&
         type != REMOVE_CMAP_WITH_ALPHA &&
         type != REMOVE_CMAP_BASED_ON_SRC) {
-        L_WARNING("Invalid type; converting based on src\n", __func__);
+        L_WARNING("Invalid type; converting based on src\n", procName);
         type = REMOVE_CMAP_BASED_ON_SRC;
     }
+
     pixGetDimensions(pixs, &w, &h, &d);
     if (d != 1 && d != 2 && d != 4 && d != 8)
-        return (PIX *)ERROR_PTR("pixs must be {1,2,4,8} bpp", __func__, NULL);
-
-    ncolors = pixcmapGetCount(cmap);
-    nalloc = 1 << d;  /* allocate for max size in case of pixel corruption */
-    if (ncolors > nalloc)
-        return (PIX *)ERROR_PTR("too many colors for pixel depth",
-                                __func__, NULL);
+        return (PIX *)ERROR_PTR("pixs must be {1,2,4,8} bpp", procName, NULL);
 
     if (pixcmapToArrays(cmap, &rmap, &gmap, &bmap, &amap))
-        return (PIX *)ERROR_PTR("colormap arrays not made", __func__, NULL);
+        return (PIX *)ERROR_PTR("colormap arrays not made", procName, NULL);
 
     if (d != 1 && type == REMOVE_CMAP_TO_BINARY) {
-        L_WARNING("not 1 bpp; can't remove cmap to binary\n", __func__);
+        L_WARNING("not 1 bpp; can't remove cmap to binary\n", procName);
         type = REMOVE_CMAP_BASED_ON_SRC;
     }
 
@@ -380,11 +370,12 @@ PIX       *pixd;
         }
     }
 
+    ncolors = pixcmapGetCount(cmap);
     datas = pixGetData(pixs);
     wpls = pixGetWpl(pixs);
     if (type == REMOVE_CMAP_TO_BINARY) {
         if ((pixd = pixCopy(NULL, pixs)) == NULL) {
-            L_ERROR("pixd not made\n", __func__);
+            L_ERROR("pixd not made\n", procName);
             goto cleanup_arrays;
         }
         pixcmapGetColor(cmap, 0, &rval, &gval, &bval);
@@ -396,18 +387,18 @@ PIX       *pixd;
         pixDestroyColormap(pixd);
     } else if (type == REMOVE_CMAP_TO_GRAYSCALE) {
         if ((pixd = pixCreate(w, h, 8)) == NULL) {
-            L_ERROR("pixd not made\n", __func__);
+            L_ERROR("pixd not made\n", procName);
             goto cleanup_arrays;
         }
         pixCopyResolution(pixd, pixs);
         pixCopyInputFormat(pixd, pixs);
         datad = pixGetData(pixd);
         wpld = pixGetWpl(pixd);
-        graymap = (l_uint32 *)LEPT_CALLOC(nalloc, sizeof(l_uint32));
-        for (i = 0; i < ncolors; i++) {
-            graymap[i] = (l_uint32)(L_RED_WEIGHT * rmap[i] +
-                                    L_GREEN_WEIGHT * gmap[i] +
-                                    L_BLUE_WEIGHT * bmap[i] + 0.5);
+        graymap = (l_int32 *)LEPT_CALLOC(ncolors, sizeof(l_int32));
+        for (i = 0; i < pixcmapGetCount(cmap); i++) {
+            graymap[i] = (l_int32)(L_RED_WEIGHT * rmap[i] +
+                                   L_GREEN_WEIGHT * gmap[i] +
+                                   L_BLUE_WEIGHT * bmap[i] + 0.5);
         }
         for (i = 0; i < h; i++) {
             lines = datas + i * wpls;
@@ -432,8 +423,8 @@ PIX       *pixd;
                     }
 #if DEBUG_UNROLLING
 #define CHECK_VALUE(a, b, c) if (GET_DATA_BYTE(a, b) != c) { \
-    lept_stderr("Error: mismatch at %d, %d vs %d\n", \
-                j, GET_DATA_BYTE(a, b), c); }
+    fprintf(stderr, "Error: mismatch at %d, %d vs %d\n", \
+            j, GET_DATA_BYTE(a, b), c); }
                     for (j = 0; j < w; j++) {
                         sval = GET_DATA_BYTE(lines, j);
                         gval = graymap[sval];
@@ -551,7 +542,7 @@ PIX       *pixd;
             LEPT_FREE(graymap);
     } else {  /* type == REMOVE_CMAP_TO_FULL_COLOR or REMOVE_CMAP_WITH_ALPHA */
         if ((pixd = pixCreate(w, h, 32)) == NULL) {
-            L_ERROR("pixd not made\n", __func__);
+            L_ERROR("pixd not made\n", procName);
             goto cleanup_arrays;
         }
         pixCopyInputFormat(pixd, pixs);
@@ -560,7 +551,7 @@ PIX       *pixd;
             pixSetSpp(pixd, 4);
         datad = pixGetData(pixd);
         wpld = pixGetWpl(pixd);
-        lut = (l_uint32 *)LEPT_CALLOC(nalloc, sizeof(l_uint32));
+        lut = (l_uint32 *)LEPT_CALLOC(ncolors, sizeof(l_uint32));
         for (i = 0; i < ncolors; i++) {
             if (type == REMOVE_CMAP_TO_FULL_COLOR)
                 composeRGBPixel(rmap[i], gmap[i], bmap[i], lut + i);
@@ -581,7 +572,7 @@ PIX       *pixd;
                 else  /* (d == 1) */
                     sval = GET_DATA_BIT(lines, j);
                 if (sval >= ncolors)
-                    L_WARNING("pixel value out of bounds\n", __func__);
+                    L_WARNING("pixel value out of bounds\n", procName);
                 else
                     lined[j] = lut[sval];
             }
@@ -604,7 +595,7 @@ cleanup_arrays:
 /*!
  * \brief   pixAddGrayColormap8()
  *
- * \param[in]    pixs   8 bpp
+ * \param[in]    pixs 8 bpp
  * \return  0 if OK, 1 on error
  *
  * <pre>
@@ -612,13 +603,15 @@ cleanup_arrays:
  *      (1) If pixs has a colormap, this is a no-op.
  * </pre>
  */
-l_ok
+l_int32
 pixAddGrayColormap8(PIX  *pixs)
 {
 PIXCMAP  *cmap;
 
+    PROCNAME("pixAddGrayColormap8");
+
     if (!pixs || pixGetDepth(pixs) != 8)
-        return ERROR_INT("pixs not defined or not 8 bpp", __func__, 1);
+        return ERROR_INT("pixs not defined or not 8 bpp", procName, 1);
     if (pixGetColormap(pixs))
         return 0;
 
@@ -631,7 +624,7 @@ PIXCMAP  *cmap;
 /*!
  * \brief   pixAddMinimalGrayColormap8()
  *
- * \param[in]    pixs   8 bpp
+ * \param[in]    pixs 8 bpp
  * \return  0 if OK, 1 on error
  *
  * <pre>
@@ -644,14 +637,16 @@ PIXCMAP  *cmap;
 PIX *
 pixAddMinimalGrayColormap8(PIX  *pixs)
 {
-l_int32    ncolors, w, h, i, j, wpl1, wpld, index, val;
+l_int32    ncolors, w, h, i, j, wplt, wpld, index, val;
 l_int32   *inta, *revmap;
-l_uint32  *data1, *datad, *line1, *lined;
-PIX       *pix1, *pixd;
+l_uint32  *datat, *datad, *linet, *lined;
+PIX       *pixt, *pixd;
 PIXCMAP   *cmap;
 
+    PROCNAME("pixAddMinimalGrayColormap8");
+
     if (!pixs || pixGetDepth(pixs) != 8)
-        return (PIX *)ERROR_PTR("pixs undefined or not 8 bpp", __func__, NULL);
+        return (PIX *)ERROR_PTR("pixs undefined or not 8 bpp", procName, NULL);
 
         /* Eliminate the easy cases */
     pixNumColors(pixs, 1, &ncolors);
@@ -660,25 +655,25 @@ PIXCMAP   *cmap;
         if (pixcmapGetCount(cmap) == ncolors)  /* irreducible */
             return pixCopy(NULL, pixs);
         else
-            pix1 = pixRemoveColormap(pixs, REMOVE_CMAP_TO_GRAYSCALE);
+            pixt = pixRemoveColormap(pixs, REMOVE_CMAP_TO_GRAYSCALE);
     } else {
         if (ncolors == 256) {
-            pix1 = pixCopy(NULL, pixs);
-            pixAddGrayColormap8(pix1);
-            return pix1;
+            pixt = pixCopy(NULL, pixs);
+            pixAddGrayColormap8(pixt);
+            return pixt;
         }
-        pix1 = pixClone(pixs);
+        pixt = pixClone(pixs);
     }
 
         /* Find the gray levels and make a reverse map */
-    pixGetDimensions(pix1, &w, &h, NULL);
-    data1 = pixGetData(pix1);
-    wpl1 = pixGetWpl(pix1);
+    pixGetDimensions(pixt, &w, &h, NULL);
+    datat = pixGetData(pixt);
+    wplt = pixGetWpl(pixt);
     inta = (l_int32 *)LEPT_CALLOC(256, sizeof(l_int32));
     for (i = 0; i < h; i++) {
-        line1 = data1 + i * wpl1;
+        linet = datat + i * wplt;
         for (j = 0; j < w; j++) {
-            val = GET_DATA_BYTE(line1, j);
+            val = GET_DATA_BYTE(linet, j);
             inta[val] = 1;
         }
     }
@@ -692,22 +687,22 @@ PIXCMAP   *cmap;
     }
 
         /* Set all pixels in pixd to the colormap index */
-    pixd = pixCreateTemplate(pix1);
+    pixd = pixCreateTemplate(pixt);
     pixSetColormap(pixd, cmap);
     pixCopyInputFormat(pixd, pixs);
     pixCopyResolution(pixd, pixs);
     datad = pixGetData(pixd);
     wpld = pixGetWpl(pixd);
     for (i = 0; i < h; i++) {
-        line1 = data1 + i * wpl1;
+        linet = datat + i * wplt;
         lined = datad + i * wpld;
         for (j = 0; j < w; j++) {
-            val = GET_DATA_BYTE(line1, j);
+            val = GET_DATA_BYTE(linet, j);
             SET_DATA_BYTE(lined, j, revmap[val]);
         }
     }
 
-    pixDestroy(&pix1);
+    pixDestroy(&pixt);
     LEPT_FREE(inta);
     LEPT_FREE(revmap);
     return pixd;
@@ -720,7 +715,7 @@ PIXCMAP   *cmap;
 /*!
  * \brief   pixConvertRGBToLuminance()
  *
- * \param[in]    pixs   32 bpp RGB
+ * \param[in]    pixs 32 bpp RGB
  * \return  8 bpp pix, or NULL on error
  *
  * <pre>
@@ -736,72 +731,9 @@ pixConvertRGBToLuminance(PIX *pixs)
 
 
 /*!
- * \brief   pixConvertRGBToGrayGeneral()
- *
- * \param[in]    pixs           32 bpp RGB
- * \param[in]    type           color selection flag
- * \param[in]    rwt, gwt, bwt  ignored if type != L_SELECT_WEIGHTED;
- *                              if used, must sum to 1.0.
- * \return  8 bpp pix, or NULL on error
- *
- * <pre>
- * Notes:
- *      (1) The color selection flag is one of: L_SELECT_RED, L_SELECT_GREEN,
- *          L_SELECT_BLUE, L_SELECT_MIN, L_SELECT_MAX, L_SELECT_AVERAGE,
- *          L_SELECT_HUE, L_SELECT_SATURATION, L_SELECT_WEIGHTED.
- *      (2) The weights, if used, must all be non-negative and must sum to 1.0.
- * </pre>
- */
-PIX *
-pixConvertRGBToGrayGeneral(PIX       *pixs,
-                           l_int32    type,
-                           l_float32  rwt,
-                           l_float32  gwt,
-                           l_float32  bwt)
-{
-PIX  *pix1;
-
-    if (!pixs || pixGetDepth(pixs) != 32)
-        return (PIX *)ERROR_PTR("pixs undefined or not 32 bpp", __func__, NULL);
-    if (type != L_SELECT_RED && type != L_SELECT_GREEN &&
-        type != L_SELECT_BLUE && type != L_SELECT_MIN &&
-        type != L_SELECT_MAX && type != L_SELECT_AVERAGE &&
-        type != L_SELECT_HUE && type != L_SELECT_SATURATION &&
-        type != L_SELECT_WEIGHTED)
-        return (PIX *)ERROR_PTR("invalid type", __func__, NULL);
-
-    if (type == L_SELECT_RED) {
-        pix1 = pixGetRGBComponent(pixs, COLOR_RED);
-    } else if (type == L_SELECT_GREEN) {
-        pix1 = pixGetRGBComponent(pixs, COLOR_GREEN);
-    } else if (type == L_SELECT_BLUE) {
-        pix1 = pixGetRGBComponent(pixs, COLOR_BLUE);
-    } else if (type == L_SELECT_MIN) {
-        pix1 = pixConvertRGBToGrayMinMax(pixs, L_CHOOSE_MIN);
-    } else if (type == L_SELECT_MAX) {
-        pix1 = pixConvertRGBToGrayMinMax(pixs, L_CHOOSE_MAX);
-    } else if (type == L_SELECT_AVERAGE) {
-        pix1 = pixConvertRGBToGray(pixs, 0.34f, 0.33f, 0.33f);
-    } else if (type == L_SELECT_HUE) {
-        pix1 = pixConvertRGBToHue(pixs);
-    } else if (type == L_SELECT_SATURATION) {
-        pix1 = pixConvertRGBToSaturation(pixs);
-    } else { /* L_SELECT_WEIGHTED */
-        if (rwt < 0.0 || gwt < 0.0 || bwt < 0.0)
-            return (PIX *)ERROR_PTR("weights not all >= 0.0", __func__, NULL);
-        if (rwt + gwt + bwt != 1.0)
-            return (PIX *)ERROR_PTR("weights don't sum to 1.0", __func__, NULL);
-        pix1 = pixConvertRGBToGray(pixs, rwt, gwt, bwt);
-    }
-
-    return pix1;
-}
-
-
-/*!
  * \brief   pixConvertRGBToGray()
  *
- * \param[in]    pixs           32 bpp RGB
+ * \param[in]    pixs 32 bpp RGB
  * \param[in]    rwt, gwt, bwt  non-negative; these should add to 1.0,
  *                              or use 0.0 for default
  * \return  8 bpp pix, or NULL on error
@@ -823,12 +755,14 @@ l_uint32  *datas, *lines, *datad, *lined;
 l_float32  sum;
 PIX       *pixd;
 
+    PROCNAME("pixConvertRGBToGray");
+
     if (!pixs)
-        return (PIX *)ERROR_PTR("pixs not defined", __func__, NULL);
+        return (PIX *)ERROR_PTR("pixs not defined", procName, NULL);
     if (pixGetDepth(pixs) != 32)
-        return (PIX *)ERROR_PTR("pixs not 32 bpp", __func__, NULL);
+        return (PIX *)ERROR_PTR("pixs not 32 bpp", procName, NULL);
     if (rwt < 0.0 || gwt < 0.0 || bwt < 0.0)
-        return (PIX *)ERROR_PTR("weights not all >= 0.0", __func__, NULL);
+        return (PIX *)ERROR_PTR("weights not all >= 0.0", procName, NULL);
 
         /* Make sure the sum of weights is 1.0; otherwise, you can get
          * overflow in the gray value. */
@@ -839,7 +773,7 @@ PIX       *pixd;
     }
     sum = rwt + gwt + bwt;
     if (L_ABS(sum - 1.0) > 0.0001) {  /* maintain ratios with sum == 1.0 */
-        L_WARNING("weights don't sum to 1; maintaining ratios\n", __func__);
+        L_WARNING("weights don't sum to 1; maintaining ratios\n", procName);
         rwt = rwt / sum;
         gwt = gwt / sum;
         bwt = bwt / sum;
@@ -849,7 +783,7 @@ PIX       *pixd;
     datas = pixGetData(pixs);
     wpls = pixGetWpl(pixs);
     if ((pixd = pixCreate(w, h, 8)) == NULL)
-        return (PIX *)ERROR_PTR("pixd not made", __func__, NULL);
+        return (PIX *)ERROR_PTR("pixd not made", procName, NULL);
     pixCopyResolution(pixd, pixs);
     pixCopyInputFormat(pixd, pixs);
     datad = pixGetData(pixd);
@@ -874,7 +808,7 @@ PIX       *pixd;
 /*!
  * \brief   pixConvertRGBToGrayFast()
  *
- * \param[in]    pixs    32 bpp RGB
+ * \param[in]    pixs 32 bpp RGB
  * \return  8 bpp pix, or NULL on error
  *
  * <pre>
@@ -894,16 +828,18 @@ l_int32    i, j, w, h, wpls, wpld, val;
 l_uint32  *datas, *lines, *datad, *lined;
 PIX       *pixd;
 
+    PROCNAME("pixConvertRGBToGrayFast");
+
     if (!pixs)
-        return (PIX *)ERROR_PTR("pixs not defined", __func__, NULL);
+        return (PIX *)ERROR_PTR("pixs not defined", procName, NULL);
     if (pixGetDepth(pixs) != 32)
-        return (PIX *)ERROR_PTR("pixs not 32 bpp", __func__, NULL);
+        return (PIX *)ERROR_PTR("pixs not 32 bpp", procName, NULL);
 
     pixGetDimensions(pixs, &w, &h, NULL);
     datas = pixGetData(pixs);
     wpls = pixGetWpl(pixs);
     if ((pixd = pixCreate(w, h, 8)) == NULL)
-        return (PIX *)ERROR_PTR("pixd not made", __func__, NULL);
+        return (PIX *)ERROR_PTR("pixd not made", procName, NULL);
     pixCopyResolution(pixd, pixs);
     pixCopyInputFormat(pixd, pixs);
     datad = pixGetData(pixd);
@@ -925,9 +861,9 @@ PIX       *pixd;
 /*!
  * \brief   pixConvertRGBToGrayMinMax()
  *
- * \param[in]    pixs   32 bpp RGB
- * \param[in]    type   L_CHOOSE_MIN, L_CHOOSE_MAX, L_CHOOSE_MAXDIFF,
- *                      L_CHOOSE_MIN_BOOST, L_CHOOSE_MAX_BOOST
+ * \param[in]    pixs 32 bpp RGB
+ * \param[in]    type L_CHOOSE_MIN, L_CHOOSE_MAX, L_CHOOSE_MAXDIFF,
+ *                    L_CHOOSE_MIN_BOOST, L_CHOOSE_MAX_BOOST
  * \return  8 bpp pix, or NULL on error
  *
  * <pre>
@@ -939,8 +875,6 @@ PIX       *pixd;
  *          value.
  *      (2) The default reference value for boosting the min and max
  *          is 200.  This can be changed with l_setNeutralBoostVal()
- *      (3) The result with L_CHOOSE_MAXDIFF is surprisingly sensitive
- *          to a jpeg compression/decompression cycle with quality = 75.
  * </pre>
  */
 PIX *
@@ -951,20 +885,22 @@ l_int32    i, j, w, h, wpls, wpld, rval, gval, bval, val, minval, maxval;
 l_uint32  *datas, *lines, *datad, *lined;
 PIX       *pixd;
 
+    PROCNAME("pixConvertRGBToGrayMinMax");
+
     if (!pixs)
-        return (PIX *)ERROR_PTR("pixs not defined", __func__, NULL);
+        return (PIX *)ERROR_PTR("pixs not defined", procName, NULL);
     if (pixGetDepth(pixs) != 32)
-        return (PIX *)ERROR_PTR("pixs not 32 bpp", __func__, NULL);
+        return (PIX *)ERROR_PTR("pixs not 32 bpp", procName, NULL);
     if (type != L_CHOOSE_MIN && type != L_CHOOSE_MAX &&
         type != L_CHOOSE_MAXDIFF && type != L_CHOOSE_MIN_BOOST &&
         type != L_CHOOSE_MAX_BOOST)
-        return (PIX *)ERROR_PTR("invalid type", __func__, NULL);
+        return (PIX *)ERROR_PTR("invalid type", procName, NULL);
 
     pixGetDimensions(pixs, &w, &h, NULL);
     datas = pixGetData(pixs);
     wpls = pixGetWpl(pixs);
     if ((pixd = pixCreate(w, h, 8)) == NULL)
-        return (PIX *)ERROR_PTR("pixd not made", __func__, NULL);
+        return (PIX *)ERROR_PTR("pixd not made", procName, NULL);
     pixCopyResolution(pixd, pixs);
     pixCopyInputFormat(pixd, pixs);
     datad = pixGetData(pixd);
@@ -1003,8 +939,8 @@ PIX       *pixd;
 /*!
  * \brief   pixConvertRGBToGraySatBoost()
  *
- * \param[in]    pixs    32 bpp rgb
- * \param[in]    refval  between 1 and 255; typ. less than 128
+ * \param[in]    pixs 32 bpp rgb
+ * \param[in]    refval between 1 and 255; typ. less than 128
  * \return  pixd 8 bpp, or NULL on error
  *
  * <pre>
@@ -1039,13 +975,15 @@ l_float32  *invmax, *ratio;
 l_uint32   *linet, *lined, *datat, *datad;
 PIX        *pixt, *pixd;
 
+    PROCNAME("pixConvertRGBToGraySatBoost");
+
     if (!pixs)
-        return (PIX *)ERROR_PTR("pixs not defined", __func__, NULL);
+        return (PIX *)ERROR_PTR("pixs not defined", procName, NULL);
     pixGetDimensions(pixs, &w, &h, &d);
     if (d != 32 && !pixGetColormap(pixs))
-        return (PIX *)ERROR_PTR("pixs not cmapped or rgb", __func__, NULL);
+        return (PIX *)ERROR_PTR("pixs not cmapped or rgb", procName, NULL);
     if (refval < 1 || refval > 255)
-        return (PIX *)ERROR_PTR("refval not in [1 ... 255]", __func__, NULL);
+        return (PIX *)ERROR_PTR("refval not in [1 ... 255]", procName, NULL);
 
     pixt = pixRemoveColormap(pixs, REMOVE_CMAP_TO_FULL_COLOR);
     pixd = pixCreate(w, h, 8);
@@ -1058,7 +996,7 @@ PIX        *pixt, *pixd;
     invmax = (l_float32 *)LEPT_CALLOC(256, sizeof(l_float32));
     ratio = (l_float32 *)LEPT_CALLOC(256, sizeof(l_float32));
     for (i = 1; i < 256; i++) {  /* i == 0  --> delta = sval = newval = 0 */
-        invmax[i] = 1.0f / (l_float32)i;
+        invmax[i] = 1.0 / (l_float32)i;
         ratio[i] = (l_float32)i / (l_float32)refval;
     }
     for (i = 0; i < h; i++) {
@@ -1092,7 +1030,7 @@ PIX        *pixt, *pixd;
 /*!
  * \brief   pixConvertRGBToGrayArb()
  *
- * \param[in]    pixs        32 bpp RGB
+ * \param[in]    pixs 32 bpp RGB
  * \param[in]    rc, gc, bc  arithmetic factors; can be negative
  * \return  8 bpp pix, or NULL on error
  *
@@ -1114,18 +1052,20 @@ l_int32    i, j, w, h, wpls, wpld, rval, gval, bval, val;
 l_uint32  *datas, *lines, *datad, *lined;
 PIX       *pixd;
 
+    PROCNAME("pixConvertRGBToGrayArb");
+
     if (!pixs)
-        return (PIX *)ERROR_PTR("pixs not defined", __func__, NULL);
+        return (PIX *)ERROR_PTR("pixs not defined", procName, NULL);
     if (pixGetDepth(pixs) != 32)
-        return (PIX *)ERROR_PTR("pixs not 32 bpp", __func__, NULL);
+        return (PIX *)ERROR_PTR("pixs not 32 bpp", procName, NULL);
     if (rc <= 0 && gc <= 0 && bc <= 0)
-        return (PIX *)ERROR_PTR("all coefficients <= 0", __func__, NULL);
+        return (PIX *)ERROR_PTR("all coefficients <= 0", procName, NULL);
 
     pixGetDimensions(pixs, &w, &h, NULL);
     datas = pixGetData(pixs);
     wpls = pixGetWpl(pixs);
     if ((pixd = pixCreate(w, h, 8)) == NULL)
-        return (PIX *)ERROR_PTR("pixd not made", __func__, NULL);
+        return (PIX *)ERROR_PTR("pixd not made", procName, NULL);
     pixCopyResolution(pixd, pixs);
     pixCopyInputFormat(pixd, pixs);
     datad = pixGetData(pixd);
@@ -1149,7 +1089,7 @@ PIX       *pixd;
 /*!
  * \brief   pixConvertRGBToBinaryArb()
  *
- * \param[in]    pixs        32 bpp RGB
+ * \param[in]    pixs 32 bpp RGB
  * \param[in]    rc, gc, bc  arithmetic factors; can be negative
  * \param[in]    thresh      binarization threshold
  * \param[in]    relation    L_SELECT_IF_LT, L_SELECT_IF_GT
@@ -1175,13 +1115,15 @@ pixConvertRGBToBinaryArb(PIX       *pixs,
 l_int32  threshold;
 PIX     *pix1, *pix2;
 
+    PROCNAME("pixConvertRGBToBinaryArb");
+
     if (!pixs || pixGetDepth(pixs) != 32)
-        return (PIX *)ERROR_PTR("pixs undefined or not 32 bpp", __func__, NULL);
+        return (PIX *)ERROR_PTR("pixs undefined or not 32 bpp", procName, NULL);
     if (rc <= 0 && gc <= 0 && bc <= 0)
-        return (PIX *)ERROR_PTR("all coefficients <= 0", __func__, NULL);
+        return (PIX *)ERROR_PTR("all coefficients <= 0", procName, NULL);
     if (relation != L_SELECT_IF_LT && relation != L_SELECT_IF_GT &&
         relation != L_SELECT_IF_LTE && relation != L_SELECT_IF_GTE)
-        return (PIX *)ERROR_PTR("invalid relation", __func__, NULL);
+        return (PIX *)ERROR_PTR("invalid relation", procName, NULL);
 
     pix1 = pixConvertRGBToGrayArb(pixs, rc, gc, bc);
     threshold = (relation == L_SELECT_IF_LTE || relation == L_SELECT_IF_GT) ?
@@ -1200,7 +1142,7 @@ PIX     *pix1, *pix2;
 /*!
  * \brief   pixConvertGrayToColormap()
  *
- * \param[in]    pixs    2, 4 or 8 bpp grayscale
+ * \param[in]    pixs 2, 4 or 8 bpp grayscale
  * \return  pixd 2, 4 or 8 bpp with colormap, or NULL on error
  *
  * <pre>
@@ -1226,14 +1168,16 @@ l_int32    d;
 PIX       *pixd;
 PIXCMAP   *cmap;
 
+    PROCNAME("pixConvertGrayToColormap");
+
     if (!pixs)
-        return (PIX *)ERROR_PTR("pixs not defined", __func__, NULL);
+        return (PIX *)ERROR_PTR("pixs not defined", procName, NULL);
     d = pixGetDepth(pixs);
     if (d != 2 && d != 4 && d != 8)
-        return (PIX *)ERROR_PTR("pixs not 2, 4 or 8 bpp", __func__, NULL);
+        return (PIX *)ERROR_PTR("pixs not 2, 4 or 8 bpp", procName, NULL);
 
     if (pixGetColormap(pixs)) {
-        L_INFO("pixs already has a colormap\n", __func__);
+        L_INFO("pixs already has a colormap\n", procName);
         return pixCopy(NULL, pixs);
     }
 
@@ -1253,8 +1197,8 @@ PIXCMAP   *cmap;
 /*!
  * \brief   pixConvertGrayToColormap8()
  *
- * \param[in]    pixs       8 bpp grayscale
- * \param[in]    mindepth   of pixd; valid values are 2, 4 and 8
+ * \param[in]    pixs 8 bpp grayscale
+ * \param[in]    mindepth of pixd; valid values are 2, 4 and 8
  * \return  pixd 2, 4 or 8 bpp with colormap, or NULL on error
  *
  * <pre>
@@ -1284,17 +1228,19 @@ NUMA      *na;
 PIX       *pixd;
 PIXCMAP   *cmap;
 
+    PROCNAME("pixConvertGrayToColormap8");
+
     if (!pixs)
-        return (PIX *)ERROR_PTR("pixs not defined", __func__, NULL);
+        return (PIX *)ERROR_PTR("pixs not defined", procName, NULL);
     if (pixGetDepth(pixs) != 8)
-        return (PIX *)ERROR_PTR("pixs not 8 bpp", __func__, NULL);
+        return (PIX *)ERROR_PTR("pixs not 8 bpp", procName, NULL);
     if (mindepth != 2 && mindepth != 4 && mindepth != 8) {
-        L_WARNING("invalid value of mindepth; setting to 8\n", __func__);
+        L_WARNING("invalid value of mindepth; setting to 8\n", procName);
         mindepth = 8;
     }
 
     if (pixGetColormap(pixs)) {
-        L_INFO("pixs already has a colormap\n", __func__);
+        L_INFO("pixs already has a colormap\n", procName);
         return pixCopy(NULL, pixs);
     }
 
@@ -1355,9 +1301,9 @@ PIXCMAP   *cmap;
 /*!
  * \brief   pixColorizeGray()
  *
- * \param[in]    pixs      8 bpp gray; 2, 4 or 8 bpp colormapped
- * \param[in]    color     32 bit rgba pixel
- * \param[in]    cmapflag  1 for result to have colormap; 0 for RGB
+ * \param[in]    pixs 8 bpp gray; 2, 4 or 8 bpp colormapped
+ * \param[in]    color 32 bit rgba pixel
+ * \param[in]    cmapflag 1 for result to have colormap; 0 for RGB
  * \return  pixd 8 bpp colormapped or 32 bpp rgb, or NULL on error
  *
  * <pre>
@@ -1377,10 +1323,12 @@ l_uint32  *datad, *datat, *lined, *linet, *tab;
 PIX       *pixt, *pixd;
 PIXCMAP   *cmap;
 
+    PROCNAME("pixColorizeGray");
+
     if (!pixs)
-        return (PIX *)ERROR_PTR("pixs not defined", __func__, NULL);
+        return (PIX *)ERROR_PTR("pixs not defined", procName, NULL);
     if (pixGetDepth(pixs) != 8 && !pixGetColormap(pixs))
-        return (PIX *)ERROR_PTR("pixs not 8 bpp or cmapped", __func__, NULL);
+        return (PIX *)ERROR_PTR("pixs not 8 bpp or cmapped", procName, NULL);
 
     if (pixGetColormap(pixs))
         pixt = pixRemoveColormap(pixs, REMOVE_CMAP_TO_GRAYSCALE);
@@ -1427,8 +1375,8 @@ PIXCMAP   *cmap;
 /*!
  * \brief   pixConvertRGBToColormap()
  *
- * \param[in]    pixs       32 bpp rgb
- * \param[in]    ditherflag  1 to dither, 0 otherwise
+ * \param[in]    pixs 32 bpp rgb
+ * \param[in]    ditherflag 1 to dither, 0 otherwise
  * \return  pixd 2, 4 or 8 bpp with colormap, or NULL on error
  *
  * <pre>
@@ -1446,7 +1394,9 @@ PIXCMAP   *cmap;
  *          the color in the colormap that represents all pixels in
  *          one of those octcubes is given by the first pixel that
  *          falls into that octcube.
- *      (3) Dithering gives better visual results on images where
+ *      (3) If there are more than 256 colors, we use adaptive octree
+ *          color quantization.
+ *      (4) Dithering gives better visual results on images where
  *          there is a color wash (a slow variation of color), but it
  *          is about twice as slow and results in significantly larger
  *          files when losslessly compressed (e.g., into png).
@@ -1460,12 +1410,14 @@ l_int32  ncolors;
 NUMA    *na;
 PIX     *pixd;
 
+    PROCNAME("pixConvertRGBToColormap");
+
     if (!pixs)
-        return (PIX *)ERROR_PTR("pixs not defined", __func__, NULL);
+        return (PIX *)ERROR_PTR("pixs not defined", procName, NULL);
     if (pixGetDepth(pixs) != 32)
-        return (PIX *)ERROR_PTR("pixs not 32 bpp", __func__, NULL);
+        return (PIX *)ERROR_PTR("pixs not 32 bpp", procName, NULL);
     if (pixGetSpp(pixs) == 4)
-        L_WARNING("pixs has alpha; removing\n", __func__);
+        L_WARNING("pixs has alpha; removing\n", procName);
 
         /* Get the histogram and count the number of occupied level 4
          * leaf octcubes.  We don't yet know if this is the number of
@@ -1474,25 +1426,26 @@ PIX     *pixd;
          * first pixel that lands there. */
     na = pixOctcubeHistogram(pixs, 4, &ncolors);
 
-        /* If 256 or fewer occupied leaf octcubes, quantize to those octcubes */
-    if (ncolors <= 256) {
-        pixd = pixFewColorsOctcubeQuant2(pixs, 4, na, ncolors, NULL);
-        pixCopyInputFormat(pixd, pixs);
+        /* If there are too many occupied leaf octcubes to be
+         * represented directly in a colormap, fall back to octree
+         * quantization, optionally with dithering. */
+    if (ncolors > 256) {
         numaDestroy(&na);
-        return pixd;
+        if (ditherflag)
+            L_INFO("More than 256 colors; using octree quant with dithering\n",
+                   procName);
+        else
+            L_INFO("More than 256 colors; using octree quant; no dithering\n",
+                   procName);
+        return pixOctreeColorQuant(pixs, 240, ditherflag);
     }
 
-        /* There are too many occupied leaf octcubes to be represented
-         * directly in a colormap.  Fall back to octree quantization,
-         * optionally with dithering. */
+        /* There are not more than 256 occupied leaf octcubes.
+         * Quantize to those octcubes. */
+    pixd = pixFewColorsOctcubeQuant2(pixs, 4, na, ncolors, NULL);
+    pixCopyInputFormat(pixd, pixs);
     numaDestroy(&na);
-    if (ditherflag)
-        L_INFO("More than 256 colors; using octree quant with dithering\n",
-               __func__);
-    else
-        L_INFO("More than 256 colors; using octree quant; no dithering\n",
-               __func__);
-    return pixOctreeColorQuant(pixs, 240, ditherflag);
+    return pixd;
 }
 
 
@@ -1502,7 +1455,7 @@ PIX     *pixd;
 /*!
  * \brief   pixConvertCmapTo1()
  *
- * \param[in]    pixs   cmapped
+ * \param[in]    pixs cmapped
  * \return  pixd 1 bpp, or NULL on error
  *
  * <pre>
@@ -1526,10 +1479,12 @@ NUMA      *na1, *na2;  /* histograms */
 PIX       *pix1, *pixd;
 PIXCMAP   *cmap;
 
+    PROCNAME("pixConvertCmapTo1");
+
     if (!pixs)
-        return (PIX *)ERROR_PTR("pixs not defined", __func__, NULL);
+        return (PIX *)ERROR_PTR("pixs not defined", procName, NULL);
     if ((cmap = pixGetColormap(pixs)) == NULL)
-        return (PIX *)ERROR_PTR("no colormap", __func__, NULL);
+        return (PIX *)ERROR_PTR("no colormap", procName, NULL);
 
         /* Select target colors for the two classes.  Find the
          * colors with smallest and largest average component values.
@@ -1543,7 +1498,7 @@ PIXCMAP   *cmap;
          * initialized to 0, so any colors not found when computing
          * the sampled histogram will get zero weight in minfract. */
     if ((lut = (l_int32 *)LEPT_CALLOC(nc, sizeof(l_int32))) == NULL)
-        return (PIX *)ERROR_PTR("calloc fail for lut", __func__, NULL);
+        return (PIX *)ERROR_PTR("calloc fail for lut", procName, NULL);
     pixGetDimensions(pixs, &w, &h, NULL);
     factor = L_MAX(1, (l_int32)sqrt((l_float64)(w * h) / 50000. + 0.5));
     na1 = pixGetCmapHistogram(pixs, factor);
@@ -1582,7 +1537,7 @@ PIXCMAP   *cmap;
         /* We expect minfract (the dark colors) to be less than 0.5.
          * If that is not the case, invert pixd. */
     if (minfract > 0.5) {
-        L_INFO("minfract = %5.3f; inverting\n", __func__, minfract);
+        L_INFO("minfract = %5.3f; inverting\n", procName, minfract);
         pixInvert(pixd, pixd);
     }
 
@@ -1596,14 +1551,13 @@ PIXCMAP   *cmap;
 /*!
  * \brief   pixQuantizeIfFewColors()
  *
- * \param[in]    pixs           8 bpp gray or 32 bpp rgb
- * \param[in]    maxcolors      max number of colors allowed to be returned
- *                              from pixColorsForQuantization();
- *                              use 0 for default
- * \param[in]    mingraycolors  min number of gray levels that a grayscale
- *                              image is quantized to; use 0 for default
- * \param[in]    octlevel       for octcube quantization: 3 or 4
- * \param[out]   ppixd          2,4 or 8 bpp quantized; null if too many colors
+ * \param[in]    pixs 8 bpp gray or 32 bpp rgb
+ * \param[in]    maxcolors max number of colors allowed to be returned
+ *                         from pixColorsForQuantization(); use 0 for default
+ * \param[in]    mingraycolors min number of gray levels that a grayscale
+ *                             image is quantized to; use 0 for default
+ * \param[in]    octlevel for octcube quantization: 3 or 4
+ * \param[out]   ppixd 2,4 or 8 bpp quantized; null if too many colors
  * \return  0 if OK, 1 on error or if pixs can't be quantized into
  *              a small number of colors.
  *
@@ -1623,7 +1577,7 @@ PIXCMAP   *cmap;
  *      (4) If the image already has a colormap, it returns a clone.
  * </pre>
  */
-l_ok
+l_int32
 pixQuantizeIfFewColors(PIX     *pixs,
                        l_int32  maxcolors,
                        l_int32  mingraycolors,
@@ -1633,14 +1587,16 @@ pixQuantizeIfFewColors(PIX     *pixs,
 l_int32  d, ncolors, iscolor, graycolors;
 PIX     *pixg, *pixd;
 
+    PROCNAME("pixQuantizeIfFewColors");
+
     if (!ppixd)
-        return ERROR_INT("&pixd not defined", __func__, 1);
+        return ERROR_INT("&pixd not defined", procName, 1);
     *ppixd = NULL;
     if (!pixs)
-        return ERROR_INT("pixs not defined", __func__, 1);
+        return ERROR_INT("pixs not defined", procName, 1);
     d = pixGetDepth(pixs);
     if (d != 8 && d != 32)
-        return ERROR_INT("pixs not defined", __func__, 1);
+        return ERROR_INT("pixs not defined", procName, 1);
     if (pixGetColormap(pixs) != NULL) {
         *ppixd = pixClone(pixs);
         return 0;
@@ -1648,13 +1604,13 @@ PIX     *pixg, *pixd;
     if (maxcolors <= 0)
         maxcolors = 15;  /* default */
     if (maxcolors > 50)
-        L_WARNING("maxcolors > 50; very large!\n", __func__);
+        L_WARNING("maxcolors > 50; very large!\n", procName);
     if (mingraycolors <= 0)
         mingraycolors = 10;  /* default */
     if (mingraycolors > 30)
-        L_WARNING("mingraycolors > 30; very large!\n", __func__);
+        L_WARNING("mingraycolors > 30; very large!\n", procName);
     if (octlevel != 3 && octlevel != 4) {
-        L_WARNING("invalid octlevel; setting to 3\n", __func__);
+        L_WARNING("invalid octlevel; setting to 3\n", procName);
         octlevel = 3;
     }
 
@@ -1662,7 +1618,7 @@ PIX     *pixg, *pixd;
          * are at level 4. */
     pixColorsForQuantization(pixs, 0, &ncolors, &iscolor, 0);
     if (ncolors > maxcolors)
-        return ERROR_INT("too many colors", __func__, 1);
+        return ERROR_INT("too many colors", procName, 1);
 
         /* Quantize!
          *  (1) For color:
@@ -1679,7 +1635,7 @@ PIX     *pixg, *pixd;
         if (!pixd) {  /* backoff */
             pixd = pixFewColorsOctcubeQuant1(pixs, octlevel - 1);
             if (octlevel == 3)  /* shouldn't happen */
-                L_WARNING("quantized at level 2; low quality\n", __func__);
+                L_WARNING("quantized at level 2; low quality\n", procName);
         }
     } else { /* image is really grayscale */
         if (d == 32)
@@ -1697,7 +1653,7 @@ PIX     *pixg, *pixd;
     *ppixd = pixd;
 
     if (!pixd)
-        return ERROR_INT("pixd not made", __func__, 1);
+        return ERROR_INT("pixd not made", procName, 1);
     pixCopyInputFormat(pixd, pixs);
     return 0;
 }
@@ -1710,8 +1666,8 @@ PIX     *pixg, *pixd;
 /*!
  * \brief   pixConvert16To8()
  *
- * \param[in]    pixs     16 bpp
- * \param[in]    type     L_LS_BYTE, L_MS_BYTE, L_AUTO_BYTE, L_CLIP_TO_FF
+ * \param[in]    pixs 16 bpp
+ * \param[in]    type L_LS_BYTE, L_MS_BYTE, L_AUTO_BYTE, L_CLIP_TO_FF
  * \return  pixd 8 bpp, or NULL on error
  *
  * <pre>
@@ -1732,17 +1688,19 @@ l_uint32   sword, first, second;
 l_uint32  *datas, *datad, *lines, *lined;
 PIX       *pixd;
 
+    PROCNAME("pixConvert16To8");
+
     if (!pixs)
-        return (PIX *)ERROR_PTR("pixs not defined", __func__, NULL);
+        return (PIX *)ERROR_PTR("pixs not defined", procName, NULL);
     if (pixGetDepth(pixs) != 16)
-        return (PIX *)ERROR_PTR("pixs not 16 bpp", __func__, NULL);
+        return (PIX *)ERROR_PTR("pixs not 16 bpp", procName, NULL);
     if (type != L_LS_BYTE && type != L_MS_BYTE &&
         type != L_AUTO_BYTE && type != L_CLIP_TO_FF)
-        return (PIX *)ERROR_PTR("invalid type", __func__, NULL);
+        return (PIX *)ERROR_PTR("invalid type", procName, NULL);
 
     pixGetDimensions(pixs, &w, &h, NULL);
     if ((pixd = pixCreate(w, h, 8)) == NULL)
-        return (PIX *)ERROR_PTR("pixd not made", __func__, NULL);
+        return (PIX *)ERROR_PTR("pixd not made", procName, NULL);
     pixCopyInputFormat(pixd, pixs);
     pixCopyResolution(pixd, pixs);
     wpls = pixGetWpl(pixs);
@@ -1765,7 +1723,7 @@ PIX       *pixd;
         }
         type = (use_lsb) ? L_LS_BYTE : L_MS_BYTE;
     }
-
+        
         /* Convert 2 pixels at a time */
     for (i = 0; i < h; i++) {
         lines = datas + i * wpls;
@@ -1797,15 +1755,16 @@ PIX       *pixd;
 }
 
 
+
 /*---------------------------------------------------------------------------*
  *                Conversion from grayscale to false color
  *---------------------------------------------------------------------------*/
 /*!
  * \brief   pixConvertGrayToFalseColor()
  *
- * \param[in]    pixs    8 or 16 bpp grayscale
- * \param[in]    gamma   (factor) 0.0 or 1.0 for default; > 1.0 for brighter;
- *                       2.0 is quite nice
+ * \param[in]    pixs 8 or 16 bpp grayscale
+ * \param[in]    gamma factor 0.0 or 1.0 for default; > 1.0 for brighter;
+ *                            2.0 is quite nice
  * \return  pixd 8 bpp with colormap, or NULL on error
  *
  * <pre>
@@ -1820,15 +1779,19 @@ PIX *
 pixConvertGrayToFalseColor(PIX       *pixs,
                            l_float32  gamma)
 {
-l_int32   d;
-PIX      *pixd;
-PIXCMAP  *cmap;
+l_int32    d, i, rval, bval, gval;
+l_int32   *curve;
+l_float32  invgamma, x;
+PIX       *pixd;
+PIXCMAP   *cmap;
+
+    PROCNAME("pixConvertGrayToFalseColor");
 
     if (!pixs)
-        return (PIX *)ERROR_PTR("pixs not defined", __func__, NULL);
+        return (PIX *)ERROR_PTR("pixs not defined", procName, NULL);
     d = pixGetDepth(pixs);
     if (d != 8 && d != 16)
-        return (PIX *)ERROR_PTR("pixs not 8 or 16 bpp", __func__, NULL);
+        return (PIX *)ERROR_PTR("pixs not 8 or 16 bpp", procName, NULL);
 
     if (d == 16) {
         pixd = pixConvert16To8(pixs, L_MS_BYTE);
@@ -1839,12 +1802,47 @@ PIXCMAP  *cmap;
             pixd = pixCopy(NULL, pixs);
     }
     if (!pixd)
-        return (PIX *)ERROR_PTR("pixd not made", __func__, NULL);
-
-    cmap = pixcmapGrayToFalseColor(gamma);
+        return (PIX *)ERROR_PTR("pixd not made", procName, NULL);
+    cmap = pixcmapCreate(8);
     pixSetColormap(pixd, cmap);
     pixCopyResolution(pixd, pixs);
     pixCopyInputFormat(pixd, pixs);
+
+        /* Generate curve for transition part of color map */
+    curve = (l_int32 *)LEPT_CALLOC(64, sizeof(l_int32));
+    if (gamma == 0.0) gamma = 1.0;
+    invgamma = 1. / gamma;
+    for (i = 0; i < 64; i++) {
+        x = (l_float32)i / 64.;
+        curve[i] = (l_int32)(255. * powf(x, invgamma) + 0.5);
+    }
+
+    for (i = 0; i < 256; i++) {
+        if (i < 32) {
+            rval = 0;
+            gval = 0;
+            bval = curve[i + 32];
+        } else if (i < 96) {   /* 32 - 95 */
+            rval = 0;
+            gval = curve[i - 32];
+            bval = 255;
+        } else if (i < 160) {  /* 96 - 159 */
+            rval = curve[i - 96];
+            gval = 255;
+            bval = curve[159 - i];
+        } else if (i < 224) {  /* 160 - 223 */
+            rval = 255;
+            gval = curve[223 - i];
+            bval = 0;
+        } else {  /* 224 - 255 */
+            rval = curve[287 - i];
+            gval = 0;
+            bval = 0;
+        }
+        pixcmapAddColor(cmap, rval, gval, bval);
+    }
+
+    LEPT_FREE(curve);
     return pixd;
 }
 
@@ -1855,12 +1853,12 @@ PIXCMAP  *cmap;
 /*!
  * \brief   pixUnpackBinary()
  *
- * \param[in]    pixs     1 bpp
- * \param[in]    depth    of destination: 2, 4, 8, 16 or 32 bpp
- * \param[in]    invert   0:  binary 0 --> grayscale 0
- *                            binary 1 --> grayscale 0xff...
- *                        1:  binary 0 --> grayscale 0xff...
- *                            binary 1 --> grayscale 0
+ * \param[in]    pixs 1 bpp
+ * \param[in]    depth of destination: 2, 4, 8, 16 or 32 bpp
+ * \param[in]    invert 0:  binary 0 --> grayscale 0
+ *                          binary 1 --> grayscale 0xff...
+ *                      1:  binary 0 --> grayscale 0xff...
+ *                          binary 1 --> grayscale 0
  * \return  pixd 2, 4, 8, 16 or 32 bpp, or NULL on error
  *
  * <pre>
@@ -1876,13 +1874,15 @@ pixUnpackBinary(PIX     *pixs,
 {
 PIX  *pixd;
 
+    PROCNAME("pixUnpackBinary");
+
     if (!pixs)
-        return (PIX *)ERROR_PTR("pixs not defined", __func__, NULL);
+        return (PIX *)ERROR_PTR("pixs not defined", procName, NULL);
     if (pixGetDepth(pixs) != 1)
-        return (PIX *)ERROR_PTR("pixs not 1 bpp", __func__, NULL);
+        return (PIX *)ERROR_PTR("pixs not 1 bpp", procName, NULL);
     if (depth != 2 && depth != 4 && depth != 8 && depth != 16 && depth != 32)
         return (PIX *)ERROR_PTR("depth not 2, 4, 8, 16 or 32 bpp",
-                                __func__, NULL);
+                                procName, NULL);
 
     if (depth == 2) {
         if (invert == 0)
@@ -1919,10 +1919,10 @@ PIX  *pixd;
 /*!
  * \brief   pixConvert1To16()
  *
- * \param[in]    pixd    [optional] 16 bpp, can be null
- * \param[in]    pixs    1 bpp
- * \param[in]    val0    16 bit value to be used for 0s in pixs
- * \param[in]    val1    16 bit value to be used for 1s in pixs
+ * \param[in]    pixd [optional] 16 bpp, can be null
+ * \param[in]    pixs 1 bpp
+ * \param[in]    val0 16 bit value to be used for 0s in pixs
+ * \param[in]    val1 16 bit value to be used for 1s in pixs
  * \return  pixd 16 bpp
  *
  * <pre>
@@ -1943,20 +1943,22 @@ l_uint16   val[2];
 l_uint32   index;
 l_uint32  *tab, *datas, *datad, *lines, *lined;
 
+    PROCNAME("pixConvert1To16");
+
     if (!pixs)
-        return (PIX *)ERROR_PTR("pixs not defined", __func__, NULL);
+        return (PIX *)ERROR_PTR("pixs not defined", procName, NULL);
     if (pixGetDepth(pixs) != 1)
-        return (PIX *)ERROR_PTR("pixs not 1 bpp", __func__, NULL);
+        return (PIX *)ERROR_PTR("pixs not 1 bpp", procName, NULL);
 
     pixGetDimensions(pixs, &w, &h, NULL);
     if (pixd) {
         if (w != pixGetWidth(pixd) || h != pixGetHeight(pixd))
-            return (PIX *)ERROR_PTR("pix sizes unequal", __func__, pixd);
+            return (PIX *)ERROR_PTR("pix sizes unequal", procName, pixd);
         if (pixGetDepth(pixd) != 16)
-            return (PIX *)ERROR_PTR("pixd not 16 bpp", __func__, pixd);
+            return (PIX *)ERROR_PTR("pixd not 16 bpp", procName, pixd);
     } else {
         if ((pixd = pixCreate(w, h, 16)) == NULL)
-            return (PIX *)ERROR_PTR("pixd not made", __func__, NULL);
+            return (PIX *)ERROR_PTR("pixd not made", procName, NULL);
     }
     pixCopyResolution(pixd, pixs);
     pixCopyInputFormat(pixd, pixs);
@@ -1991,10 +1993,10 @@ l_uint32  *tab, *datas, *datad, *lines, *lined;
 /*!
  * \brief   pixConvert1To32()
  *
- * \param[in]    pixd    [optional] 32 bpp, can be null
- * \param[in]    pixs    1 bpp
- * \param[in]    val0    32 bit value to be used for 0s in pixs
- * \param[in]    val1    32 bit value to be used for 1s in pixs
+ * \param[in]    pixd [optional] 32 bpp, can be null
+ * \param[in]    pixs 1 bpp
+ * \param[in]    val0 32 bit value to be used for 0s in pixs
+ * \param[in]    val1 32 bit value to be used for 1s in pixs
  * \return  pixd 32 bpp
  *
  * <pre>
@@ -2014,20 +2016,22 @@ l_int32    w, h, i, j, wpls, wpld, bit;
 l_uint32   val[2];
 l_uint32  *datas, *datad, *lines, *lined;
 
+    PROCNAME("pixConvert1To32");
+
     if (!pixs)
-        return (PIX *)ERROR_PTR("pixs not defined", __func__, NULL);
+        return (PIX *)ERROR_PTR("pixs not defined", procName, NULL);
     if (pixGetDepth(pixs) != 1)
-        return (PIX *)ERROR_PTR("pixs not 1 bpp", __func__, NULL);
+        return (PIX *)ERROR_PTR("pixs not 1 bpp", procName, NULL);
 
     pixGetDimensions(pixs, &w, &h, NULL);
     if (pixd) {
         if (w != pixGetWidth(pixd) || h != pixGetHeight(pixd))
-            return (PIX *)ERROR_PTR("pix sizes unequal", __func__, pixd);
+            return (PIX *)ERROR_PTR("pix sizes unequal", procName, pixd);
         if (pixGetDepth(pixd) != 32)
-            return (PIX *)ERROR_PTR("pixd not 32 bpp", __func__, pixd);
+            return (PIX *)ERROR_PTR("pixd not 32 bpp", procName, pixd);
     } else {
         if ((pixd = pixCreate(w, h, 32)) == NULL)
-            return (PIX *)ERROR_PTR("pixd not made", __func__, NULL);
+            return (PIX *)ERROR_PTR("pixd not made", procName, NULL);
     }
     pixCopyResolution(pixd, pixs);
     pixCopyInputFormat(pixd, pixs);
@@ -2057,7 +2061,7 @@ l_uint32  *datas, *datad, *lines, *lined;
 /*!
  * \brief   pixConvert1To2Cmap()
  *
- * \param[in]    pixs    1 bpp
+ * \param[in]    pixs 1 bpp
  * \return  pixd 2 bpp, cmapped
  *
  * <pre>
@@ -2071,13 +2075,15 @@ pixConvert1To2Cmap(PIX  *pixs)
 PIX      *pixd;
 PIXCMAP  *cmap;
 
+    PROCNAME("pixConvert1To2Cmap");
+
     if (!pixs)
-        return (PIX *)ERROR_PTR("pixs not defined", __func__, NULL);
+        return (PIX *)ERROR_PTR("pixs not defined", procName, NULL);
     if (pixGetDepth(pixs) != 1)
-        return (PIX *)ERROR_PTR("pixs not 1 bpp", __func__, NULL);
+        return (PIX *)ERROR_PTR("pixs not 1 bpp", procName, NULL);
 
     if ((pixd = pixConvert1To2(NULL, pixs, 0, 1)) == NULL)
-        return (PIX *)ERROR_PTR("pixd not made", __func__, NULL);
+        return (PIX *)ERROR_PTR("pixd not made", procName, NULL);
     cmap = pixcmapCreate(2);
     pixcmapAddColor(cmap, 255, 255, 255);
     pixcmapAddColor(cmap, 0, 0, 0);
@@ -2091,10 +2097,10 @@ PIXCMAP  *cmap;
 /*!
  * \brief   pixConvert1To2()
  *
- * \param[in]    pixd    [optional] 2 bpp, can be null
- * \param[in]    pixs    1 bpp
- * \param[in]    val0    2 bit value to be used for 0s in pixs
- * \param[in]    val1    2 bit value to be used for 1s in pixs
+ * \param[in]    pixd [optional] 2 bpp, can be null
+ * \param[in]    pixs 1 bpp
+ * \param[in]    val0 2 bit value to be used for 0s in pixs
+ * \param[in]    val1 2 bit value to be used for 1s in pixs
  * \return  pixd 2 bpp
  *
  * <pre>
@@ -2118,20 +2124,22 @@ l_uint32   index;
 l_uint16  *tab;
 l_uint32  *datas, *datad, *lines, *lined;
 
+    PROCNAME("pixConvert1To2");
+
     if (!pixs)
-        return (PIX *)ERROR_PTR("pixs not defined", __func__, pixd);
+        return (PIX *)ERROR_PTR("pixs not defined", procName, pixd);
     if (pixGetDepth(pixs) != 1)
-        return (PIX *)ERROR_PTR("pixs not 1 bpp", __func__, pixd);
+        return (PIX *)ERROR_PTR("pixs not 1 bpp", procName, pixd);
 
     pixGetDimensions(pixs, &w, &h, NULL);
     if (pixd) {
         if (w != pixGetWidth(pixd) || h != pixGetHeight(pixd))
-            return (PIX *)ERROR_PTR("pix sizes unequal", __func__, pixd);
+            return (PIX *)ERROR_PTR("pix sizes unequal", procName, pixd);
         if (pixGetDepth(pixd) != 2)
-            return (PIX *)ERROR_PTR("pixd not 2 bpp", __func__, pixd);
+            return (PIX *)ERROR_PTR("pixd not 2 bpp", procName, pixd);
     } else {
         if ((pixd = pixCreate(w, h, 2)) == NULL)
-            return (PIX *)ERROR_PTR("pixd not made", __func__, NULL);
+            return (PIX *)ERROR_PTR("pixd not made", procName, NULL);
     }
     pixCopyResolution(pixd, pixs);
     pixCopyInputFormat(pixd, pixs);
@@ -2175,7 +2183,7 @@ l_uint32  *datas, *datad, *lines, *lined;
 /*!
  * \brief   pixConvert1To4Cmap()
  *
- * \param[in]    pixs    1 bpp
+ * \param[in]    pixs 1 bpp
  * \return  pixd 4 bpp, cmapped
  *
  * <pre>
@@ -2189,13 +2197,15 @@ pixConvert1To4Cmap(PIX  *pixs)
 PIX      *pixd;
 PIXCMAP  *cmap;
 
+    PROCNAME("pixConvert1To4Cmap");
+
     if (!pixs)
-        return (PIX *)ERROR_PTR("pixs not defined", __func__, NULL);
+        return (PIX *)ERROR_PTR("pixs not defined", procName, NULL);
     if (pixGetDepth(pixs) != 1)
-        return (PIX *)ERROR_PTR("pixs not 1 bpp", __func__, NULL);
+        return (PIX *)ERROR_PTR("pixs not 1 bpp", procName, NULL);
 
     if ((pixd = pixConvert1To4(NULL, pixs, 0, 1)) == NULL)
-        return (PIX *)ERROR_PTR("pixd not made", __func__, NULL);
+        return (PIX *)ERROR_PTR("pixd not made", procName, NULL);
     cmap = pixcmapCreate(4);
     pixcmapAddColor(cmap, 255, 255, 255);
     pixcmapAddColor(cmap, 0, 0, 0);
@@ -2209,10 +2219,10 @@ PIXCMAP  *cmap;
 /*!
  * \brief   pixConvert1To4()
  *
- * \param[in]    pixd    [optional] 4 bpp, can be null
- * \param[in]    pixs    1 bpp
- * \param[in]    val0    4 bit value to be used for 0s in pixs
- * \param[in]    val1    4 bit value to be used for 1s in pixs
+ * \param[in]    pixd [optional] 4 bpp, can be null
+ * \param[in]    pixs 1 bpp
+ * \param[in]    val0 4 bit value to be used for 0s in pixs
+ * \param[in]    val1 4 bit value to be used for 1s in pixs
  * \return  pixd 4 bpp
  *
  * <pre>
@@ -2235,20 +2245,22 @@ l_uint8    val[2];
 l_uint32   index;
 l_uint32  *tab, *datas, *datad, *lines, *lined;
 
+    PROCNAME("pixConvert1To4");
+
     if (!pixs)
-        return (PIX *)ERROR_PTR("pixs not defined", __func__, pixd);
+        return (PIX *)ERROR_PTR("pixs not defined", procName, pixd);
     if (pixGetDepth(pixs) != 1)
-        return (PIX *)ERROR_PTR("pixs not 1 bpp", __func__, pixd);
+        return (PIX *)ERROR_PTR("pixs not 1 bpp", procName, pixd);
 
     pixGetDimensions(pixs, &w, &h, NULL);
     if (pixd) {
         if (w != pixGetWidth(pixd) || h != pixGetHeight(pixd))
-            return (PIX *)ERROR_PTR("pix sizes unequal", __func__, pixd);
+            return (PIX *)ERROR_PTR("pix sizes unequal", procName, pixd);
         if (pixGetDepth(pixd) != 4)
-            return (PIX *)ERROR_PTR("pixd not 4 bpp", __func__, pixd);
+            return (PIX *)ERROR_PTR("pixd not 4 bpp", procName, pixd);
     } else {
         if ((pixd = pixCreate(w, h, 4)) == NULL)
-            return (PIX *)ERROR_PTR("pixd not made", __func__, NULL);
+            return (PIX *)ERROR_PTR("pixd not made", procName, NULL);
     }
     pixCopyResolution(pixd, pixs);
     pixCopyInputFormat(pixd, pixs);
@@ -2292,7 +2304,7 @@ l_uint32  *tab, *datas, *datad, *lines, *lined;
 /*!
  * \brief   pixConvert1To8Cmap()
  *
- * \param[in]    pixs    1 bpp
+ * \param[in]    pixs 1 bpp
  * \return  pixd 8 bpp, cmapped
  *
  * <pre>
@@ -2306,13 +2318,15 @@ pixConvert1To8Cmap(PIX  *pixs)
 PIX      *pixd;
 PIXCMAP  *cmap;
 
+    PROCNAME("pixConvert1To8Cmap");
+
     if (!pixs)
-        return (PIX *)ERROR_PTR("pixs not defined", __func__, NULL);
+        return (PIX *)ERROR_PTR("pixs not defined", procName, NULL);
     if (pixGetDepth(pixs) != 1)
-        return (PIX *)ERROR_PTR("pixs not 1 bpp", __func__, NULL);
+        return (PIX *)ERROR_PTR("pixs not 1 bpp", procName, NULL);
 
     if ((pixd = pixConvert1To8(NULL, pixs, 0, 1)) == NULL)
-        return (PIX *)ERROR_PTR("pixd not made", __func__, NULL);
+        return (PIX *)ERROR_PTR("pixd not made", procName, NULL);
     cmap = pixcmapCreate(8);
     pixcmapAddColor(cmap, 255, 255, 255);
     pixcmapAddColor(cmap, 0, 0, 0);
@@ -2325,10 +2339,10 @@ PIXCMAP  *cmap;
 /*!
  * \brief   pixConvert1To8()
  *
- * \param[in]    pixd    [optional] 8 bpp, can be null
- * \param[in]    pixs    1 bpp
- * \param[in]    val0    8 bit value to be used for 0s in pixs
- * \param[in]    val1    8 bit value to be used for 1s in pixs
+ * \param[in]    pixd [optional] 8 bpp, can be null
+ * \param[in]    pixs 1 bpp
+ * \param[in]    val0 8 bit value to be used for 0s in pixs
+ * \param[in]    val1 8 bit value to be used for 1s in pixs
  * \return  pixd 8 bpp
  *
  * <pre>
@@ -2352,31 +2366,32 @@ l_uint8    val[2];
 l_uint32   index;
 l_uint32  *tab, *datas, *datad, *lines, *lined;
 
+    PROCNAME("pixConvert1To8");
+
     if (!pixs)
-        return (PIX *)ERROR_PTR("pixs not defined", __func__, pixd);
+        return (PIX *)ERROR_PTR("pixs not defined", procName, pixd);
     if (pixGetDepth(pixs) != 1)
-        return (PIX *)ERROR_PTR("pixs not 1 bpp", __func__, pixd);
+        return (PIX *)ERROR_PTR("pixs not 1 bpp", procName, pixd);
 
     pixGetDimensions(pixs, &w, &h, NULL);
     if (pixd) {
         if (w != pixGetWidth(pixd) || h != pixGetHeight(pixd))
-            return (PIX *)ERROR_PTR("pix sizes unequal", __func__, pixd);
+            return (PIX *)ERROR_PTR("pix sizes unequal", procName, pixd);
         if (pixGetDepth(pixd) != 8)
-            return (PIX *)ERROR_PTR("pixd not 8 bpp", __func__, pixd);
+            return (PIX *)ERROR_PTR("pixd not 8 bpp", procName, pixd);
     } else {
         if ((pixd = pixCreate(w, h, 8)) == NULL)
-            return (PIX *)ERROR_PTR("pixd not made", __func__, NULL);
+            return (PIX *)ERROR_PTR("pixd not made", procName, NULL);
     }
     pixCopyResolution(pixd, pixs);
     pixCopyInputFormat(pixd, pixs);
-    pixSetPadBits(pixs, 0);
 
         /* Use a table to convert 4 src bits at a time */
     tab = (l_uint32 *)LEPT_CALLOC(16, sizeof(l_uint32));
     val[0] = val0;
     val[1] = val1;
     for (index = 0; index < 16; index++) {
-        tab[index] = ((l_uint32)val[(index >> 3) & 1] << 24) |
+        tab[index] = (val[(index >> 3) & 1] << 24) |
                      (val[(index >> 2) & 1] << 16) |
                      (val[(index >> 1) & 1] << 8) | val[index & 1];
     }
@@ -2403,12 +2418,12 @@ l_uint32  *tab, *datas, *datad, *lines, *lined;
 /*!
  * \brief   pixConvert2To8()
  *
- * \param[in]    pixs      2 bpp
- * \param[in]    val0      8 bit value to be used for 00 in pixs
- * \param[in]    val1      8 bit value to be used for 01 in pixs
- * \param[in]    val2      8 bit value to be used for 10 in pixs
- * \param[in]    val3      8 bit value to be used for 11 in pixs
- * \param[in]    cmapflag  TRUE if pixd is to have a colormap; FALSE otherwise
+ * \param[in]    pixs 2 bpp
+ * \param[in]    val0 8 bit value to be used for 00 in pixs
+ * \param[in]    val1 8 bit value to be used for 01 in pixs
+ * \param[in]    val2 8 bit value to be used for 10 in pixs
+ * \param[in]    val3 8 bit value to be used for 11 in pixs
+ * \param[in]    cmapflag TRUE if pixd is to have a colormap; FALSE otherwise
  * \return  pixd 8 bpp, or NULL on error
  *
  * <pre>
@@ -2439,16 +2454,18 @@ pixConvert2To8(PIX     *pixs,
                l_int32  cmapflag)
 {
 l_int32    w, h, i, j, nbytes, wpls, wpld, dibit, byte;
-l_uint32   val[4];
+l_uint8    val[4];
 l_uint32   index;
 l_uint32  *tab, *datas, *datad, *lines, *lined;
 PIX       *pixd;
 PIXCMAP   *cmaps, *cmapd;
 
+    PROCNAME("pixConvert2To8");
+
     if (!pixs)
-        return (PIX *)ERROR_PTR("pixs not defined", __func__, NULL);
+        return (PIX *)ERROR_PTR("pixs not defined", procName, NULL);
     if (pixGetDepth(pixs) != 2)
-        return (PIX *)ERROR_PTR("pixs not 2 bpp", __func__, NULL);
+        return (PIX *)ERROR_PTR("pixs not 2 bpp", procName, NULL);
 
     cmaps = pixGetColormap(pixs);
     if (cmaps && cmapflag == FALSE)
@@ -2456,8 +2473,7 @@ PIXCMAP   *cmaps, *cmapd;
 
     pixGetDimensions(pixs, &w, &h, NULL);
     if ((pixd = pixCreate(w, h, 8)) == NULL)
-        return (PIX *)ERROR_PTR("pixd not made", __func__, NULL);
-    pixSetPadBits(pixs, 0);
+        return (PIX *)ERROR_PTR("pixd not made", procName, NULL);
     pixCopyResolution(pixd, pixs);
     pixCopyInputFormat(pixd, pixs);
     datas = pixGetData(pixs);
@@ -2519,8 +2535,8 @@ PIXCMAP   *cmaps, *cmapd;
 /*!
  * \brief   pixConvert4To8()
  *
- * \param[in]    pixs      4 bpp
- * \param[in]    cmapflag  TRUE if pixd is to have a colormap; FALSE otherwise
+ * \param[in]    pixs 4 bpp
+ * \param[in]    cmapflag TRUE if pixd is to have a colormap; FALSE otherwise
  * \return  pixd 8 bpp, or NULL on error
  *
  * <pre>
@@ -2549,10 +2565,12 @@ l_uint32  *datas, *datad, *lines, *lined;
 PIX       *pixd;
 PIXCMAP   *cmaps, *cmapd;
 
+    PROCNAME("pixConvert4To8");
+
     if (!pixs)
-        return (PIX *)ERROR_PTR("pixs not defined", __func__, NULL);
+        return (PIX *)ERROR_PTR("pixs not defined", procName, NULL);
     if (pixGetDepth(pixs) != 4)
-        return (PIX *)ERROR_PTR("pixs not 4 bpp", __func__, NULL);
+        return (PIX *)ERROR_PTR("pixs not 4 bpp", procName, NULL);
 
     cmaps = pixGetColormap(pixs);
     if (cmaps && cmapflag == FALSE)
@@ -2560,7 +2578,7 @@ PIXCMAP   *cmaps, *cmapd;
 
     pixGetDimensions(pixs, &w, &h, NULL);
     if ((pixd = pixCreate(w, h, 8)) == NULL)
-        return (PIX *)ERROR_PTR("pixd not made", __func__, NULL);
+        return (PIX *)ERROR_PTR("pixd not made", procName, NULL);
     pixCopyResolution(pixd, pixs);
     pixCopyInputFormat(pixd, pixs);
     datas = pixGetData(pixs);
@@ -2610,9 +2628,9 @@ PIXCMAP   *cmaps, *cmapd;
 /*!
  * \brief   pixConvert8To16()
  *
- * \param[in]    pixs       8 bpp; colormap removed to gray
- * \param[in]    leftshift  number of bits: 0 is no shift;
- *                          8 replicates in MSB and LSB of dest
+ * \param[in]    pixs 8 bpp; colormap removed to gray
+ * \param[in]    leftshift number of bits: 0 is no shift;
+ *                         8 replicates in MSB and LSB of dest
  * \return  pixd 16 bpp, or NULL on error
  *
  * <pre>
@@ -2631,13 +2649,15 @@ l_int32    i, j, w, h, d, wplt, wpld, val;
 l_uint32  *datat, *datad, *linet, *lined;
 PIX       *pixt, *pixd;
 
+    PROCNAME("pixConvert8To16");
+
     if (!pixs)
-        return (PIX *)ERROR_PTR("pixs not defined", __func__, NULL);
+        return (PIX *)ERROR_PTR("pixs not defined", procName, NULL);
     pixGetDimensions(pixs, &w, &h, &d);
     if (d != 8)
-        return (PIX *)ERROR_PTR("pixs not 8 bpp", __func__, NULL);
+        return (PIX *)ERROR_PTR("pixs not 8 bpp", procName, NULL);
     if (leftshift < 0 || leftshift > 8)
-        return (PIX *)ERROR_PTR("leftshift not in [0 ... 8]", __func__, NULL);
+        return (PIX *)ERROR_PTR("leftshift not in [0 ... 8]", procName, NULL);
 
     if (pixGetColormap(pixs) != NULL)
         pixt = pixRemoveColormap(pixs, REMOVE_CMAP_TO_GRAYSCALE);
@@ -2669,276 +2689,15 @@ PIX       *pixt, *pixd;
 }
 
 
-/*---------------------------------------------------------------------------*
- *                     Top-level conversion to 2 bpp                         *
- *---------------------------------------------------------------------------*/
-/*!
- * \brief   pixConvertTo2()
- *
- * \param[in]    pixs   1, 2, 4, 8, 24, 32 bpp; colormap OK but will be removed
- * \return  pixd   2 bpp, or NULL on error
- *
- * <pre>
- * Notes:
- *      (1) This is a top-level function, with simple default values
- *          used in pixConvertTo8() if unpacking is necessary.
- *      (2) Any existing colormap is removed; the result is always gray.
- *      (3) If the input image has 2 bpp and no colormap, the operation is
- *          lossless and a copy is returned.
- * </pre>
- */
-PIX *
-pixConvertTo2(PIX  *pixs)
-{
-l_int32  d;
-PIX     *pix1, *pix2, *pix3, *pixd;
-
-    if (!pixs)
-        return (PIX *)ERROR_PTR("pixs not defined", __func__, NULL);
-    d = pixGetDepth(pixs);
-    if (d != 1 && d != 2 && d != 4 && d != 8 && d != 24 && d != 32)
-        return (PIX *)ERROR_PTR("depth not {1,2,4,8,24,32}", __func__, NULL);
-
-    if (pixGetColormap(pixs) != NULL) {
-        pix1 = pixRemoveColormap(pixs, REMOVE_CMAP_TO_GRAYSCALE);
-        d = pixGetDepth(pix1);
-    } else {
-        pix1 = pixCopy(NULL, pixs);
-    }
-    if (d == 24 || d == 32)
-        pix2 = pixConvertTo8(pix1, FALSE);
-    else
-        pix2 = pixClone(pix1);
-    pixDestroy(&pix1);
-    if (d == 1) {
-        pixd = pixConvert1To2(NULL, pix2, 3, 0);
-    } else if (d == 2) {
-        pixd = pixClone(pix2);
-    } else if (d == 4) {
-        pix3 = pixConvert4To8(pix2, FALSE);  /* unpack to 8 */
-        pixd = pixConvert8To2(pix3);
-        pixDestroy(&pix3);
-    } else {  /* d == 8 */
-        pixd = pixConvert8To2(pix2);
-    }
-    pixDestroy(&pix2);
-    return pixd;
-}
-
-
-/*!
- * \brief   pixConvert8To2()
- *
- * \param[in]     pix     8 bpp; colormap OK
- * \return  pixd  2 bpp, or NULL on error
- *
- * <pre>
- * Notes:
- *      (1) Any existing colormap is removed to gray.
- * </pre>
- */
-PIX *
-pixConvert8To2(PIX  *pix)
-{
-l_int32    i, j, w, h, wpls, wpld;
-l_uint32   word;
-l_uint32  *datas, *lines, *datad, *lined;
-PIX       *pixs, *pixd;
-
-    if (!pix || pixGetDepth(pix) != 8)
-        return (PIX *)ERROR_PTR("pix undefined or not 8 bpp", __func__, NULL);
-
-    if (pixGetColormap(pix) != NULL)
-        pixs = pixRemoveColormap(pix, REMOVE_CMAP_TO_GRAYSCALE);
-    else
-        pixs = pixClone(pix);
-    pixGetDimensions(pixs, &w, &h, NULL);
-    datas = pixGetData(pixs);
-    wpls = pixGetWpl(pixs);
-    pixd = pixCreate(w, h, 2);
-    datad = pixGetData(pixd);
-    wpld = pixGetWpl(pixd);
-    for (i = 0; i < h; i++) {
-        lines = datas + i * wpls;
-        lined = datad + i * wpld;
-        for (j = 0; j < wpls; j++) {  /* march through 4 pixels at a time */
-            word = lines[j] & 0xc0c0c0c0;  /* top 2 bits of each byte */
-            word = (word >> 24) | ((word & 0xff0000) >> 18) |
-                   ((word & 0xff00) >> 12) | ((word & 0xff) >> 6);
-            SET_DATA_BYTE(lined, j, word);  /* only LS byte is filled */
-        }
-    }
-    pixDestroy(&pixs);
-    return pixd;
-}
-
-
-/*---------------------------------------------------------------------------*
- *                     Top-level conversion to 4 bpp                         *
- *---------------------------------------------------------------------------*/
-/*!
- * \brief   pixConvertTo4()
- *
- * \param[in]    pixs   1, 2, 4, 8, 24, 32 bpp; colormap OK but will be removed
- * \return  pixd   4 bpp, or NULL on error
- *
- * <pre>
- * Notes:
- *      (1) This is a top-level function, with simple default values
- *          used in pixConvertTo8() if unpacking is necessary.
- *      (2) Any existing colormap is removed; the result is always gray.
- *      (3) If the input image has 4 bpp and no colormap, the operation is
- *          lossless and a copy is returned.
- * </pre>
- */
-PIX *
-pixConvertTo4(PIX  *pixs)
-{
-l_int32  d;
-PIX     *pix1, *pix2, *pix3, *pixd;
-
-    if (!pixs)
-        return (PIX *)ERROR_PTR("pixs not defined", __func__, NULL);
-    d = pixGetDepth(pixs);
-    if (d != 1 && d != 2 && d != 4 && d != 8 && d != 24 && d != 32)
-        return (PIX *)ERROR_PTR("depth not {1,2,4,8,24,32}", __func__, NULL);
-
-    if (pixGetColormap(pixs) != NULL) {
-        pix1 = pixRemoveColormap(pixs, REMOVE_CMAP_TO_GRAYSCALE);
-        d = pixGetDepth(pix1);
-    } else {
-        pix1 = pixCopy(NULL, pixs);
-    }
-    if (d == 24 || d == 32)
-        pix2 = pixConvertTo8(pix1, FALSE);
-    else
-        pix2 = pixClone(pix1);
-    pixDestroy(&pix1);
-    if (d == 1) {
-        pixd = pixConvert1To4(NULL, pix2, 15, 0);
-    } else if (d == 2) {
-        pix3 = pixConvert2To8(pix2, 0, 0x55, 0xaa, 0xff, FALSE);
-        pixd = pixConvert8To4(pix3);
-        pixDestroy(&pix3);
-    } else if (d == 4) {
-        pixd = pixClone(pix2);
-    } else {  /* d == 8 */
-        pixd = pixConvert8To4(pix2);
-    }
-    pixDestroy(&pix2);
-    return pixd;
-}
-
-
-/*!
- * \brief   pixConvert8To4()
- *
- * \param[in]     pix     8 bpp; colormap OK
- * \return  pixd  4 bpp, or NULL on error
- *
- * <pre>
- * Notes:
- *      (1) Any existing colormap is removed to gray.
- * </pre>
- */
-PIX *
-pixConvert8To4(PIX  *pix)
-{
-l_int32    i, j, w, h, wpls, wpld, val;
-l_uint32  *datas, *lines, *datad, *lined;
-PIX       *pixs, *pixd;
-
-    if (!pix || pixGetDepth(pix) != 8)
-        return (PIX *)ERROR_PTR("pix undefined or not 8 bpp", __func__, NULL);
-
-    if (pixGetColormap(pix) != NULL)
-        pixs = pixRemoveColormap(pix, REMOVE_CMAP_TO_GRAYSCALE);
-    else
-        pixs = pixClone(pix);
-    pixGetDimensions(pixs, &w, &h, NULL);
-    datas = pixGetData(pixs);
-    wpls = pixGetWpl(pixs);
-    pixd = pixCreate(w, h, 4);
-    datad = pixGetData(pixd);
-    wpld = pixGetWpl(pixd);
-    for (i = 0; i < h; i++) {
-        lines = datas + i * wpls;
-        lined = datad + i * wpld;
-        for (j = 0; j < w; j++) {
-            val = GET_DATA_BYTE(lines, j);
-            val = val >> 4;  /* take top 4 bits */
-            SET_DATA_QBIT(lined, j, val);
-        }
-    }
-    pixDestroy(&pixs);
-    return pixd;
-}
-
 
 /*---------------------------------------------------------------------------*
  *                     Top-level conversion to 1 bpp                         *
  *---------------------------------------------------------------------------*/
 /*!
- * \brief   pixConvertTo1Adaptive()
- *
- * \param[in]    pixs       1, 2, 4, 8, 16, 24 or 32 bpp
- * \return  pixd 1 bpp, or NULL on error
- *
- * <pre>
- * Notes:
- *      (1) This is a top-level function, that uses default values for
- *          adaptive thresholding, if necessary.  Otherwise, it is the same as
- *          pixConvertTo1(), which uses a global threshold for binarization.
- *      (2) Other high-level adaptive thresholding functions are
- *          pixAdaptThresholdToBinary() and pixCleanImage().
- * </pre>
- */
-PIX *
-pixConvertTo1Adaptive(PIX     *pixs)
-{
-l_int32   d, color0, color1, rval, gval, bval;
-PIX      *pix1, *pix2, *pixd;
-PIXCMAP  *cmap;
-
-    if (!pixs)
-        return (PIX *)ERROR_PTR("pixs not defined", __func__, NULL);
-    d = pixGetDepth(pixs);
-    if (d != 1 && d != 2 && d != 4 && d != 8 && d != 16 && d != 24 && d != 32)
-        return (PIX *)ERROR_PTR("depth not {1,2,4,8,16,24,32}", __func__, NULL);
-
-    cmap = pixGetColormap(pixs);
-    if (d == 1) {
-        if (!cmap) {
-            return pixCopy(NULL, pixs);
-        } else {  /* strip the colormap off, and invert if reasonable
-                   for standard binary photometry.  */
-            pixcmapGetColor(cmap, 0, &rval, &gval, &bval);
-            color0 = rval + gval + bval;
-            pixcmapGetColor(cmap, 1, &rval, &gval, &bval);
-            color1 = rval + gval + bval;
-            pixd = pixCopy(NULL, pixs);
-            pixDestroyColormap(pixd);
-            if (color1 > color0)
-                pixInvert(pixd, pixd);
-            return pixd;
-        }
-    }
-
-        /* For all other depths, use 8 bpp as an intermediary */
-    pix1 = pixConvertTo8(pixs, FALSE);
-    pix2 = pixBackgroundNormSimple(pix1, NULL, NULL);
-    pixd = pixThresholdToBinary(pix2, 180);
-    pixDestroy(&pix1);
-    pixDestroy(&pix2);
-    return pixd;
-}
-
-
-/*!
  * \brief   pixConvertTo1()
  *
- * \param[in]    pixs       1, 2, 4, 8, 16, 24 or 32 bpp
- * \param[in]    threshold  for final binarization, relative to 8 bpp
+ * \param[in]    pixs 1, 2, 4, 8, 16 or 32 bpp
+ * \param[in]    threshold for final binarization, relative to 8 bpp
  * \return  pixd 1 bpp, or NULL on error
  *
  * <pre>
@@ -2958,11 +2717,13 @@ l_int32   d, color0, color1, rval, gval, bval;
 PIX      *pixg, *pixd;
 PIXCMAP  *cmap;
 
+    PROCNAME("pixConvertTo1");
+
     if (!pixs)
-        return (PIX *)ERROR_PTR("pixs not defined", __func__, NULL);
+        return (PIX *)ERROR_PTR("pixs not defined", procName, NULL);
     d = pixGetDepth(pixs);
-    if (d != 1 && d != 2 && d != 4 && d != 8 && d != 16 && d != 24 && d != 32)
-        return (PIX *)ERROR_PTR("depth not {1,2,4,8,16,24,32}", __func__, NULL);
+    if (d != 1 && d != 2 && d != 4 && d != 8 && d != 16 && d != 32)
+        return (PIX *)ERROR_PTR("depth not {1,2,4,8,16,32}", procName, NULL);
 
     cmap = pixGetColormap(pixs);
     if (d == 1) {
@@ -2993,9 +2754,9 @@ PIXCMAP  *cmap;
 /*!
  * \brief   pixConvertTo1BySampling()
  *
- * \param[in]    pixs       1, 2, 4, 8, 16, 24 or 32 bpp
- * \param[in]    factor     subsampling factor; integer >= 1
- * \param[in]    threshold  for final binarization, relative to 8 bpp
+ * \param[in]    pixs 1, 2, 4, 8, 16 or 32 bpp
+ * \param[in]    factor submsampling factor; integer >= 1
+ * \param[in]    threshold for final binarization, relative to 8 bpp
  * \return  pixd 1 bpp, or NULL on error
  *
  * <pre>
@@ -3012,14 +2773,17 @@ pixConvertTo1BySampling(PIX     *pixs,
 l_float32  scalefactor;
 PIX       *pixt, *pixd;
 
-    if (!pixs)
-        return (PIX *)ERROR_PTR("pixs not defined", __func__, NULL);
-    if (factor < 1)
-        return (PIX *)ERROR_PTR("factor must be >= 1", __func__, NULL);
+    PROCNAME("pixConvertTo1BySampling");
 
-    scalefactor = 1.f / (l_float32)factor;
+    if (!pixs)
+        return (PIX *)ERROR_PTR("pixs not defined", procName, NULL);
+    if (factor < 1)
+        return (PIX *)ERROR_PTR("factor must be >= 1", procName, NULL);
+
+    scalefactor = 1. / (l_float32)factor;
     pixt = pixScaleBySampling(pixs, scalefactor, scalefactor);
     pixd = pixConvertTo1(pixt, threshold);
+
     pixDestroy(&pixt);
     return pixd;
 }
@@ -3031,8 +2795,8 @@ PIX       *pixt, *pixd;
 /*!
  * \brief   pixConvertTo8()
  *
- * \param[in]    pixs      1, 2, 4, 8, 16, 24 or 32 bpp
- * \param[in]    cmapflag  TRUE if pixd is to have a colormap; FALSE otherwise
+ * \param[in]    pixs 1, 2, 4, 8, 16 or 32 bpp
+ * \param[in]    cmapflag TRUE if pixd is to have a colormap; FALSE otherwise
  * \return  pixd 8 bpp, or NULL on error
  *
  * <pre>
@@ -3048,9 +2812,9 @@ PIX       *pixt, *pixd;
  *          ~ 2 bpp: 4 bpp:  even increments over dynamic range
  *          ~ 8 bpp: lossless if cmap matches cmapflag
  *          ~ 16 bpp: use most significant byte
- *      (4) If 24 bpp or 32 bpp RGB, this is converted to gray.
- *          For color quantization, you must specify the type explicitly,
- *          using the color quantization code.
+ *      (4) If 32 bpp RGB, this is converted to gray.  If you want
+ *          to do color quantization, you must specify the type
+ *          explicitly, using the color quantization code.
  * </pre>
  */
 PIX *
@@ -3058,14 +2822,16 @@ pixConvertTo8(PIX     *pixs,
               l_int32  cmapflag)
 {
 l_int32   d;
-PIX      *pix1, *pixd;
+PIX      *pixd;
 PIXCMAP  *cmap;
 
+    PROCNAME("pixConvertTo8");
+
     if (!pixs)
-        return (PIX *)ERROR_PTR("pixs not defined", __func__, NULL);
+        return (PIX *)ERROR_PTR("pixs not defined", procName, NULL);
     d = pixGetDepth(pixs);
-    if (d != 1 && d != 2 && d != 4 && d != 8 && d != 16 && d != 24 && d != 32)
-        return (PIX *)ERROR_PTR("depth not {1,2,4,8,16,24,32}", __func__, NULL);
+    if (d != 1 && d != 2 && d != 4 && d != 8 && d != 16 && d != 32)
+        return (PIX *)ERROR_PTR("depth not {1,2,4,8,16,32}", procName, NULL);
 
     if (d == 1) {
         if (cmapflag)
@@ -3092,13 +2858,6 @@ PIXCMAP  *cmap;
         if (cmapflag)
             pixAddGrayColormap8(pixd);
         return pixd;
-    } else if (d == 24) {
-        pix1 = pixConvert24To32(pixs);
-        pixd = pixConvertRGBToLuminance(pix1);
-        if (cmapflag)
-            pixAddGrayColormap8(pixd);
-        pixDestroy(&pix1);
-        return pixd;
     } else { /* d == 32 */
         pixd = pixConvertRGBToLuminance(pixs);
         if (cmapflag)
@@ -3111,9 +2870,9 @@ PIXCMAP  *cmap;
 /*!
  * \brief   pixConvertTo8BySampling()
  *
- * \param[in]    pixs      1, 2, 4, 8, 16 or 32 bpp
- * \param[in]    factor    submsampling factor; integer >= 1
- * \param[in]    cmapflag  TRUE if pixd is to have a colormap; FALSE otherwise
+ * \param[in]    pixs 1, 2, 4, 8, 16 or 32 bpp
+ * \param[in]    factor submsampling factor; integer >= 1
+ * \param[in]    cmapflag TRUE if pixd is to have a colormap; FALSE otherwise
  * \return  pixd 8 bpp, or NULL on error
  *
  * <pre>
@@ -3130,12 +2889,14 @@ pixConvertTo8BySampling(PIX     *pixs,
 l_float32  scalefactor;
 PIX       *pixt, *pixd;
 
-    if (!pixs)
-        return (PIX *)ERROR_PTR("pixs not defined", __func__, NULL);
-    if (factor < 1)
-        return (PIX *)ERROR_PTR("factor must be >= 1", __func__, NULL);
+    PROCNAME("pixConvertTo8BySampling");
 
-    scalefactor = 1.f / (l_float32)factor;
+    if (!pixs)
+        return (PIX *)ERROR_PTR("pixs not defined", procName, NULL);
+    if (factor < 1)
+        return (PIX *)ERROR_PTR("factor must be >= 1", procName, NULL);
+
+    scalefactor = 1. / (l_float32)factor;
     pixt = pixScaleBySampling(pixs, scalefactor, scalefactor);
     pixd = pixConvertTo8(pixt, cmapflag);
 
@@ -3145,10 +2906,10 @@ PIX       *pixt, *pixd;
 
 
 /*!
- * \brief   pixConvertTo8Colormap()
+ * \brief   pixConvertTo8Color()
  *
- * \param[in]    pixs    1, 2, 4, 8, 16 or 32 bpp
- * \param[in]    dither  1 to dither if necessary; 0 otherwise
+ * \param[in]    pixs 1, 2, 4, 8, 16 or 32 bpp
+ * \param[in]    dither 1 to dither if necessary; 0 otherwise
  * \return  pixd 8 bpp, cmapped, or NULL on error
  *
  * <pre>
@@ -3165,16 +2926,18 @@ PIX       *pixt, *pixd;
  * </pre>
  */
 PIX *
-pixConvertTo8Colormap(PIX     *pixs,
-                      l_int32  dither)
+pixConvertTo8Color(PIX     *pixs,
+                   l_int32  dither)
 {
 l_int32  d;
 
+    PROCNAME("pixConvertTo8Color");
+
     if (!pixs)
-        return (PIX *)ERROR_PTR("pixs not defined", __func__, NULL);
+        return (PIX *)ERROR_PTR("pixs not defined", procName, NULL);
     d = pixGetDepth(pixs);
     if (d != 1 && d != 2 && d != 4 && d != 8 && d != 16 && d != 32)
-        return (PIX *)ERROR_PTR("depth not {1,2,4,8,16,32}", __func__, NULL);
+        return (PIX *)ERROR_PTR("depth not {1,2,4,8,16,32}", procName, NULL);
 
     if (d != 32)
         return pixConvertTo8(pixs, 1);
@@ -3189,7 +2952,7 @@ l_int32  d;
 /*!
  * \brief   pixConvertTo16()
  *
- * \param[in]    pixs    1, 8 bpp
+ * \param[in]    pixs 1, 8 bpp
  * \return  pixd 16 bpp, or NULL on error
  *
  *  Usage: Top-level function, with simple default values for unpacking.
@@ -3202,8 +2965,10 @@ pixConvertTo16(PIX  *pixs)
 {
 l_int32  d;
 
+    PROCNAME("pixConvertTo16");
+
     if (!pixs)
-        return (PIX *)ERROR_PTR("pixs not defined", __func__, NULL);
+        return (PIX *)ERROR_PTR("pixs not defined", procName, NULL);
 
     d = pixGetDepth(pixs);
     if (d == 1)
@@ -3211,7 +2976,7 @@ l_int32  d;
     else if (d == 8)
         return pixConvert8To16(pixs, 8);
     else
-        return (PIX *)ERROR_PTR("src depth not 1 or 8 bpp", __func__, NULL);
+        return (PIX *)ERROR_PTR("src depth not 1 or 8 bpp", procName, NULL);
 }
 
 
@@ -3222,7 +2987,7 @@ l_int32  d;
 /*!
  * \brief   pixConvertTo32()
  *
- * \param[in]    pixs    1, 2, 4, 8, 16, 24 or 32 bpp
+ * \param[in]    pixs 1, 2, 4, 8, 16 or 32 bpp
  * \return  pixd 32 bpp, or NULL on error
  *
  *  Usage: Top-level function, with simple default values for unpacking.
@@ -3242,36 +3007,39 @@ l_int32  d;
  * <pre>
  * Notes:
  *      (1) Never returns a clone of pixs.
+ *      (2) Implicit assumption about RGB component ordering.
  * </pre>
  */
 PIX *
 pixConvertTo32(PIX  *pixs)
 {
 l_int32  d;
-PIX     *pix1, *pixd;
+PIX     *pixt, *pixd;
+
+    PROCNAME("pixConvertTo32");
 
     if (!pixs)
-        return (PIX *)ERROR_PTR("pixs not defined", __func__, NULL);
+        return (PIX *)ERROR_PTR("pixs not defined", procName, NULL);
 
     d = pixGetDepth(pixs);
     if (d == 1) {
         return pixConvert1To32(NULL, pixs, 0xffffffff, 0);
     } else if (d == 2) {
-        pix1 = pixConvert2To8(pixs, 0, 85, 170, 255, TRUE);
-        pixd = pixConvert8To32(pix1);
-        pixDestroy(&pix1);
+        pixt = pixConvert2To8(pixs, 0, 85, 170, 255, TRUE);
+        pixd = pixConvert8To32(pixt);
+        pixDestroy(&pixt);
         return pixd;
     } else if (d == 4) {
-        pix1 = pixConvert4To8(pixs, TRUE);
-        pixd = pixConvert8To32(pix1);
-        pixDestroy(&pix1);
+        pixt = pixConvert4To8(pixs, TRUE);
+        pixd = pixConvert8To32(pixt);
+        pixDestroy(&pixt);
         return pixd;
     } else if (d == 8) {
         return pixConvert8To32(pixs);
     } else if (d == 16) {
-        pix1 = pixConvert16To8(pixs, L_MS_BYTE);
-        pixd = pixConvert8To32(pix1);
-        pixDestroy(&pix1);
+        pixt = pixConvert16To8(pixs, L_MS_BYTE);
+        pixd = pixConvert8To32(pixt);
+        pixDestroy(&pixt);
         return pixd;
     } else if (d == 24) {
         return pixConvert24To32(pixs);
@@ -3279,7 +3047,7 @@ PIX     *pix1, *pixd;
         return pixCopy(NULL, pixs);
     } else {
         return (PIX *)ERROR_PTR("depth not 1, 2, 4, 8, 16, 32 bpp",
-                                __func__, NULL);
+                                procName, NULL);
     }
 }
 
@@ -3287,8 +3055,8 @@ PIX     *pix1, *pixd;
 /*!
  * \brief   pixConvertTo32BySampling()
  *
- * \param[in]    pixs    1, 2, 4, 8, 16, 24 or 32 bpp
- * \param[in]    factor  submsampling factor; integer >= 1
+ * \param[in]    pixs 1, 2, 4, 8, 16 or 32 bpp
+ * \param[in]    factor submsampling factor; integer >= 1
  * \return  pixd 32 bpp, or NULL on error
  *
  * <pre>
@@ -3302,18 +3070,20 @@ pixConvertTo32BySampling(PIX     *pixs,
                          l_int32  factor)
 {
 l_float32  scalefactor;
-PIX       *pix1, *pixd;
+PIX       *pixt, *pixd;
+
+    PROCNAME("pixConvertTo32BySampling");
 
     if (!pixs)
-        return (PIX *)ERROR_PTR("pixs not defined", __func__, NULL);
+        return (PIX *)ERROR_PTR("pixs not defined", procName, NULL);
     if (factor < 1)
-        return (PIX *)ERROR_PTR("factor must be >= 1", __func__, NULL);
+        return (PIX *)ERROR_PTR("factor must be >= 1", procName, NULL);
 
-    scalefactor = 1.f / (l_float32)factor;
-    pix1 = pixScaleBySampling(pixs, scalefactor, scalefactor);
-    pixd = pixConvertTo32(pix1);
+    scalefactor = 1. / (l_float32)factor;
+    pixt = pixScaleBySampling(pixs, scalefactor, scalefactor);
+    pixd = pixConvertTo32(pixt);
 
-    pixDestroy(&pix1);
+    pixDestroy(&pixt);
     return pixd;
 }
 
@@ -3321,13 +3091,14 @@ PIX       *pix1, *pixd;
 /*!
  * \brief   pixConvert8To32()
  *
- * \param[in]    pixs    8 bpp
+ * \param[in]    pixs 8 bpp
  * \return  32 bpp rgb pix, or NULL on error
  *
  * <pre>
  * Notes:
  *      (1) If there is no colormap, replicates the gray value
  *          into the 3 MSB of the dest pixel.
+ *      (2) Implicit assumption about RGB component ordering.
  * </pre>
  */
 PIX *
@@ -3338,10 +3109,12 @@ l_uint32  *datas, *datad, *lines, *lined;
 l_uint32  *tab;
 PIX       *pixd;
 
+    PROCNAME("pixConvert8To32");
+
     if (!pixs)
-        return (PIX *)ERROR_PTR("pixs not defined", __func__, NULL);
+        return (PIX *)ERROR_PTR("pixs not defined", procName, NULL);
     if (pixGetDepth(pixs) != 8)
-        return (PIX *)ERROR_PTR("pixs not 8 bpp", __func__, NULL);
+        return (PIX *)ERROR_PTR("pixs not 8 bpp", procName, NULL);
 
     if (pixGetColormap(pixs))
         return pixRemoveColormap(pixs, REMOVE_CMAP_TO_FULL_COLOR);
@@ -3350,7 +3123,7 @@ PIX       *pixd;
     datas = pixGetData(pixs);
     wpls = pixGetWpl(pixs);
     if ((pixd = pixCreate(w, h, 32)) == NULL)
-        return (PIX *)ERROR_PTR("pixd not made", __func__, NULL);
+        return (PIX *)ERROR_PTR("pixd not made", procName, NULL);
     pixCopyResolution(pixd, pixs);
     pixCopyInputFormat(pixd, pixs);
     datad = pixGetData(pixd);
@@ -3359,7 +3132,7 @@ PIX       *pixd;
         /* Replication table gray --> rgb */
     tab = (l_uint32 *)LEPT_CALLOC(256, sizeof(l_uint32));
     for (i = 0; i < 256; i++)
-      tab[i] = ((l_uint32)i << 24) | (i << 16) | (i << 8);
+      tab[i] = (i << 24) | (i << 16) | (i << 8);
 
         /* Replicate 1 --> 4 bytes (alpha byte not set) */
     for (i = 0; i < h; i++) {
@@ -3382,10 +3155,9 @@ PIX       *pixd;
 /*!
  * \brief   pixConvertTo8Or32()
  *
- * \param[in]    pixs      1, 2, 4, 8, 16, with or without colormap;
- *                         or 32 bpp rgb
+ * \param[in]    pixs 1, 2, 4, 8, 16, with or without colormap; or 32 bpp rgb
  * \param[in]    copyflag  L_CLONE or L_COPY
- * \param[in]    warnflag  1 to issue warning if colormap is removed; else 0
+ * \param[in]    warnflag 1 to issue warning if colormap is removed; else 0
  * \return  pixd 8 bpp grayscale or 32 bpp rgb, or NULL on error
  *
  * <pre>
@@ -3406,14 +3178,16 @@ pixConvertTo8Or32(PIX     *pixs,
 l_int32  d;
 PIX     *pixd;
 
+    PROCNAME("pixConvertTo8Or32");
+
     if (!pixs)
-        return (PIX *)ERROR_PTR("pixs not defined", __func__, NULL);
+        return (PIX *)ERROR_PTR("pixs not defined", procName, NULL);
     if (copyflag != L_CLONE && copyflag != L_COPY)
-        return (PIX *)ERROR_PTR("invalid copyflag", __func__, NULL);
+        return (PIX *)ERROR_PTR("invalid copyflag", procName, NULL);
 
     d = pixGetDepth(pixs);
     if (pixGetColormap(pixs)) {
-        if (warnflag) L_WARNING("pix has colormap; removing\n", __func__);
+        if (warnflag) L_WARNING("pix has colormap; removing\n", procName);
         pixd = pixRemoveColormap(pixs, REMOVE_CMAP_BASED_ON_SRC);
     } else if (d == 8 || d == 32) {
         if (copyflag == L_CLONE)
@@ -3428,7 +3202,7 @@ PIX     *pixd;
     d = pixGetDepth(pixd);
     if (d != 8 && d != 32) {
         pixDestroy(&pixd);
-        return (PIX *)ERROR_PTR("depth not 8 or 32 bpp", __func__, NULL);
+        return (PIX *)ERROR_PTR("depth not 8 or 32 bpp", procName, NULL);
     }
 
     return pixd;
@@ -3441,7 +3215,7 @@ PIX     *pixd;
 /*!
  * \brief   pixConvert24To32()
  *
- * \param[in]    pixs    24 bpp rgb
+ * \param[in]    pixs 24 bpp rgb
  * \return  pixd 32 bpp rgb, or NULL on error
  *
  * <pre>
@@ -3468,13 +3242,15 @@ l_uint32   pixel;
 l_uint32  *datas, *datad, *lined;
 PIX       *pixd;
 
+    PROCNAME("pixConvert24to32");
+
     if (!pixs)
-        return (PIX *)ERROR_PTR("pixs not defined", __func__, NULL);
+        return (PIX *)ERROR_PTR("pixs not defined", procName, NULL);
     pixGetDimensions(pixs, &w, &h, &d);
     if (d != 24)
-        return (PIX *)ERROR_PTR("pixs not 24 bpp", __func__, NULL);
+        return (PIX *)ERROR_PTR("pixs not 24 bpp", procName, NULL);
 
-    pixd = pixCreate(w, h, 32);
+    pixd = pixCreateNoInit(w, h, 32);
     datas = pixGetData(pixs);
     datad = pixGetData(pixd);
     wpls = pixGetWpl(pixs);
@@ -3499,7 +3275,7 @@ PIX       *pixd;
 /*!
  * \brief   pixConvert32To24()
  *
- * \param[in]    pixs    32 bpp rgb
+ * \param[in]    pixs 32 bpp rgb
  * \return  pixd 24 bpp rgb, or NULL on error
  *
  * <pre>
@@ -3515,15 +3291,17 @@ l_int32    w, h, d, i, j, wpls, wpld, rval, gval, bval;
 l_uint32  *datas, *lines, *rgbdata;
 PIX       *pixd;
 
+    PROCNAME("pixConvert32to24");
+
     if (!pixs)
-        return (PIX *)ERROR_PTR("pixs not defined", __func__, NULL);
+        return (PIX *)ERROR_PTR("pixs not defined", procName, NULL);
     pixGetDimensions(pixs, &w, &h, &d);
     if (d != 32)
-        return (PIX *)ERROR_PTR("pixs not 32 bpp", __func__, NULL);
+        return (PIX *)ERROR_PTR("pixs not 32 bpp", procName, NULL);
 
     datas = pixGetData(pixs);
     wpls = pixGetWpl(pixs);
-    pixd = pixCreate(w, h, 24);
+    pixd = pixCreateNoInit(w, h, 24);
     rgbdata = pixGetData(pixd);
     wpld = pixGetWpl(pixd);
     for (i = 0; i < h; i++) {
@@ -3548,8 +3326,8 @@ PIX       *pixd;
 /*!
  * \brief   pixConvert32To16()
  *
- * \param[in]    pixs   32 bpp, single component
- * \param[in]    type   L_LS_TWO_BYTES, L_MS_TWO_BYTES, L_CLIP_TO_FFFF
+ * \param[in]    pixs 32 bpp, single component
+ * \param[in]    type L_LS_TWO_BYTES, L_MS_TWO_BYTES, L_CLIP_TO_FFFF
  * \return  pixd 16 bpp , or NULL on error
  *
  * <pre>
@@ -3568,15 +3346,17 @@ l_uint32   sword;
 l_uint32  *datas, *lines, *datad, *lined;
 PIX       *pixd;
 
+    PROCNAME("pixConvert32to16");
+
     if (!pixs || pixGetDepth(pixs) != 32)
-        return (PIX *)ERROR_PTR("pixs undefined or not 32 bpp", __func__, NULL);
+        return (PIX *)ERROR_PTR("pixs undefined or not 32 bpp", procName, NULL);
     if (type != L_LS_TWO_BYTES && type != L_MS_TWO_BYTES &&
         type != L_CLIP_TO_FFFF)
-        return (PIX *)ERROR_PTR("invalid type", __func__, NULL);
+        return (PIX *)ERROR_PTR("invalid type", procName, NULL);
 
     pixGetDimensions(pixs, &w, &h, NULL);
     if ((pixd = pixCreate(w, h, 16)) == NULL)
-        return (PIX *)ERROR_PTR("pixd not made", __func__, NULL);
+        return (PIX *)ERROR_PTR("pixd not made", procName, NULL);
     pixCopyResolution(pixd, pixs);
     pixCopyInputFormat(pixd, pixs);
     wpls = pixGetWpl(pixs);
@@ -3615,10 +3395,10 @@ PIX       *pixd;
 /*!
  * \brief   pixConvert32To8()
  *
- * \param[in]    pixs    32 bpp, single component
- * \param[in]    type16  L_LS_TWO_BYTES, L_MS_TWO_BYTES, L_CLIP_TO_FFFF
- * \param[in]    type8   L_LS_BYTE, L_MS_BYTE, L_CLIP_TO_FF
- * \return  pixd 8 bpp, or NULL on error
+ * \param[in]    pixs 32 bpp, single component
+ * \param[in]    type16 L_LS_TWO_BYTES, L_MS_TWO_BYTES, L_CLIP_TO_FFFF
+ * \param[in]    type8 L_LS_BYTE, L_MS_BYTE, L_CLIP_TO_FF
+ * \return  pixd 8 bpp , or NULL on error
  */
 PIX *
 pixConvert32To8(PIX     *pixs,
@@ -3627,13 +3407,15 @@ pixConvert32To8(PIX     *pixs,
 {
 PIX  *pix1, *pixd;
 
+    PROCNAME("pixConvert32to8");
+
     if (!pixs || pixGetDepth(pixs) != 32)
-        return (PIX *)ERROR_PTR("pixs undefined or not 32 bpp", __func__, NULL);
+        return (PIX *)ERROR_PTR("pixs undefined or not 32 bpp", procName, NULL);
     if (type16 != L_LS_TWO_BYTES && type16 != L_MS_TWO_BYTES &&
         type16 != L_CLIP_TO_FFFF)
-        return (PIX *)ERROR_PTR("invalid type16", __func__, NULL);
+        return (PIX *)ERROR_PTR("invalid type16", procName, NULL);
     if (type8 != L_LS_BYTE && type8 != L_MS_BYTE && type8 != L_CLIP_TO_FF)
-        return (PIX *)ERROR_PTR("invalid type8", __func__, NULL);
+        return (PIX *)ERROR_PTR("invalid type8", procName, NULL);
 
     pix1 = pixConvert32To16(pixs, type16);
     pixd = pixConvert16To8(pix1, type8);
@@ -3648,9 +3430,9 @@ PIX  *pix1, *pixd;
 /*!
  * \brief   pixRemoveAlpha()
  *
- * \param[in]    pixs   any depth
- * \return  pixd        if 32 bpp rgba, pixs blended over a white background;
- *                      a clone of pixs otherwise, and NULL on error
+ * \param[in]    pixs any depth
+ * \return  pixd if 32 bpp rgba, pixs blended over a white background;
+ *                    a clone of pixs otherwise, and NULL on error
  *
  * <pre>
  * Notes:
@@ -3660,8 +3442,10 @@ PIX  *pix1, *pixd;
 PIX *
 pixRemoveAlpha(PIX *pixs)
 {
+    PROCNAME("pixRemoveAlpha");
+
     if (!pixs)
-        return (PIX *)ERROR_PTR("pixs not defined", __func__, NULL);
+        return (PIX *)ERROR_PTR("pixs not defined", procName, NULL);
 
     if (pixGetDepth(pixs) == 32 && pixGetSpp(pixs) == 4)
         return pixAlphaBlendUniform(pixs, 0xffffff00);
@@ -3676,8 +3460,8 @@ pixRemoveAlpha(PIX *pixs)
 /*!
  * \brief   pixAddAlphaTo1bpp()
  *
- * \param[in]    pixd    [optional] 1 bpp, can be null or equal to pixs
- * \param[in]    pixs    1 bpp
+ * \param[in]    pixd [optional] 1 bpp, can be null or equal to pixs
+ *              pixs (1 bpp
  * \return  pixd 1 bpp with colormap and non-opaque alpha,
  *                    or NULL on error
  *
@@ -3698,10 +3482,12 @@ pixAddAlphaTo1bpp(PIX  *pixd,
 {
 PIXCMAP  *cmap;
 
+    PROCNAME("pixAddAlphaTo1bpp");
+
     if (!pixs || (pixGetDepth(pixs) != 1))
-        return (PIX *)ERROR_PTR("pixs undefined or not 1 bpp", __func__, NULL);
+        return (PIX *)ERROR_PTR("pixs undefined or not 1 bpp", procName, NULL);
     if (pixd && (pixd != pixs))
-        return (PIX *)ERROR_PTR("pixd defined but != pixs", __func__, NULL);
+        return (PIX *)ERROR_PTR("pixd defined but != pixs", procName, NULL);
 
     pixd = pixCopy(pixd, pixs);
     cmap = pixcmapCreate(1);
@@ -3718,8 +3504,8 @@ PIXCMAP  *cmap;
 /*!
  * \brief   pixConvertLossless()
  *
- * \param[in]    pixs    1, 2, 4, 8 bpp, not cmapped
- * \param[in]    d       destination depth: 2, 4 or 8
+ * \param[in]    pixs 1, 2, 4, 8 bpp, not cmapped
+ * \param[in]    d destination depth: 2, 4 or 8
  * \return  pixd 2, 4 or 8 bpp, or NULL on error
  *
  * <pre>
@@ -3740,21 +3526,23 @@ l_int32    w, h, ds, wpls, wpld, i, j, val;
 l_uint32  *datas, *datad, *lines, *lined;
 PIX       *pixd;
 
+    PROCNAME("pixConvertLossless");
+
     if (!pixs)
-        return (PIX *)ERROR_PTR("pixs not defined", __func__, NULL);
+        return (PIX *)ERROR_PTR("pixs not defined", procName, NULL);
     if (pixGetColormap(pixs))
-        return (PIX *)ERROR_PTR("pixs has colormap", __func__, NULL);
+        return (PIX *)ERROR_PTR("pixs has colormap", procName, NULL);
     if (d != 2 && d != 4 && d != 8)
-        return (PIX *)ERROR_PTR("invalid dest depth", __func__, NULL);
+        return (PIX *)ERROR_PTR("invalid dest depth", procName, NULL);
 
     pixGetDimensions(pixs, &w, &h, &ds);
     if (d < ds)
-        return (PIX *)ERROR_PTR("depth > d", __func__, NULL);
+        return (PIX *)ERROR_PTR("depth > d", procName, NULL);
     else if (d == ds)
         return pixCopy(NULL, pixs);
 
     if ((pixd = pixCreate(w, h, d)) == NULL)
-        return (PIX *)ERROR_PTR("pixd not made", __func__, NULL);
+        return (PIX *)ERROR_PTR("pixd not made", procName, NULL);
     pixCopyResolution(pixd, pixs);
     pixCopyInputFormat(pixd, pixs);
 
@@ -3807,8 +3595,8 @@ PIX       *pixd;
 /*!
  * \brief   pixConvertForPSWrap()
  *
- * \param[in]    pixs    1, 2, 4, 8, 16, 32 bpp
- * \return  pixd    1, 8, or 32 bpp, or NULL on error
+ * \param[in]    pixs 1, 2, 4, 8, 16, 32 bpp
+ * \return  pixd 1, 8, or 32 bpp, or NULL on error
  *
  * <pre>
  * Notes:
@@ -3828,8 +3616,10 @@ l_int32   d;
 PIX      *pixd;
 PIXCMAP  *cmap;
 
+    PROCNAME("pixConvertForPSWrap");
+
     if (!pixs)
-        return (PIX *)ERROR_PTR("pixs not defined", __func__, NULL);
+        return (PIX *)ERROR_PTR("pixs not defined", procName, NULL);
 
     cmap = pixGetColormap(pixs);
     d = pixGetDepth(pixs);
@@ -3858,7 +3648,7 @@ PIXCMAP  *cmap;
         pixd = pixConvert16To8(pixs, L_MS_BYTE);
         break;
     default:
-        lept_stderr("depth not in {1, 2, 4, 8, 16, 32}");
+        fprintf(stderr, "depth not in {1, 2, 4, 8, 16, 32}");
         return NULL;
    }
 
@@ -3872,13 +3662,13 @@ PIXCMAP  *cmap;
 /*!
  * \brief   pixConvertToSubpixelRGB()
  *
- * \param[in]    pixs            8 bpp grayscale, 32 bpp rgb, or colormapped
- * \param[in]    scalex, scaley  anisotropic scaling permitted between
- *                               source and destination
- * \param[in]    order           of subpixel rgb color components in
- *                               composition of pixd:
- *                               L_SUBPIXEL_ORDER_RGB, L_SUBPIXEL_ORDER_BGR,
- *                               L_SUBPIXEL_ORDER_VRGB, L_SUBPIXEL_ORDER_VBGR
+ * \param[in]    pixs 8 bpp grayscale, 32 bpp rgb, or colormapped
+ * \param[in]    scalex, scaley anisotropic scaling permitted between
+ *                              source and destination
+ * \param[in]    order of subpixel rgb color components in composition of pixd:
+ *                     L_SUBPIXEL_ORDER_RGB, L_SUBPIXEL_ORDER_BGR,
+ *                     L_SUBPIXEL_ORDER_VRGB, L_SUBPIXEL_ORDER_VBGR
+ *
  * \return  pixd 32 bpp, or NULL on error
  *
  * <pre>
@@ -3905,34 +3695,36 @@ pixConvertToSubpixelRGB(PIX       *pixs,
                         l_int32    order)
 {
 l_int32    d;
-PIX       *pix1, *pixd;
+PIX       *pixt, *pixd;
 PIXCMAP   *cmap;
 
+    PROCNAME("pixConvertToSubpixelRGB");
+
     if (!pixs)
-        return (PIX *)ERROR_PTR("pixs not defined", __func__, NULL);
+        return (PIX *)ERROR_PTR("pixs not defined", procName, NULL);
     d = pixGetDepth(pixs);
     cmap = pixGetColormap(pixs);
     if (d != 8 && d != 32 && !cmap)
         return (PIX *)ERROR_PTR("pix not 8 or 32 bpp and not cmapped",
-                                __func__, NULL);
+                                procName, NULL);
     if (scalex <= 0.0 || scaley <= 0.0)
-        return (PIX *)ERROR_PTR("scale factors must be > 0", __func__, NULL);
+        return (PIX *)ERROR_PTR("scale factors must be > 0", procName, NULL);
     if (order != L_SUBPIXEL_ORDER_RGB && order != L_SUBPIXEL_ORDER_BGR &&
         order != L_SUBPIXEL_ORDER_VRGB && order != L_SUBPIXEL_ORDER_VBGR)
-        return (PIX *)ERROR_PTR("invalid subpixel order", __func__, NULL);
-    if ((pix1 = pixRemoveColormap(pixs, REMOVE_CMAP_BASED_ON_SRC)) == NULL)
-        return (PIX *)ERROR_PTR("pix1 not made", __func__, NULL);
+        return (PIX *)ERROR_PTR("invalid subpixel order", procName, NULL);
+    if ((pixt = pixRemoveColormap(pixs, REMOVE_CMAP_BASED_ON_SRC)) == NULL)
+        return (PIX *)ERROR_PTR("pixt not made", procName, NULL);
 
-    d = pixGetDepth(pix1);
+    d = pixGetDepth(pixt);
     pixd = NULL;
     if (d == 8)
-        pixd = pixConvertGrayToSubpixelRGB(pix1, scalex, scaley, order);
+        pixd = pixConvertGrayToSubpixelRGB(pixt, scalex, scaley, order);
     else if (d == 32)
-        pixd = pixConvertColorToSubpixelRGB(pix1, scalex, scaley, order);
+        pixd = pixConvertColorToSubpixelRGB(pixt, scalex, scaley, order);
     else
-        L_ERROR("invalid depth %d\n", __func__, d);
+        L_ERROR("invalid depth %d\n", procName, d);
 
-    pixDestroy(&pix1);
+    pixDestroy(&pixt);
     return pixd;
 }
 
@@ -3940,12 +3732,12 @@ PIXCMAP   *cmap;
 /*!
  * \brief   pixConvertGrayToSubpixelRGB()
  *
- * \param[in]    pixs            8 bpp or colormapped
+ * \param[in]    pixs 8 bpp or colormapped
  * \param[in]    scalex, scaley
- * \param[in]    order           of subpixel rgb color components in
- *                               composition of pixd:
- *                               L_SUBPIXEL_ORDER_RGB, L_SUBPIXEL_ORDER_BGR,
- *                               L_SUBPIXEL_ORDER_VRGB, L_SUBPIXEL_ORDER_VBGR
+ * \param[in]    order of subpixel rgb color components in composition of pixd:
+ *                     L_SUBPIXEL_ORDER_RGB, L_SUBPIXEL_ORDER_BGR,
+ *                     L_SUBPIXEL_ORDER_VRGB, L_SUBPIXEL_ORDER_VBGR
+ *
  * \return  pixd 32 bpp, or NULL on error
  *
  * <pre>
@@ -3977,26 +3769,28 @@ l_uint32  *datat, *datad, *linet, *lined;
 PIX       *pix1, *pix2, *pixd;
 PIXCMAP   *cmap;
 
+    PROCNAME("pixConvertGrayToSubpixelRGB");
+
     if (!pixs)
-        return (PIX *)ERROR_PTR("pixs not defined", __func__, NULL);
+        return (PIX *)ERROR_PTR("pixs not defined", procName, NULL);
     d = pixGetDepth(pixs);
     cmap = pixGetColormap(pixs);
     if (d != 8 && !cmap)
-        return (PIX *)ERROR_PTR("pix not 8 bpp & not cmapped", __func__, NULL);
+        return (PIX *)ERROR_PTR("pix not 8 bpp & not cmapped", procName, NULL);
     if (scalex <= 0.0 || scaley <= 0.0)
-        return (PIX *)ERROR_PTR("scale factors must be > 0", __func__, NULL);
+        return (PIX *)ERROR_PTR("scale factors must be > 0", procName, NULL);
     if (order != L_SUBPIXEL_ORDER_RGB && order != L_SUBPIXEL_ORDER_BGR &&
         order != L_SUBPIXEL_ORDER_VRGB && order != L_SUBPIXEL_ORDER_VBGR)
-        return (PIX *)ERROR_PTR("invalid subpixel order", __func__, NULL);
+        return (PIX *)ERROR_PTR("invalid subpixel order", procName, NULL);
 
     direction =
         (order == L_SUBPIXEL_ORDER_RGB || order == L_SUBPIXEL_ORDER_BGR)
         ? L_HORIZ : L_VERT;
     pix1 = pixRemoveColormap(pixs, REMOVE_CMAP_TO_GRAYSCALE);
     if (direction == L_HORIZ)
-        pix2 = pixScale(pix1, 3.0f * scalex, scaley);
+        pix2 = pixScale(pix1, 3.0 * scalex, scaley);
     else  /* L_VERT */
-        pix2 = pixScale(pix1, scalex, 3.0f * scaley);
+        pix2 = pixScale(pix1, scalex, 3.0 * scaley);
 
     pixGetDimensions(pix2, &w, &h, NULL);
     wd = (direction == L_HORIZ) ? w / 3 : w;
@@ -4045,12 +3839,12 @@ PIXCMAP   *cmap;
 /*!
  * \brief   pixConvertColorToSubpixelRGB()
  *
- * \param[in]    pixs            32 bpp or colormapped
+ * \param[in]    pixs 32 bpp or colormapped
  * \param[in]    scalex, scaley
- * \param[in]    order           of subpixel rgb color components in
- *                               composition of pixd:
- *                               L_SUBPIXEL_ORDER_RGB, L_SUBPIXEL_ORDER_BGR,
- *                               L_SUBPIXEL_ORDER_VRGB, L_SUBPIXEL_ORDER_VBGR
+ * \param[in]    order of subpixel rgb color components in composition of pixd:
+ *                     L_SUBPIXEL_ORDER_RGB, L_SUBPIXEL_ORDER_BGR,
+ *                     L_SUBPIXEL_ORDER_VRGB, L_SUBPIXEL_ORDER_VBGR
+ *
  * \return  pixd 32 bpp, or NULL on error
  *
  * <pre>
@@ -4080,26 +3874,28 @@ l_uint32  *datat, *datad, *linet, *lined;
 PIX       *pix1, *pix2, *pixd;
 PIXCMAP   *cmap;
 
+    PROCNAME("pixConvertColorToSubpixelRGB");
+
     if (!pixs)
-        return (PIX *)ERROR_PTR("pixs not defined", __func__, NULL);
+        return (PIX *)ERROR_PTR("pixs not defined", procName, NULL);
     d = pixGetDepth(pixs);
     cmap = pixGetColormap(pixs);
     if (d != 32 && !cmap)
-        return (PIX *)ERROR_PTR("pix not 32 bpp & not cmapped", __func__, NULL);
+        return (PIX *)ERROR_PTR("pix not 32 bpp & not cmapped", procName, NULL);
     if (scalex <= 0.0 || scaley <= 0.0)
-        return (PIX *)ERROR_PTR("scale factors must be > 0", __func__, NULL);
+        return (PIX *)ERROR_PTR("scale factors must be > 0", procName, NULL);
     if (order != L_SUBPIXEL_ORDER_RGB && order != L_SUBPIXEL_ORDER_BGR &&
         order != L_SUBPIXEL_ORDER_VRGB && order != L_SUBPIXEL_ORDER_VBGR)
-        return (PIX *)ERROR_PTR("invalid subpixel order", __func__, NULL);
+        return (PIX *)ERROR_PTR("invalid subpixel order", procName, NULL);
 
     direction =
         (order == L_SUBPIXEL_ORDER_RGB || order == L_SUBPIXEL_ORDER_BGR)
         ? L_HORIZ : L_VERT;
     pix1 = pixRemoveColormap(pixs, REMOVE_CMAP_TO_FULL_COLOR);
     if (direction == L_HORIZ)
-        pix2 = pixScale(pix1, 3.0f * scalex, scaley);
+        pix2 = pixScale(pix1, 3.0 * scalex, scaley);
     else  /* L_VERT */
-        pix2 = pixScale(pix1, scalex, 3.0f * scaley);
+        pix2 = pixScale(pix1, scalex, 3.0 * scaley);
 
     pixGetDimensions(pix2, &w, &h, NULL);
     wd = (direction == L_HORIZ) ? w / 3 : w;
@@ -4161,7 +3957,7 @@ PIXCMAP   *cmap;
 /*!
  * \brief   l_setNeutralBoostVal()
  *
- * \param[in]    val    between 1 and 255; typical value is 180
+ * \param[in]    val between 1 and 255; typical value is 180
  * \return  void
  *
  * <pre>
@@ -4173,8 +3969,10 @@ PIXCMAP   *cmap;
 void
 l_setNeutralBoostVal(l_int32  val)
 {
+    PROCNAME("l_setNeutralBoostVal");
+
     if (val <= 0) {
-        L_ERROR("invalid reference value for neutral boost\n", __func__);
+        L_ERROR("invalid reference value for neutral boost\n", procName);
         return;
     }
     var_NEUTRAL_BOOST_VAL = val;

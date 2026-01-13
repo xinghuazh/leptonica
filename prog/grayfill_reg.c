@@ -27,30 +27,24 @@
 /*
  * grayfill_reg.c
  *
- *   Regression test for gray filling operations
  */
-
-#ifdef HAVE_CONFIG_H
-#include <config_auto.h>
-#endif  /* HAVE_CONFIG_H */
 
 #include "allheaders.h"
 
-void PixTestEqual(L_REGPARAMS *rp, PIX *pixs1, PIX *pixs2, PIX *pixm,
-                  l_int32 set, l_int32 connectivity);
+void PixTestEqual(PIX *pixs1, PIX *pixs2, PIX *pixm, l_int32 set,
+                  l_int32 connectivity);
+
 
 int main(int    argc,
          char **argv)
 {
-l_int32       i, j;
-PIX          *pixm, *pixmi, *pixs1, *pixs1_8, *pix1;
-PIX          *pixs2, *pixs2_8, *pixs3, *pixs3_8;
-PIX          *pixb1, *pixb2, *pixb3, *pixmin;
-PIXA         *pixa;
-L_REGPARAMS  *rp;
+l_int32  i, j;
+PIX     *pixm, *pixmi, *pixs1, *pixs1_8;
+PIX     *pixs2, *pixs2_8, *pixs3, *pixs3_8;
+PIX     *pixb1, *pixb2, *pixb3, *pixmin, *pixd;
+PIXA    *pixac;
 
-    if (regTestSetup(argc, argv, &rp))
-        return 1;
+    pixac = pixaCreate(0);
 
         /* Mask */
     pixm = pixCreate(200, 200, 8);
@@ -74,76 +68,52 @@ L_REGPARAMS  *rp;
     pixs2_8 = pixCopy(NULL, pixs2);
 
         /* Inverse grayscale fill */
-    pixa = pixaCreate(0);
-    pixaAddPix(pixa, pixm, L_COPY);
-    regTestWritePixAndCheck(rp, pixm, IFF_PNG);  /* 0 */
-    pixaAddPix(pixa, pixs1, L_COPY);
-    regTestWritePixAndCheck(rp, pixs1, IFF_PNG);  /* 1 */
+    pixSaveTiled(pixm, pixac, 1.0, 1, 10, 8);
+    pixSaveTiled(pixs1, pixac, 1.0, 0, 10, 0);
     pixSeedfillGrayInv(pixs1, pixm, 4);
     pixSeedfillGrayInv(pixs1_8, pixm, 8);
-    pixaAddPix(pixa, pixs1, L_COPY);
-    regTestWritePixAndCheck(rp, pixs1, IFF_PNG);  /* 2 */
-    pixaAddPix(pixa, pixs1_8, L_COPY);
-    regTestWritePixAndCheck(rp, pixs1_8, IFF_PNG);  /* 3 */
+    pixSaveTiled(pixs1, pixac, 1.0, 0, 10, 0);
+    pixSaveTiled(pixs1_8, pixac, 1.0, 0, 10, 0);
     pixb1 = pixThresholdToBinary(pixs1, 20);
-    pixaAddPix(pixa, pixb1, L_COPY);
-    regTestWritePixAndCheck(rp, pixb1, IFF_PNG);  /* 4 */
+    pixSaveTiled(pixb1, pixac, 1.0, 0, 10, 0);
     pixCombineMasked(pixs1, pixm, pixb1);
-    pixaAddPix(pixa, pixs1, L_COPY);
-    regTestWritePixAndCheck(rp, pixs1, IFF_PNG);  /* 5 */
-    pix1 = pixaDisplayTiledInColumns(pixa, 6, 1.0, 15, 2);
-    regTestWritePixAndCheck(rp, pix1, IFF_PNG);  /* 6 */
-    pixDisplayWithTitle(pix1, 100, 0, "inverse gray fill", rp->display);
+    pixSaveTiled(pixs1, pixac, 1.0, 0, 10, 0);
     pixDestroy(&pixs1);
     pixDestroy(&pixs1_8);
     pixDestroy(&pixb1);
-    pixDestroy(&pix1);
-    pixaDestroy(&pixa);
 
         /* Standard grayscale fill */
-    pixa = pixaCreate(0);
-    pixaAddPix(pixa, pixmi, L_COPY);
-    regTestWritePixAndCheck(rp, pixmi, IFF_PNG);  /* 7 */
-    pixaAddPix(pixa, pixs2, L_COPY);
-    regTestWritePixAndCheck(rp, pixs2, IFF_PNG);  /* 8 */
+    pixSaveTiled(pixmi, pixac, 1.0, 1, 10, 0);
+    pixSaveTiled(pixs2, pixac, 1.0, 0, 10, 0);
     pixSeedfillGray(pixs2, pixmi, 4);
     pixSeedfillGray(pixs2_8, pixmi, 8);
-    pixaAddPix(pixa, pixs2, L_COPY);
-    regTestWritePixAndCheck(rp, pixs2, IFF_PNG);  /* 9 */
-    pixaAddPix(pixa, pixs2_8, L_COPY);
-    regTestWritePixAndCheck(rp, pixs2_8, IFF_PNG);  /* 10 */
+    pixSaveTiled(pixs2, pixac, 1.0, 0, 10, 0);
+    pixSaveTiled(pixs2_8, pixac, 1.0, 0, 10, 0);
     pixb2 = pixThresholdToBinary(pixs2, 205);
-    regTestWritePixAndCheck(rp, pixb2, IFF_PNG);  /* 11 */
-    pixaAddPix(pixa, pixb2, L_INSERT);
-    pix1 = pixaDisplayTiledInColumns(pixa, 5, 1.0, 15, 2);
-    regTestWritePixAndCheck(rp, pix1, IFF_PNG);  /* 12 */
-    pixDisplayWithTitle(pix1, 100, 200, "standard gray fill", rp->display);
+    pixSaveTiled(pixb2, pixac, 1.0, 0, 10, 0);
     pixDestroy(&pixs2);
     pixDestroy(&pixs2_8);
-    pixDestroy(&pix1);
-    pixaDestroy(&pixa);
+    pixDestroy(&pixb2);
 
         /* Basin fill from minima as seed */
-    pixa = pixaCreate(0);
-    pixaAddPix(pixa, pixm, L_COPY);
-    regTestWritePixAndCheck(rp, pixm, IFF_PNG);  /* 13 */
+    pixSaveTiled(pixm, pixac, 1.0, 1, 10, 8);
     pixLocalExtrema(pixm, 0, 0, &pixmin, NULL);
-    pixaAddPix(pixa, pixmin, L_COPY);
-    regTestWritePixAndCheck(rp, pixmin, IFF_PNG);  /* 14 */
+    pixSaveTiled(pixmin, pixac, 1.0, 0, 10, 0);
     pixs3 = pixSeedfillGrayBasin(pixmin, pixm, 30, 4);
     pixs3_8 = pixSeedfillGrayBasin(pixmin, pixm, 30, 8);
-    pixaAddPix(pixa, pixs3, L_INSERT);
-    regTestWritePixAndCheck(rp, pixs3, IFF_PNG);  /* 15 */
-    pixaAddPix(pixa, pixs3_8, L_INSERT);
-    regTestWritePixAndCheck(rp, pixs3_8, IFF_PNG);  /* 15 */
+    pixSaveTiled(pixs3, pixac, 1.0, 0, 10, 0);
+    pixSaveTiled(pixs3_8, pixac, 1.0, 0, 10, 0);
     pixb3 = pixThresholdToBinary(pixs3, 60);
-    regTestWritePixAndCheck(rp, pixb3, IFF_PNG);  /* 17 */
-    pixaAddPix(pixa, pixb3, L_INSERT);
-    pix1 = pixaDisplayTiledInColumns(pixa, 5, 1.0, 15, 2);
-    regTestWritePixAndCheck(rp, pix1, IFF_PNG);  /* 18 */
-    pixDisplayWithTitle(pix1, 100, 400, "gray fill form seed", rp->display);
-    pixDestroy(&pix1);
-    pixaDestroy(&pixa);
+    pixSaveTiled(pixb3, pixac, 1.0, 0, 10, 0);
+    pixDestroy(&pixs3);
+    pixDestroy(&pixs3_8);
+    pixDestroy(&pixb3);
+
+    pixd = pixaDisplay(pixac, 0, 0);
+    pixDisplay(pixd, 100, 100);
+    pixWrite("/tmp/junkfill.png", pixd, IFF_PNG);
+    pixDestroy(&pixd);
+    pixaDestroy(&pixac);
 
         /* Compare hybrid and iterative gray seedfills */
     pixs1 = pixCopy(NULL, pixm);
@@ -151,28 +121,29 @@ L_REGPARAMS  *rp;
     pixAddConstantGray(pixs1, -30);
     pixAddConstantGray(pixs2, 60);
 
-    PixTestEqual(rp, pixs1, pixs2, pixm, 1, 4);  /* 19 - 22 */
-    PixTestEqual(rp, pixs1, pixs2, pixm, 2, 8);  /* 23 - 26 */
-    PixTestEqual(rp, pixs2, pixs1, pixm, 3, 4);  /* 27 - 30 */
-    PixTestEqual(rp, pixs2, pixs1, pixm, 4, 8);  /* 31 - 34 */
+    PixTestEqual(pixs1, pixs2, pixm, 1, 4);
+    PixTestEqual(pixs1, pixs2, pixm, 2, 8);
+    PixTestEqual(pixs2, pixs1, pixm, 3, 4);
+    PixTestEqual(pixs2, pixs1, pixm, 4, 8);
     pixDestroy(&pixs1);
     pixDestroy(&pixs2);
 
     pixDestroy(&pixm);
     pixDestroy(&pixmi);
     pixDestroy(&pixmin);
-    return regTestCleanup(rp);;
+    return 0;
 }
 
+
 void
-PixTestEqual(L_REGPARAMS  *rp,
-             PIX          *pixs1,
-             PIX          *pixs2,
-             PIX          *pixm,
-             l_int32       set,
-             l_int32       connectivity)
+PixTestEqual(PIX     *pixs1,
+             PIX     *pixs2,
+             PIX     *pixm,
+             l_int32  set,
+             l_int32  connectivity)
 {
-PIX  *pixc11, *pixc12, *pixc21, *pixc22, *pixmi;
+l_int32  same;
+PIX     *pixc11, *pixc12, *pixc21, *pixc22, *pixmi;
 
     pixmi = pixInvert(NULL, pixm);
     pixc11 = pixCopy(NULL, pixs1);
@@ -182,15 +153,21 @@ PIX  *pixc11, *pixc12, *pixc21, *pixc22, *pixmi;
 
         /* Test inverse seed filling */
     pixSeedfillGrayInv(pixc11, pixm, connectivity);
-    regTestWritePixAndCheck(rp, pixc11, IFF_PNG);  /* '1' */
     pixSeedfillGrayInvSimple(pixc12, pixm, connectivity);
-    regTestComparePix(rp, pixc11, pixc12);  /* '2' */
+    pixEqual(pixc11, pixc12, &same);
+    if (same)
+        fprintf(stderr, "\nSuccess for inv set %d\n", set);
+    else
+        fprintf(stderr, "\nFailure for inv set %d\n", set);
 
         /* Test seed filling */
     pixSeedfillGray(pixc21, pixm, connectivity);
-    regTestWritePixAndCheck(rp, pixc21, IFF_PNG);  /* '3' */
     pixSeedfillGraySimple(pixc22, pixm, connectivity);
-    regTestComparePix(rp, pixc21, pixc22);  /* '4' */
+    pixEqual(pixc21, pixc22, &same);
+    if (same)
+        fprintf(stderr, "Success for set %d\n", set);
+    else
+        fprintf(stderr, "Failure for set %d\n", set);
 
        /* Display the filling results */
 /*    pixDisplay(pixc11, 220 * (set - 1), 100);

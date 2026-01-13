@@ -93,10 +93,9 @@
  *  without buffering, and then rewrite old pixels that are
  *  no longer covered by sheared pixels.  For that rewriting,
  *  you have the choice of using white or black pixels.
- *  When not in-place, the new pix is initialized with white or black
- *  pixels by pixSetBlackOrWhite(), which also works for cmapped pix.
- *  But for in-place, this initialization is not possible, so
- *  in-place shear operations on cmapped pix are not allowed.
+ *  (Note that this may give undesirable results for colormapped
+ *  images, where the white and black values are arbitrary
+ *  indexes into the colormap, and may not even exist.)
  *
  *  Rotation by shear is fast and depth-independent.  However, it
  *  does not work well for large rotation angles.  In fact, for
@@ -161,24 +160,13 @@
  * </pre>
  */
 
-#ifdef HAVE_CONFIG_H
-#include <config_auto.h>
-#endif  /* HAVE_CONFIG_H */
-
 #include <math.h>
 #include <string.h>
 #include "allheaders.h"
 
-    /* Angle limits:
-     *     angle < MinAngleToRotate    ==>  clone
-     *     angle > MaxTwoShearAngle    ==>  warning for 2-angle shears
-     *     angle > MaxThreeShearAngle  ==>  warning for 3-angle shears
-     *     angle > MaxShearAngle       ==>  error
-     */
-static const l_float32  MinAngleToRotate = 0.001f;   /* radians; ~0.06 deg */
-static const l_float32  MaxTwoShearAngle = 0.06f;    /* radians; ~3 deg    */
-static const l_float32  MaxThreeShearAngle = 0.35f;  /* radians; ~20 deg   */
-static const l_float32  MaxShearAngle = 0.50f;       /* radians; ~29 deg   */
+static const l_float32  MIN_ANGLE_TO_ROTATE = 0.001;  /* radians; ~0.06 deg */
+static const l_float32  MAX_2_SHEAR_ANGLE = 0.06;     /* radians; ~3 deg    */
+static const l_float32  LIMIT_SHEAR_ANGLE = 0.35;     /* radians; ~20 deg   */
 
 /*------------------------------------------------------------------*
  *                Rotations about an arbitrary point                *
@@ -186,11 +174,11 @@ static const l_float32  MaxShearAngle = 0.50f;       /* radians; ~29 deg   */
 /*!
  * \brief   pixRotateShear()
  *
- * \param[in]    pixs     any depth; cmap ok
- * \param[in]    xcen     x value for which there is no horizontal shear
- * \param[in]    ycen     y value for which there is no vertical shear
- * \param[in]    angle    radians
- * \param[in]    incolor  L_BRING_IN_WHITE, L_BRING_IN_BLACK;
+ * \param[in]    pixs
+ * \param[in]    xcen x value for which there is no horizontal shear
+ * \param[in]    ycen y value for which there is no vertical shear
+ * \param[in]    angle radians
+ * \param[in]    incolor L_BRING_IN_WHITE, L_BRING_IN_BLACK;
  * \return  pixd, or NULL on error.
  *
  * <pre>
@@ -211,40 +199,40 @@ pixRotateShear(PIX       *pixs,
                l_float32  angle,
                l_int32    incolor)
 {
-    if (!pixs)
-        return (PIX *)(PIX *)ERROR_PTR("pixs not defined", __func__, NULL);
-    if (incolor != L_BRING_IN_WHITE && incolor != L_BRING_IN_BLACK)
-        return (PIX *)(PIX *)ERROR_PTR("invalid incolor value", __func__, NULL);
+    PROCNAME("pixRotateShear");
 
-    if (L_ABS(angle) > MaxShearAngle) {
-        L_ERROR("%6.2f radians; too large for shear rotation\n", __func__,
-                L_ABS(angle));
-        return NULL;
-    }
-    if (L_ABS(angle) < MinAngleToRotate)
+    if (!pixs)
+        return (PIX *)(PIX *)ERROR_PTR("pixs not defined", procName, NULL);
+    if (incolor != L_BRING_IN_WHITE && incolor != L_BRING_IN_BLACK)
+        return (PIX *)(PIX *)ERROR_PTR("invalid incolor value", procName, NULL);
+
+    if (L_ABS(angle) < MIN_ANGLE_TO_ROTATE)
         return pixClone(pixs);
 
-    if (L_ABS(angle) <= MaxTwoShearAngle)
+    if (L_ABS(angle) <= MAX_2_SHEAR_ANGLE)
         return pixRotate2Shear(pixs, xcen, ycen, angle, incolor);
-    else
-        return pixRotate3Shear(pixs, xcen, ycen, angle, incolor);
+
+    if (L_ABS(angle) > LIMIT_SHEAR_ANGLE)
+        L_WARNING("%6.2f radians; large angle for shear rotation\n",
+                  procName, L_ABS(angle));
+    return pixRotate3Shear(pixs, xcen, ycen, angle, incolor);
 }
 
 
 /*!
  * \brief   pixRotate2Shear()
  *
- * \param[in]    pixs         any depth; cmap ok
- * \param[in]    xcen, ycen   center of rotation
- * \param[in]    angle        radians
- * \param[in]    incolor      L_BRING_IN_WHITE, L_BRING_IN_BLACK;
+ * \param[in]    pixs
+ * \param[in]    xcen, ycen center of rotation
+ * \param[in]    angle radians
+ * \param[in]    incolor L_BRING_IN_WHITE, L_BRING_IN_BLACK;
  * \return  pixd, or NULL on error.
  *
  * <pre>
  * Notes:
  *      (1) This rotates the image about the given point, using the 2-shear
- *          method.  It should only be used for angles no larger than
- *          MaxTwoShearAngle.  For larger angles, a warning is issued.
+ *          method.  It should only be used for angles smaller than
+ *          MAX_2_SHEAR_ANGLE.  For larger angles, a warning is issued.
  *      (2) A positive angle gives a clockwise rotation.
  *      (3) 2-shear rotation by a specified angle is equivalent
  *          to the sequential transformations
@@ -265,28 +253,25 @@ pixRotate2Shear(PIX       *pixs,
 {
 PIX  *pix1, *pix2, *pixd;
 
-    if (!pixs)
-        return (PIX *)ERROR_PTR("pixs not defined", __func__, NULL);
-    if (incolor != L_BRING_IN_WHITE && incolor != L_BRING_IN_BLACK)
-        return (PIX *)(PIX *)ERROR_PTR("invalid incolor value", __func__, NULL);
+    PROCNAME("pixRotate2Shear");
 
-    if (L_ABS(angle) > MaxShearAngle) {
-        L_ERROR("%6.2f radians; too large for shear rotation\n", __func__,
-                L_ABS(angle));
-        return NULL;
-    }
-    if (L_ABS(angle) < MinAngleToRotate)
+    if (!pixs)
+        return (PIX *)ERROR_PTR("pixs not defined", procName, NULL);
+    if (incolor != L_BRING_IN_WHITE && incolor != L_BRING_IN_BLACK)
+        return (PIX *)(PIX *)ERROR_PTR("invalid incolor value", procName, NULL);
+
+    if (L_ABS(angle) < MIN_ANGLE_TO_ROTATE)
         return pixClone(pixs);
-    if (L_ABS(angle) > MaxTwoShearAngle)
+    if (L_ABS(angle) > MAX_2_SHEAR_ANGLE)
         L_WARNING("%6.2f radians; large angle for 2-shear rotation\n",
-                  __func__, L_ABS(angle));
+                  procName, L_ABS(angle));
 
     if ((pix1 = pixHShear(NULL, pixs, ycen, angle, incolor)) == NULL)
-        return (PIX *)ERROR_PTR("pix1 not made", __func__, NULL);
+        return (PIX *)ERROR_PTR("pix1 not made", procName, NULL);
     pixd = pixVShear(NULL, pix1, xcen, angle, incolor);
     pixDestroy(&pix1);
     if (!pixd)
-        return (PIX *)ERROR_PTR("pixd not made", __func__, NULL);
+        return (PIX *)ERROR_PTR("pixd not made", procName, NULL);
 
     if (pixGetDepth(pixs) == 32 && pixGetSpp(pixs) == 4) {
         pix1 = pixGetRGBComponent(pixs, L_ALPHA_CHANNEL);
@@ -299,21 +284,20 @@ PIX  *pix1, *pix2, *pixd;
     return pixd;
 }
 
-
 /*!
  * \brief   pixRotate3Shear()
  *
- * \param[in]    pixs         any depth; cmap ok
- * \param[in]    xcen, ycen   center of rotation
- * \param[in]    angle        radians
- * \param[in]    incolor      L_BRING_IN_WHITE, L_BRING_IN_BLACK;
+ * \param[in]    pixs
+ * \param[in]    xcen, ycen center of rotation
+ * \param[in]    angle radians
+ * \param[in]    incolor L_BRING_IN_WHITE, L_BRING_IN_BLACK;
  * \return  pixd, or NULL on error.
  *
  * <pre>
  * Notes:
  *      (1) This rotates the image about the given point, using the 3-shear
  *          method.  It should only be used for angles smaller than
- *          MaxThreeShearAngle.  For larger angles, a warning is issued.
+ *          LIMIT_SHEAR_ANGLE.  For larger angles, a warning is issued.
  *      (2) A positive angle gives a clockwise rotation.
  *      (3) 3-shear rotation by a specified angle is equivalent
  *          to the sequential transformations
@@ -341,31 +325,28 @@ pixRotate3Shear(PIX       *pixs,
 l_float32  hangle;
 PIX       *pix1, *pix2, *pixd;
 
-    if (!pixs)
-        return (PIX *)ERROR_PTR("pixs not defined", __func__, NULL);
-    if (incolor != L_BRING_IN_WHITE && incolor != L_BRING_IN_BLACK)
-        return (PIX *)(PIX *)ERROR_PTR("invalid incolor value", __func__, NULL);
+    PROCNAME("pixRotate3Shear");
 
-    if (L_ABS(angle) > MaxShearAngle) {
-        L_ERROR("%6.2f radians; too large for shear rotation\n", __func__,
-                L_ABS(angle));
-        return NULL;
-    }
-    if (L_ABS(angle) < MinAngleToRotate)
+    if (!pixs)
+        return (PIX *)ERROR_PTR("pixs not defined", procName, NULL);
+    if (incolor != L_BRING_IN_WHITE && incolor != L_BRING_IN_BLACK)
+        return (PIX *)(PIX *)ERROR_PTR("invalid incolor value", procName, NULL);
+
+    if (L_ABS(angle) < MIN_ANGLE_TO_ROTATE)
         return pixClone(pixs);
-    if (L_ABS(angle) > MaxThreeShearAngle) {
+    if (L_ABS(angle) > LIMIT_SHEAR_ANGLE) {
         L_WARNING("%6.2f radians; large angle for 3-shear rotation\n",
-                  __func__, L_ABS(angle));
+                  procName, L_ABS(angle));
     }
 
     hangle = atan(sin(angle));
-    if ((pixd = pixVShear(NULL, pixs, xcen, angle / 2.f, incolor)) == NULL)
-        return (PIX *)ERROR_PTR("pixd not made", __func__, NULL);
+    if ((pixd = pixVShear(NULL, pixs, xcen, angle / 2., incolor)) == NULL)
+        return (PIX *)ERROR_PTR("pixd not made", procName, NULL);
     if ((pix1 = pixHShear(NULL, pixd, ycen, hangle, incolor)) == NULL) {
         pixDestroy(&pixd);
-        return (PIX *)ERROR_PTR("pix1 not made", __func__, NULL);
+        return (PIX *)ERROR_PTR("pix1 not made", procName, NULL);
     }
-    pixVShear(pixd, pix1, xcen, angle / 2.f, incolor);
+    pixVShear(pixd, pix1, xcen, angle / 2., incolor);
     pixDestroy(&pix1);
 
     if (pixGetDepth(pixs) == 32 && pixGetSpp(pixs) == 4) {
@@ -386,17 +367,17 @@ PIX       *pix1, *pix2, *pixd;
 /*!
  * \brief   pixRotateShearIP()
  *
- * \param[in]    pixs         any depth; no cmap
- * \param[in]    xcen, ycen   center of rotation
- * \param[in]    angle        radians
- * \param[in]    incolor      L_BRING_IN_WHITE, L_BRING_IN_BLACK
+ * \param[in]    pixs any depth; not colormapped
+ * \param[in]    xcen, ycen center of rotation
+ * \param[in]    angle radians
+ * \param[in]    incolor L_BRING_IN_WHITE, L_BRING_IN_BLACK
  * \return  0 if OK; 1 on error
  *
  * <pre>
  * Notes:
  *      (1) This does an in-place rotation of the image about the
  *          specified point, using the 3-shear method.  It should only
- *          be used for angles smaller than MaxThreeShearAngle.
+ *          be used for angles smaller than LIMIT_SHEAR_ANGLE.
  *          For larger angles, a warning is issued.
  *      (2) A positive angle gives a clockwise rotation.
  *      (3) 3-shear rotation by a specified angle is equivalent
@@ -410,7 +391,7 @@ PIX       *pix1, *pix2, *pixd;
  *          only blits in 0 or 1 bits, not an arbitrary colormap index.
  * </pre>
  */
-l_ok
+l_int32
 pixRotateShearIP(PIX       *pixs,
                  l_int32    xcen,
                  l_int32    ycen,
@@ -419,24 +400,26 @@ pixRotateShearIP(PIX       *pixs,
 {
 l_float32  hangle;
 
+    PROCNAME("pixRotateShearIP");
+
     if (!pixs)
-        return ERROR_INT("pixs not defined", __func__, 1);
+        return ERROR_INT("pixs not defined", procName, 1);
     if (incolor != L_BRING_IN_WHITE && incolor != L_BRING_IN_BLACK)
-        return ERROR_INT("invalid value for incolor", __func__, 1);
+        return ERROR_INT("invalid value for incolor", procName, 1);
     if (pixGetColormap(pixs) != NULL)
-        return ERROR_INT("pixs is colormapped", __func__, 1);
+        return ERROR_INT("pixs is colormapped", procName, 1);
 
     if (angle == 0.0)
         return 0;
-    if (L_ABS(angle) > MaxThreeShearAngle) {
+    if (L_ABS(angle) > LIMIT_SHEAR_ANGLE) {
         L_WARNING("%6.2f radians; large angle for in-place 3-shear rotation\n",
-                  __func__, L_ABS(angle));
+                  procName, L_ABS(angle));
     }
 
     hangle = atan(sin(angle));
-    pixHShearIP(pixs, ycen, angle / 2.f, incolor);
+    pixHShearIP(pixs, ycen, angle / 2., incolor);
     pixVShearIP(pixs, xcen, hangle, incolor);
-    pixHShearIP(pixs, ycen, angle / 2.f, incolor);
+    pixHShearIP(pixs, ycen, angle / 2., incolor);
     return 0;
 }
 
@@ -447,9 +430,9 @@ l_float32  hangle;
 /*!
  * \brief   pixRotateShearCenter()
  *
- * \param[in]    pixs      any depth; cmap ok
- * \param[in]    angle     radians
- * \param[in]    incolor   L_BRING_IN_WHITE, L_BRING_IN_BLACK
+ * \param[in]    pixs
+ * \param[in]    angle radians
+ * \param[in]    incolor L_BRING_IN_WHITE, L_BRING_IN_BLACK
  * \return  pixd, or NULL on error
  */
 PIX *
@@ -457,8 +440,10 @@ pixRotateShearCenter(PIX       *pixs,
                      l_float32  angle,
                      l_int32    incolor)
 {
+    PROCNAME("pixRotateShearCenter");
+
     if (!pixs)
-        return (PIX *)ERROR_PTR("pixs not defined", __func__, NULL);
+        return (PIX *)ERROR_PTR("pixs not defined", procName, NULL);
 
     return pixRotateShear(pixs, pixGetWidth(pixs) / 2,
                           pixGetHeight(pixs) / 2, angle, incolor);
@@ -468,18 +453,20 @@ pixRotateShearCenter(PIX       *pixs,
 /*!
  * \brief   pixRotateShearCenterIP()
  *
- * \param[in]    pixs      any depth; no cmap
- * \param[in]    angle     radians
- * \param[in]    incolor   L_BRING_IN_WHITE, L_BRING_IN_BLACK
+ * \param[in]    pixs
+ * \param[in]    angle radians
+ * \param[in]    incolor L_BRING_IN_WHITE, L_BRING_IN_BLACK
  * \return  0 if OK, 1 on error
  */
-l_ok
+l_int32
 pixRotateShearCenterIP(PIX       *pixs,
                        l_float32  angle,
                        l_int32    incolor)
 {
+    PROCNAME("pixRotateShearCenterIP");
+
     if (!pixs)
-        return ERROR_INT("pixs not defined", __func__, 1);
+        return ERROR_INT("pixs not defined", procName, 1);
 
     return pixRotateShearIP(pixs, pixGetWidth(pixs) / 2,
                             pixGetHeight(pixs) / 2, angle, incolor);

@@ -62,10 +62,6 @@
  * </pre>
  */
 
-#ifdef HAVE_CONFIG_H
-#include <config_auto.h>
-#endif  /* HAVE_CONFIG_H */
-
 #include <math.h>
 #include "allheaders.h"
 
@@ -80,9 +76,9 @@ static l_int32 applyWarpTransform(l_float32 xmag, l_float32 ymag,
 
     /* Suggested input to pixStereoFromPair().  These are weighting
      * factors for input to the red channel from the left image. */
-static const l_float32  DefaultRedWeight   = 0.0f;
-static const l_float32  DefaultGreenWeight = 0.7f;
-static const l_float32  DefaultBlueWeight  = 0.3f;
+static const l_float32  L_DEFAULT_RED_WEIGHT   = 0.0;
+static const l_float32  L_DEFAULT_GREEN_WEIGHT = 0.7;
+static const l_float32  L_DEFAULT_BLUE_WEIGHT  = 0.3;
 
 
 /*----------------------------------------------------------------------*
@@ -91,13 +87,13 @@ static const l_float32  DefaultBlueWeight  = 0.3f;
 /*!
  * \brief   pixSimpleCaptcha()
  *
- * \param[in]    pixs      8 bpp; no colormap
- * \param[in]    border    added white pixels on each side
- * \param[in]    nterms    number of x and y harmonic terms
- * \param[in]    seed      of random number generator
- * \param[in]    color     for colorizing; in 0xrrggbb00 format; use 0 for black
- * \param[in]    cmapflag  1 for colormap output; 0 for rgb
- * \return  pixd   8 bpp cmap or 32 bpp rgb, or NULL on error
+ * \param[in]    pixs 8 bpp; no colormap
+ * \param[in]    border added white pixels on each side
+ * \param[in]    nterms number of x and y harmonic terms
+ * \param[in]    seed of random number generator
+ * \param[in]    color for colorizing; in 0xrrggbb00 format; use 0 for black
+ * \param[in]    cmapflag 1 for colormap output; 0 for rgb
+ * \return  pixd 8 bpp cmap or 32 bpp rgb, or NULL on error
  *
  * <pre>
  * Notes:
@@ -122,10 +118,12 @@ l_float32  xfreq[] = {0.12f, 0.10f, 0.10f, 0.11f};
 l_float32  yfreq[] = {0.15f, 0.13f, 0.13f, 0.11f};
 PIX       *pixg, *pixgb, *pixw, *pixd;
 
+    PROCNAME("pixSimpleCaptcha");
+
     if (!pixs)
-        return (PIX *)ERROR_PTR("pixs not defined", __func__, NULL);
+        return (PIX *)ERROR_PTR("pixs not defined", procName, NULL);
     if (nterms < 1 || nterms > 4)
-        return (PIX *)ERROR_PTR("nterms must be in {1,2,3,4}", __func__, NULL);
+        return (PIX *)ERROR_PTR("nterms must be in {1,2,3,4}", procName, NULL);
 
     k = nterms - 1;
     pixg = pixConvertTo8(pixs, 0);
@@ -147,14 +145,14 @@ PIX       *pixg, *pixgb, *pixw, *pixd;
 /*!
  * \brief   pixRandomHarmonicWarp()
  *
- * \param[in]    pixs          8 bpp; no colormap
- * \param[in]    xmag, ymag    maximum magnitude of x and y distortion
- * \param[in]    xfreq, yfreq  maximum magnitude of x and y frequency
- * \param[in]    nx, ny        number of x and y harmonic terms
- * \param[in]    seed          of random number generator
- * \param[in]    grayval       color brought in from the outside;
- *                             0 for black, 255 for white
- * \return  pixd   8 bpp; no colormap, or NULL on error
+ * \param[in]    pixs 8 bpp; no colormap
+ * \param[in]    xmag, ymag maximum magnitude of x and y distortion
+ * \param[in]    xfreq, yfreq maximum magnitude of x and y frequency
+ * \param[in]    nx, ny number of x and y harmonic terms
+ * \param[in]    seed of random number generator
+ * \param[in]    grayval color brought in from the outside;
+ *                       0 for black, 255 for white
+ * \return  pixd 8 bpp; no colormap, or NULL on error
  *
  * <pre>
  * Notes:
@@ -196,11 +194,13 @@ l_float32   x, y;
 l_float64  *randa;
 PIX        *pixd;
 
+    PROCNAME("pixRandomHarmonicWarp");
+
     if (!pixs)
-        return (PIX *)ERROR_PTR("pixs not defined", __func__, NULL);
+        return (PIX *)ERROR_PTR("pixs not defined", procName, NULL);
     pixGetDimensions(pixs, &w, &h, &d);
     if (d != 8)
-        return (PIX *)ERROR_PTR("pixs not 8 bpp", __func__, NULL);
+        return (PIX *)ERROR_PTR("pixs not 8 bpp", procName, NULL);
 
         /* Compute filter output at each location.  We iterate over
          * the destination pixels.  For each dest pixel, use the
@@ -239,8 +239,10 @@ generateRandomNumberArray(l_int32  size)
 l_int32     i;
 l_float64  *randa;
 
+    PROCNAME("generateRandomNumberArray");
+
     if ((randa = (l_float64 *)LEPT_CALLOC(size, sizeof(l_float64))) == NULL)
-        return (l_float64 *)ERROR_PTR("calloc fail for randa", __func__, NULL);
+        return (l_float64 *)ERROR_PTR("calloc fail for randa", procName, NULL);
 
         /* Return random values between 0.5 and 1.0 */
     for (i = 0; i < size; i++)
@@ -305,14 +307,14 @@ static l_float32 getSinFromLUT(l_float32 *tab, l_int32 npts,
 /*!
  * \brief   pixRandomHarmonicWarpLUT()
  *
- * \param[in]    pixs           8 bpp; no colormap
- * \param[in]    xmag, ymag     maximum magnitude of x and y distortion
- * \param[in]    xfreq, yfreq   maximum magnitude of x and y frequency
- * \param[in]    nx, ny         number of x and y harmonic terms
- * \param[in]    seed           of random number generator
- * \param[in]    grayval        color brought in from the outside;
- *                              0 for black, 255 for white
- * \return  pixd   8 bpp; no colormap, or NULL on error
+ * \param[in]    pixs 8 bpp; no colormap
+ * \param[in]    xmag, ymag maximum magnitude of x and y distortion
+ * \param[in]    xfreq, yfreq maximum magnitude of x and y frequency
+ * \param[in]    nx, ny number of x and y harmonic terms
+ * \param[in]    seed of random number generator
+ * \param[in]    grayval color brought in from the outside;
+ *                       0 for black, 255 for white
+ * \return  pixd 8 bpp; no colormap, or NULL on error
  *
  * <pre>
  * Notes:
@@ -341,11 +343,13 @@ l_float64  *randa;
 NUMA       *na;
 PIX        *pixd;
 
+    PROCNAME("pixRandomHarmonicWarp");
+
     if (!pixs)
-        return (PIX *)ERROR_PTR("pixs not defined", __func__, NULL);
+        return (PIX *)ERROR_PTR("pixs not defined", procName, NULL);
     pixGetDimensions(pixs, &w, &h, &d);
     if (d != 8)
-        return (PIX *)ERROR_PTR("pixs not 8 bpp", __func__, NULL);
+        return (PIX *)ERROR_PTR("pixs not 8 bpp", procName, NULL);
 
         /* Compute filter output at each location.  We iterate over
          * the destination pixels.  For each dest pixel, use the
@@ -434,11 +438,13 @@ l_int32    i, n;
 l_float32  delx, fval;
 NUMA      *na;
 
+    PROCNAME("makeSinLUT");
+
     if (!pna)
-        return ERROR_INT("&na not defined", __func__, 1);
+        return ERROR_INT("&na not defined", procName, 1);
     *pna = NULL;
     if (npts < 2)
-        return ERROR_INT("npts < 2", __func__, 1);
+        return ERROR_INT("npts < 2", procName, 1);
     n = 2 * npts + 1;
     na = numaCreate(n);
     *pna = na;
@@ -490,25 +496,25 @@ l_float32  twopi, invtwopi, findex, diff;
 /*!
  * \brief   pixWarpStereoscopic()
  *
- * \param[in]    pixs      any depth, colormap ok
- * \param[in]    zbend     horizontal separation in pixels of red and cyan
- *                         at the left and right sides, that gives rise to
- *                         quadratic curvature out of the image plane
- * \param[in]    zshiftt   uniform pixel translation difference between
- *                         red and cyan, that pushes the top of the image
- *                         plane away from the viewer (zshiftt > 0) or
- *                         towards the viewer (zshiftt < 0)
- * \param[in]    zshiftb   uniform pixel translation difference between
- *                         red and cyan, that pushes the bottom of the image
- *                         plane away from the viewer (zshiftb > 0) or
- *                         towards the viewer (zshiftb < 0)
- * \param[in]    ybendt    multiplicative parameter for in-plane vertical
- *                         displacement at the left or right edge at the top:
- *                           y = ybendt * (2x/w - 1)^2
- * \param[in]    ybendb    same as ybendt, except at the left or right edge
- *                         at the bottom
- * \param[in]    redleft   1 if the red filter is on the left; 0 otherwise
- * \return  pixd   32 bpp, or NULL on error
+ * \param[in]    pixs any depth, colormap ok
+ * \param[in]    zbend horizontal separation in pixels of red and cyan
+ *                    at the left and right sides, that gives rise to
+ *                    quadratic curvature out of the image plane
+ * \param[in]    zshiftt uniform pixel translation difference between
+ *                      red and cyan, that pushes the top of the image
+ *                      plane away from the viewer (zshiftt > 0) or
+ *                      towards the viewer (zshiftt < 0)
+ * \param[in]    zshiftb uniform pixel translation difference between
+ *                      red and cyan, that pushes the bottom of the image
+ *                      plane away from the viewer (zshiftb > 0) or
+ *                      towards the viewer (zshiftb < 0)
+ * \param[in]    ybendt multiplicative parameter for in-plane vertical
+ *                      displacement at the left or right edge at the top:
+ *                        y = ybendt * (2x/w - 1)^2
+ * \param[in]    ybendb same as ybendt, except at the left or right edge
+ *                      at the bottom
+ * \param[in]    redleft 1 if the red filter is on the left; 0 otherwise
+ * \return  pixd 32 bpp, or NULL on error
  *
  * <pre>
  * Notes:
@@ -588,16 +594,19 @@ pixWarpStereoscopic(PIX     *pixs,
 l_int32    w, h, zshift;
 l_float32  angle;
 BOX       *boxleft, *boxright;
-PIX       *pix1, *pix2, *pix3, *pix4, *pixr, *pixg, *pixb;
+PIX       *pixt, *pixt2, *pixt3;
+PIX       *pixr, *pixg, *pixb;
 PIX       *pixv1, *pixv2, *pixv3, *pixv4;
-PIX       *pixrs, *pixrss;
+PIX       *pixr1, *pixr2, *pixr3, *pixr4, *pixrs, *pixrss;
 PIX       *pixd;
 
+    PROCNAME("pixWarpStereoscopic");
+
     if (!pixs)
-        return (PIX *)ERROR_PTR("pixs not defined", __func__, NULL);
+        return (PIX *)ERROR_PTR("pixs not defined", procName, NULL);
 
         /* Convert to the output depth, 32 bpp. */
-    pix1 = pixConvertTo32(pixs);
+    pixt = pixConvertTo32(pixs);
 
         /* If requested, do a quad vertical shearing, pushing pixels up
          * or down, depending on their distance from the centerline. */
@@ -605,31 +614,31 @@ PIX       *pixd;
     boxleft = boxCreate(0, 0, w / 2, h);
     boxright = boxCreate(w / 2, 0, w - w / 2, h);
     if (ybendt != 0 || ybendb != 0) {
-        pixv1 = pixClipRectangle(pix1, boxleft, NULL);
-        pixv2 = pixClipRectangle(pix1, boxright, NULL);
+        pixv1 = pixClipRectangle(pixt, boxleft, NULL);
+        pixv2 = pixClipRectangle(pixt, boxright, NULL);
         pixv3 = pixQuadraticVShear(pixv1, L_WARP_TO_LEFT, ybendt,
                                           ybendb, L_INTERPOLATED,
                                           L_BRING_IN_WHITE);
         pixv4 = pixQuadraticVShear(pixv2, L_WARP_TO_RIGHT, ybendt,
                                           ybendb, L_INTERPOLATED,
                                           L_BRING_IN_WHITE);
-        pix2 = pixCreate(w, h, 32);
-        pixRasterop(pix2, 0, 0, w / 2, h, PIX_SRC, pixv3, 0, 0);
-        pixRasterop(pix2, w / 2, 0, w - w / 2, h, PIX_SRC, pixv4, 0, 0);
+        pixt2 = pixCreate(w, h, 32);
+        pixRasterop(pixt2, 0, 0, w / 2, h, PIX_SRC, pixv3, 0, 0);
+        pixRasterop(pixt2, w / 2, 0, w - w / 2, h, PIX_SRC, pixv4, 0, 0);
         pixDestroy(&pixv1);
         pixDestroy(&pixv2);
         pixDestroy(&pixv3);
         pixDestroy(&pixv4);
     } else {
-        pix2 = pixClone(pix1);
+        pixt2 = pixClone(pixt);
     }
-    pixDestroy(&pix1);
 
         /* Split out the 3 components */
-    pixr = pixGetRGBComponent(pix2, COLOR_RED);
-    pixg = pixGetRGBComponent(pix2, COLOR_GREEN);
-    pixb = pixGetRGBComponent(pix2, COLOR_BLUE);
-    pixDestroy(&pix2);
+    pixr = pixGetRGBComponent(pixt2, COLOR_RED);
+    pixg = pixGetRGBComponent(pixt2, COLOR_GREEN);
+    pixb = pixGetRGBComponent(pixt2, COLOR_BLUE);
+    pixDestroy(&pixt);
+    pixDestroy(&pixt2);
 
         /* The direction of the stereo disparity below is set
          * for the red filter to be over the left eye.  If the red
@@ -645,19 +654,19 @@ PIX       *pixd;
     if (zbend == 0) {
         pixrs = pixClone(pixr);
     } else {
-        pix1 = pixClipRectangle(pixr, boxleft, NULL);
-        pix2 = pixClipRectangle(pixr, boxright, NULL);
-        pix3 = pixStretchHorizontal(pix1, L_WARP_TO_LEFT, L_QUADRATIC_WARP,
+        pixr1 = pixClipRectangle(pixr, boxleft, NULL);
+        pixr2 = pixClipRectangle(pixr, boxright, NULL);
+        pixr3 = pixStretchHorizontal(pixr1, L_WARP_TO_LEFT, L_QUADRATIC_WARP,
                                      zbend, L_INTERPOLATED, L_BRING_IN_WHITE);
-        pix4 = pixStretchHorizontal(pix2, L_WARP_TO_RIGHT, L_QUADRATIC_WARP,
+        pixr4 = pixStretchHorizontal(pixr2, L_WARP_TO_RIGHT, L_QUADRATIC_WARP,
                                      zbend, L_INTERPOLATED, L_BRING_IN_WHITE);
         pixrs = pixCreate(w, h, 8);
-        pixRasterop(pixrs, 0, 0, w / 2, h, PIX_SRC, pix3, 0, 0);
-        pixRasterop(pixrs, w / 2, 0, w - w / 2, h, PIX_SRC, pix4, 0, 0);
-        pixDestroy(&pix1);
-        pixDestroy(&pix2);
-        pixDestroy(&pix3);
-        pixDestroy(&pix4);
+        pixRasterop(pixrs, 0, 0, w / 2, h, PIX_SRC, pixr3, 0, 0);
+        pixRasterop(pixrs, w / 2, 0, w - w / 2, h, PIX_SRC, pixr4, 0, 0);
+        pixDestroy(&pixr1);
+        pixDestroy(&pixr2);
+        pixDestroy(&pixr3);
+        pixDestroy(&pixr4);
     }
 
         /* Perform a combination of horizontal shift and shear of
@@ -668,12 +677,11 @@ PIX       *pixd;
     } else if (zshiftt == zshiftb) {
         pixrss = pixTranslate(NULL, pixrs, zshiftt, 0, L_BRING_IN_WHITE);
     } else {
-        angle = (l_float32)(zshiftb - zshiftt) /
-                L_MAX(1.0f, (l_float32)pixGetHeight(pixrs));
+        angle = (l_float32)(zshiftb - zshiftt) / (l_float32)pixGetHeight(pixrs);
         zshift = (zshiftt + zshiftb) / 2;
-        pix1 = pixTranslate(NULL, pixrs, zshift, 0, L_BRING_IN_WHITE);
-        pixrss = pixHShearLI(pix1, h / 2, angle, L_BRING_IN_WHITE);
-        pixDestroy(&pix1);
+        pixt3 = pixTranslate(NULL, pixrs, zshift, 0, L_BRING_IN_WHITE);
+        pixrss = pixHShearLI(pixt3, h / 2, angle, L_BRING_IN_WHITE);
+        pixDestroy(&pixt3);
     }
 
         /* Combine the unchanged cyan (g,b) image with the shifted red */
@@ -696,13 +704,13 @@ PIX       *pixd;
 /*!
  * \brief   pixStretchHorizontal()
  *
- * \param[in]    pixs        1, 8 or 32 bpp
- * \param[in]    dir         L_WARP_TO_LEFT or L_WARP_TO_RIGHT
- * \param[in]    type        L_LINEAR_WARP or L_QUADRATIC_WARP
- * \param[in]    hmax        horizontal displacement at edge
- * \param[in]    operation   L_SAMPLED or L_INTERPOLATED
- * \param[in]    incolor     L_BRING_IN_WHITE or L_BRING_IN_BLACK
- * \return  pixd   stretched/compressed, or NULL on error
+ * \param[in]    pixs 1, 8 or 32 bpp
+ * \param[in]    dir L_WARP_TO_LEFT or L_WARP_TO_RIGHT
+ * \param[in]    type L_LINEAR_WARP or L_QUADRATIC_WARP
+ * \param[in]    hmax horizontal displacement at edge
+ * \param[in]    operation L_SAMPLED or L_INTERPOLATED
+ * \param[in]    incolor L_BRING_IN_WHITE or L_BRING_IN_BLACK
+ * \return  pixd stretched/compressed, or NULL on error
  *
  * <pre>
  * Notes:
@@ -731,21 +739,23 @@ pixStretchHorizontal(PIX     *pixs,
 {
 l_int32  d;
 
+    PROCNAME("pixStretchHorizontal");
+
     if (!pixs)
-        return (PIX *)ERROR_PTR("pixs not defined", __func__, NULL);
+        return (PIX *)ERROR_PTR("pixs not defined", procName, NULL);
     d = pixGetDepth(pixs);
     if (d != 1 && d != 8 && d != 32)
-        return (PIX *)ERROR_PTR("pixs not 1, 8 or 32 bpp", __func__, NULL);
+        return (PIX *)ERROR_PTR("pixs not 1, 8 or 32 bpp", procName, NULL);
     if (dir != L_WARP_TO_LEFT && dir != L_WARP_TO_RIGHT)
-        return (PIX *)ERROR_PTR("invalid direction", __func__, NULL);
+        return (PIX *)ERROR_PTR("invalid direction", procName, NULL);
     if (type != L_LINEAR_WARP && type != L_QUADRATIC_WARP)
-        return (PIX *)ERROR_PTR("invalid type", __func__, NULL);
+        return (PIX *)ERROR_PTR("invalid type", procName, NULL);
     if (operation != L_SAMPLED && operation != L_INTERPOLATED)
-        return (PIX *)ERROR_PTR("invalid operation", __func__, NULL);
+        return (PIX *)ERROR_PTR("invalid operation", procName, NULL);
     if (incolor != L_BRING_IN_WHITE && incolor != L_BRING_IN_BLACK)
-        return (PIX *)ERROR_PTR("invalid incolor", __func__, NULL);
+        return (PIX *)ERROR_PTR("invalid incolor", procName, NULL);
     if (d == 1 && operation == L_INTERPOLATED) {
-        L_WARNING("Using sampling for 1 bpp\n", __func__);
+        L_WARNING("Using sampling for 1 bpp\n", procName);
         operation = L_INTERPOLATED;
     }
 
@@ -759,12 +769,12 @@ l_int32  d;
 /*!
  * \brief   pixStretchHorizontalSampled()
  *
- * \param[in]    pixs      1, 8 or 32 bpp
- * \param[in]    dir       L_WARP_TO_LEFT or L_WARP_TO_RIGHT
- * \param[in]    type      L_LINEAR_WARP or L_QUADRATIC_WARP
- * \param[in]    hmax      horizontal displacement at edge
- * \param[in]    incolor   L_BRING_IN_WHITE or L_BRING_IN_BLACK
- * \return  pixd   stretched/compressed, or NULL on error
+ * \param[in]    pixs 1, 8 or 32 bpp
+ * \param[in]    dir L_WARP_TO_LEFT or L_WARP_TO_RIGHT
+ * \param[in]    type L_LINEAR_WARP or L_QUADRATIC_WARP
+ * \param[in]    hmax horizontal displacement at edge
+ * \param[in]    incolor L_BRING_IN_WHITE or L_BRING_IN_BLACK
+ * \return  pixd stretched/compressed, or NULL on error
  *
  * <pre>
  * Notes:
@@ -782,17 +792,19 @@ l_int32    i, j, jd, w, wm, h, d, wpls, wpld, val;
 l_uint32  *datas, *datad, *lines, *lined;
 PIX       *pixd;
 
+    PROCNAME("pixStretchHorizontalSampled");
+
     if (!pixs)
-        return (PIX *)ERROR_PTR("pixs not defined", __func__, NULL);
+        return (PIX *)ERROR_PTR("pixs not defined", procName, NULL);
     pixGetDimensions(pixs, &w, &h, &d);
     if (d != 1 && d != 8 && d != 32)
-        return (PIX *)ERROR_PTR("pixs not 1, 8 or 32 bpp", __func__, NULL);
+        return (PIX *)ERROR_PTR("pixs not 1, 8 or 32 bpp", procName, NULL);
     if (dir != L_WARP_TO_LEFT && dir != L_WARP_TO_RIGHT)
-        return (PIX *)ERROR_PTR("invalid direction", __func__, NULL);
+        return (PIX *)ERROR_PTR("invalid direction", procName, NULL);
     if (type != L_LINEAR_WARP && type != L_QUADRATIC_WARP)
-        return (PIX *)ERROR_PTR("invalid type", __func__, NULL);
+        return (PIX *)ERROR_PTR("invalid type", procName, NULL);
     if (incolor != L_BRING_IN_WHITE && incolor != L_BRING_IN_BLACK)
-        return (PIX *)ERROR_PTR("invalid incolor", __func__, NULL);
+        return (PIX *)ERROR_PTR("invalid incolor", procName, NULL);
 
     pixd = pixCreateTemplate(pixs);
     pixSetBlackOrWhite(pixd, L_BRING_IN_WHITE);
@@ -842,7 +854,7 @@ PIX       *pixd;
             }
             break;
         default:
-            L_ERROR("invalid depth: %d\n", __func__, d);
+            L_ERROR("invalid depth: %d\n", procName, d);
             pixDestroy(&pixd);
             return NULL;
         }
@@ -855,12 +867,12 @@ PIX       *pixd;
 /*!
  * \brief   pixStretchHorizontalLI()
  *
- * \param[in]    pixs      1, 8 or 32 bpp
- * \param[in]    dir       L_WARP_TO_LEFT or L_WARP_TO_RIGHT
- * \param[in]    type      L_LINEAR_WARP or L_QUADRATIC_WARP
- * \param[in]    hmax      horizontal displacement at edge
- * \param[in]    incolor   L_BRING_IN_WHITE or L_BRING_IN_BLACK
- * \return  pixd   stretched/compressed, or NULL on error
+ * \param[in]    pixs 1, 8 or 32 bpp
+ * \param[in]    dir L_WARP_TO_LEFT or L_WARP_TO_RIGHT
+ * \param[in]    type L_LINEAR_WARP or L_QUADRATIC_WARP
+ * \param[in]    hmax horizontal displacement at edge
+ * \param[in]    incolor L_BRING_IN_WHITE or L_BRING_IN_BLACK
+ * \return  pixd stretched/compressed, or NULL on error
  *
  * <pre>
  * Notes:
@@ -879,17 +891,19 @@ l_uint32   word0, word1;
 l_uint32  *datas, *datad, *lines, *lined;
 PIX       *pixd;
 
+    PROCNAME("pixStretchHorizontalLI");
+
     if (!pixs)
-        return (PIX *)ERROR_PTR("pixs not defined", __func__, NULL);
+        return (PIX *)ERROR_PTR("pixs not defined", procName, NULL);
     pixGetDimensions(pixs, &w, &h, &d);
     if (d != 8 && d != 32)
-        return (PIX *)ERROR_PTR("pixs not 8 or 32 bpp", __func__, NULL);
+        return (PIX *)ERROR_PTR("pixs not 8 or 32 bpp", procName, NULL);
     if (dir != L_WARP_TO_LEFT && dir != L_WARP_TO_RIGHT)
-        return (PIX *)ERROR_PTR("invalid direction", __func__, NULL);
+        return (PIX *)ERROR_PTR("invalid direction", procName, NULL);
     if (type != L_LINEAR_WARP && type != L_QUADRATIC_WARP)
-        return (PIX *)ERROR_PTR("invalid type", __func__, NULL);
+        return (PIX *)ERROR_PTR("invalid type", procName, NULL);
     if (incolor != L_BRING_IN_WHITE && incolor != L_BRING_IN_BLACK)
-        return (PIX *)ERROR_PTR("invalid incolor", __func__, NULL);
+        return (PIX *)ERROR_PTR("invalid incolor", procName, NULL);
 
         /* Standard linear interpolation, subdividing each pixel into 64 */
     pixd = pixCreateTemplate(pixs);
@@ -959,7 +973,7 @@ PIX       *pixd;
             }
             break;
         default:
-            L_ERROR("invalid depth: %d\n", __func__, d);
+            L_ERROR("invalid depth: %d\n", procName, d);
             pixDestroy(&pixd);
             return NULL;
         }
@@ -975,13 +989,13 @@ PIX       *pixd;
 /*!
  * \brief   pixQuadraticVShear()
  *
- * \param[in]    pixs        1, 8 or 32 bpp
- * \param[in]    dir         L_WARP_TO_LEFT or L_WARP_TO_RIGHT
- * \param[in]    vmaxt       max vertical displacement at edge and at top
- * \param[in]    vmaxb       max vertical displacement at edge and at bottom
- * \param[in]    operation   L_SAMPLED or L_INTERPOLATED
- * \param[in]    incolor     L_BRING_IN_WHITE or L_BRING_IN_BLACK
- * \return  pixd   stretched, or NULL on error
+ * \param[in]    pixs 1, 8 or 32 bpp
+ * \param[in]    dir L_WARP_TO_LEFT or L_WARP_TO_RIGHT
+ * \param[in]    vmaxt max vertical displacement at edge and at top
+ * \param[in]    vmaxb max vertical displacement at edge and at bottom
+ * \param[in]    operation L_SAMPLED or L_INTERPOLATED
+ * \param[in]    incolor L_BRING_IN_WHITE or L_BRING_IN_BLACK
+ * \return  pixd stretched, or NULL on error
  *
  * <pre>
  * Notes:
@@ -1011,23 +1025,25 @@ pixQuadraticVShear(PIX     *pixs,
 {
 l_int32    w, h, d;
 
+    PROCNAME("pixQuadraticVShear");
+
     if (!pixs)
-        return (PIX *)ERROR_PTR("pixs not defined", __func__, NULL);
+        return (PIX *)ERROR_PTR("pixs not defined", procName, NULL);
     pixGetDimensions(pixs, &w, &h, &d);
     if (d != 1 && d != 8 && d != 32)
-        return (PIX *)ERROR_PTR("pixs not 1, 8 or 32 bpp", __func__, NULL);
+        return (PIX *)ERROR_PTR("pixs not 1, 8 or 32 bpp", procName, NULL);
     if (dir != L_WARP_TO_LEFT && dir != L_WARP_TO_RIGHT)
-        return (PIX *)ERROR_PTR("invalid direction", __func__, NULL);
+        return (PIX *)ERROR_PTR("invalid direction", procName, NULL);
     if (operation != L_SAMPLED && operation != L_INTERPOLATED)
-        return (PIX *)ERROR_PTR("invalid operation", __func__, NULL);
+        return (PIX *)ERROR_PTR("invalid operation", procName, NULL);
     if (incolor != L_BRING_IN_WHITE && incolor != L_BRING_IN_BLACK)
-        return (PIX *)ERROR_PTR("invalid incolor", __func__, NULL);
+        return (PIX *)ERROR_PTR("invalid incolor", procName, NULL);
 
     if (vmaxt == 0 && vmaxb == 0)
         return pixCopy(NULL, pixs);
 
     if (operation == L_INTERPOLATED && d == 1) {
-        L_WARNING("no interpolation for 1 bpp; using sampling\n", __func__);
+        L_WARNING("no interpolation for 1 bpp; using sampling\n", procName);
         operation = L_SAMPLED;
     }
 
@@ -1041,12 +1057,12 @@ l_int32    w, h, d;
 /*!
  * \brief   pixQuadraticVShearSampled()
  *
- * \param[in]    pixs      1, 8 or 32 bpp
- * \param[in]    dir       L_WARP_TO_LEFT or L_WARP_TO_RIGHT
- * \param[in]    vmaxt     max vertical displacement at edge and at top
- * \param[in]    vmaxb     max vertical displacement at edge and at bottom
- * \param[in]    incolor   L_BRING_IN_WHITE or L_BRING_IN_BLACK
- * \return  pixd   stretched, or NULL on error
+ * \param[in]    pixs 1, 8 or 32 bpp
+ * \param[in]    dir L_WARP_TO_LEFT or L_WARP_TO_RIGHT
+ * \param[in]    vmaxt max vertical displacement at edge and at top
+ * \param[in]    vmaxb max vertical displacement at edge and at bottom
+ * \param[in]    incolor L_BRING_IN_WHITE or L_BRING_IN_BLACK
+ * \return  pixd stretched, or NULL on error
  *
  * <pre>
  * Notes:
@@ -1065,15 +1081,17 @@ l_uint32  *datas, *datad, *lines, *lined;
 l_float32  delrowt, delrowb, denom1, denom2, dely;
 PIX       *pixd;
 
+    PROCNAME("pixQuadraticVShearSampled");
+
     if (!pixs)
-        return (PIX *)ERROR_PTR("pixs not defined", __func__, NULL);
+        return (PIX *)ERROR_PTR("pixs not defined", procName, NULL);
     pixGetDimensions(pixs, &w, &h, &d);
     if (d != 1 && d != 8 && d != 32)
-        return (PIX *)ERROR_PTR("pixs not 1, 8 or 32 bpp", __func__, NULL);
+        return (PIX *)ERROR_PTR("pixs not 1, 8 or 32 bpp", procName, NULL);
     if (dir != L_WARP_TO_LEFT && dir != L_WARP_TO_RIGHT)
-        return (PIX *)ERROR_PTR("invalid direction", __func__, NULL);
+        return (PIX *)ERROR_PTR("invalid direction", procName, NULL);
     if (incolor != L_BRING_IN_WHITE && incolor != L_BRING_IN_BLACK)
-        return (PIX *)ERROR_PTR("invalid incolor", __func__, NULL);
+        return (PIX *)ERROR_PTR("invalid incolor", procName, NULL);
 
     if (vmaxt == 0 && vmaxb == 0)
         return pixCopy(NULL, pixs);
@@ -1086,8 +1104,8 @@ PIX       *pixd;
     wpld = pixGetWpl(pixd);
     wm = w - 1;
     hm = h - 1;
-    denom1 = 1.f / (l_float32)h;
-    denom2 = 1.f / (l_float32)(wm * wm);
+    denom1 = 1. / (l_float32)h;
+    denom2 = 1. / (l_float32)(wm * wm);
     for (j = 0; j < w; j++) {
         if (dir == L_WARP_TO_LEFT) {
             delrowt = (l_float32)(vmaxt * (wm - j) * (wm - j)) * denom2;
@@ -1132,7 +1150,7 @@ PIX       *pixd;
             }
             break;
         default:
-            L_ERROR("invalid depth: %d\n", __func__, d);
+            L_ERROR("invalid depth: %d\n", procName, d);
             pixDestroy(&pixd);
             return NULL;
         }
@@ -1145,12 +1163,12 @@ PIX       *pixd;
 /*!
  * \brief   pixQuadraticVShearLI()
  *
- * \param[in]    pixs      8 or 32 bpp, or colormapped
- * \param[in]    dir       L_WARP_TO_LEFT or L_WARP_TO_RIGHT
- * \param[in]    vmaxt     max vertical displacement at edge and at top
- * \param[in]    vmaxb     max vertical displacement at edge and at bottom
- * \param[in]    incolor   L_BRING_IN_WHITE or L_BRING_IN_BLACK
- * \return  pixd   stretched, or NULL on error
+ * \param[in]    pixs 8 or 32 bpp, or colormapped
+ * \param[in]    dir L_WARP_TO_LEFT or L_WARP_TO_RIGHT
+ * \param[in]    vmaxt max vertical displacement at edge and at top
+ * \param[in]    vmaxb max vertical displacement at edge and at bottom
+ * \param[in]    incolor L_BRING_IN_WHITE or L_BRING_IN_BLACK
+ * \return  pixd stretched, or NULL on error
  *
  * <pre>
  * Notes:
@@ -1172,18 +1190,20 @@ l_float32  delrowt, delrowb, denom1, denom2, dely;
 PIX       *pix, *pixd;
 PIXCMAP   *cmap;
 
+    PROCNAME("pixQuadraticVShearLI");
+
     if (!pixs)
-        return (PIX *)ERROR_PTR("pixs not defined", __func__, NULL);
+        return (PIX *)ERROR_PTR("pixs not defined", procName, NULL);
     pixGetDimensions(pixs, &w, &h, &d);
     if (d == 1)
-        return (PIX *)ERROR_PTR("pixs is 1 bpp", __func__, NULL);
+        return (PIX *)ERROR_PTR("pixs is 1 bpp", procName, NULL);
     cmap = pixGetColormap(pixs);
     if (d != 8 && d != 32 && !cmap)
-        return (PIX *)ERROR_PTR("pixs not 8, 32 bpp, or cmap", __func__, NULL);
+        return (PIX *)ERROR_PTR("pixs not 8, 32 bpp, or cmap", procName, NULL);
     if (dir != L_WARP_TO_LEFT && dir != L_WARP_TO_RIGHT)
-        return (PIX *)ERROR_PTR("invalid direction", __func__, NULL);
+        return (PIX *)ERROR_PTR("invalid direction", procName, NULL);
     if (incolor != L_BRING_IN_WHITE && incolor != L_BRING_IN_BLACK)
-        return (PIX *)ERROR_PTR("invalid incolor", __func__, NULL);
+        return (PIX *)ERROR_PTR("invalid incolor", procName, NULL);
 
     if (vmaxt == 0 && vmaxb == 0)
         return pixCopy(NULL, pixs);
@@ -1196,7 +1216,7 @@ PIXCMAP   *cmap;
     d = pixGetDepth(pix);
     if (d != 8 && d != 32) {
         pixDestroy(&pix);
-        return (PIX *)ERROR_PTR("invalid depth", __func__, NULL);
+        return (PIX *)ERROR_PTR("invalid depth", procName, NULL);
     }
 
         /* Standard linear interp: subdivide each pixel into 64 parts */
@@ -1208,8 +1228,8 @@ PIXCMAP   *cmap;
     wpld = pixGetWpl(pixd);
     wm = w - 1;
     hm = h - 1;
-    denom1 = 1.0f / (l_float32)h;
-    denom2 = 1.0f / (l_float32)(wm * wm);
+    denom1 = 1.0 / (l_float32)h;
+    denom2 = 1.0 / (l_float32)(wm * wm);
     for (j = 0; j < w; j++) {
         if (dir == L_WARP_TO_LEFT) {
             delrowt = (l_float32)(vmaxt * (wm - j) * (wm - j)) * denom2;
@@ -1263,7 +1283,7 @@ PIXCMAP   *cmap;
             }
             break;
         default:
-            L_ERROR("invalid depth: %d\n", __func__, d);
+            L_ERROR("invalid depth: %d\n", procName, d);
             pixDestroy(&pix);
             pixDestroy(&pixd);
             return NULL;
@@ -1281,11 +1301,11 @@ PIXCMAP   *cmap;
 /*!
  * \brief   pixStereoFromPair()
  *
- * \param[in]    pix1   32 bpp rgb
- * \param[in]    pix2   32 bpp rgb
- * \param[in]    rwt, gwt, bwt   weighting factors used for each component in
-                                 pix1 to determine the output red channel
- * \return  pixd   stereo enhanced, or NULL on error
+ * \param[in]    pix1 32 bpp rgb
+ * \param[in]    pix2 32 bpp rgb
+ * \param[in]    rwt, gwt, bwt weighting factors used for each component in
+                               pix1 to determine the output red channel
+ * \return  pixd stereo enhanced, or NULL on error
  *
  * <pre>
  * Notes:
@@ -1321,21 +1341,23 @@ l_uint32  *data1, *data2, *datad, *line1, *line2, *lined;
 l_float32  sum;
 PIX       *pixd;
 
+    PROCNAME("pixStereoFromPair");
+
     if (!pix1 || !pix2)
-        return (PIX *)ERROR_PTR("pix1, pix2 not both defined", __func__, NULL);
+        return (PIX *)ERROR_PTR("pix1, pix2 not both defined", procName, NULL);
     if (pixGetDepth(pix1) != 32 || pixGetDepth(pix2) != 32)
-        return (PIX *)ERROR_PTR("pix1, pix2 not both 32 bpp", __func__, NULL);
+        return (PIX *)ERROR_PTR("pix1, pix2 not both 32 bpp", procName, NULL);
 
         /* Make sure the sum of weights is 1.0; otherwise, you can get
          * overflow in the gray value. */
     if (rwt == 0.0 && gwt == 0.0 && bwt == 0.0) {
-        rwt = DefaultRedWeight;
-        gwt = DefaultGreenWeight;
-        bwt = DefaultBlueWeight;
+        rwt = L_DEFAULT_RED_WEIGHT;
+        gwt = L_DEFAULT_GREEN_WEIGHT;
+        bwt = L_DEFAULT_BLUE_WEIGHT;
     }
     sum = rwt + gwt + bwt;
     if (L_ABS(sum - 1.0) > 0.0001) {  /* maintain ratios with sum == 1.0 */
-        L_WARNING("weights don't sum to 1; maintaining ratios\n", __func__);
+        L_WARNING("weights don't sum to 1; maintaining ratios\n", procName);
         rwt = rwt / sum;
         gwt = gwt / sum;
         bwt = bwt / sum;

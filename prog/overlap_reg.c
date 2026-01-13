@@ -29,13 +29,7 @@
  *
  *    Tests functions that combine boxes that overlap into
  *    their bounding regions.
- *
- *    Also tests the overlap and separation distance between boxes.
  */
-
-#ifdef HAVE_CONFIG_H
-#include <config_auto.h>
-#endif  /* HAVE_CONFIG_H */
 
 #include "allheaders.h"
 
@@ -51,12 +45,9 @@ BOXA *boxaCombineOverlapsAlt(BOXA *boxas);
 int main(int    argc,
          char **argv)
 {
-l_int32       i, j, n, k, x, y, w, h, result, hovl, hsep, vovl, vsep;
-l_uint8      *data;
-size_t        nbytes;
-BOX          *box1, *box2;
+l_int32       i, n, k, x, y, w, h, result;
+BOX          *box1;
 BOXA         *boxa1, *boxa2, *boxa3, *boxa4;
-FILE         *fp;
 PIX          *pix1, *pix2, *pix3;
 PIXA         *pixa1;
 L_REGPARAMS  *rp;
@@ -93,9 +84,9 @@ L_REGPARAMS  *rp;
         pix3 = pixaDisplayTiledInRows(pixa1, 1, 1500, 1.0, 0, 50, 2);
         pixDisplayWithTitle(pix3, 100, 100 + 100 * k, NULL, rp->display);
         regTestWritePixAndCheck(rp, pix3, IFF_PNG);   /* 0 - 6 */
-        lept_stderr("Test %d, maxsize = %d: n_init = %d, n_final = %d\n",
-                    k + 1, (l_int32)maxsize[k] + 1,
-                    boxaGetCount(boxa1), boxaGetCount(boxa2));
+        fprintf(stderr, "Test %d, maxsize = %d: n_init = %d, n_final = %d\n",
+                k + 1, (l_int32)maxsize[k] + 1,
+                boxaGetCount(boxa1), boxaGetCount(boxa2));
         pixDestroy(&pix3);
         boxaDestroy(&boxa1);
         boxaDestroy(&boxa2);
@@ -172,27 +163,6 @@ L_REGPARAMS  *rp;
     boxaDestroy(&boxa3);
     boxaDestroy(&boxa4);
 
-    /* --------------------------------------------------------- */
-    /*    Test the overlap and separation distance functions     */
-    /* --------------------------------------------------------- */
-    box1 = boxCreate(0, 0, 1, 1);
-    lept_mkdir("lept/overlap");
-    fp = lept_fopen("/tmp/lept/overlap/result.dat", "wb");
-    for (i = 0; i < 3; i++) {  /* 9 1x1 boxes on a 3x3 square */
-        for (j = 0; j < 3; j++) {
-            box2 = boxCreate(i, j, 1, 1);
-            boxOverlapDistance(box1, box2, &hovl, &vovl);
-            boxSeparationDistance(box1, box2, &hsep, &vsep);
-            fprintf(fp, "(%d,%d): ovl = (%d,%d); sep = (%d,%d)\n",
-                    i, j, hovl, vovl, hsep, vsep);
-            boxDestroy(&box2);
-        }
-    }
-    lept_fclose(fp);
-    data = l_binaryRead("/tmp/lept/overlap/result.dat", &nbytes);
-    regTestWriteDataAndCheck(rp, data, nbytes, "dat");  /* 12 */
-    lept_free(data);
-    boxDestroy(&box1);
     return regTestCleanup(rp);
 }
 
@@ -207,8 +177,10 @@ l_int32  i, j, n1, n2, inter, interfound, niters;
 BOX     *box1, *box2, *box3;
 BOXA    *boxa1, *boxa2;
 
+    PROCNAME("boxaCombineOverlapsAlt");
+
     if (!boxas)
-        return (BOXA *)ERROR_PTR("boxas not defined", __func__, NULL);
+        return (BOXA *)ERROR_PTR("boxas not defined", procName, NULL);
 
     boxa1 = boxaCopy(boxas, L_COPY);
     n1 = boxaGetCount(boxa1);

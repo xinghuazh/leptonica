@@ -75,12 +75,11 @@ This work is licensed under a <a rel="license" href="http://creativecommons.org/
  -  SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
  *====================================================================*/
 
-README (version 1.87.0)
-File update: Dec 24, 2025
--------------------------
+README  (1.74.3: 8 Jun 2017)
+---------------------------
 
-gunzip leptonica-1.87.0.tar.gz
-tar -xvf leptonica-1.87.0.tar
+gunzip leptonica-1.74.3.tar.gz
+tar -xvf leptonica-1.74.3.tar
 
 </pre>
 
@@ -89,7 +88,6 @@ tar -xvf leptonica-1.87.0.tar
 <P>
 <A HREF="#BUILDING">Building leptonica</A><br>
 <A HREF="#DEPENDENCIES">I/O libraries leptonica is dependent on</A><br>
-<A HREF="#DOXYGEN">Generating documentation using doxygen</A><br>
 <A HREF="#DEVELOP">Developing with leptonica</A><br>
 <A HREF="#CONTENTS">What's in leptonica?</A><br>
 <P>
@@ -117,26 +115,20 @@ Building leptonica
   Libraries, executables and prototypes are easily made, as described below.
 
   When you extract from the archive, all files are put in a
-  subdirectory 'leptonica-1.87.0'.  In that directory you will
+  subdirectory 'leptonica-1.74.3'.  In that directory you will
   find a src directory containing the source files for the library,
   and a prog directory containing source files for various
   testing and example programs.
 
 2. Building on Linux/Unix/MacOS
 
-  The software can be downloaded from either a release tar file or
-  from the current head of the source.  For the latter, go to a directory
-  and clone the tree into it (note the '.' at the end):
-     cd [some directory]
-     git clone https://github.com/DanBloomberg/leptonica.git .
-
   There are three ways to build the library:
 
     (1) By customization:  Use the existing static makefile,
         src/makefile.static and customize the build by setting flags
-        in src/environ.h.  See details below.
-        Note: if you are going to develop with leptonica, the static
-        makefiles are useful.
+        in src/environ.h.  See src/environ.h and src/makefile for details.
+        Note: if you are going to develop with leptonica, I encourage
+        you to use the static makefiles.
 
     (2) Using autoconf (supported by James Le Cuirot).
         Run ./configure in this directory to
@@ -165,7 +157,7 @@ Building leptonica
         To clean out the current build, just remove everything in
         the build subdirectory.
 
-  In more detail for these three methods:
+  In more detail:
 
     (1) Customization using the static makefiles:
 
@@ -179,16 +171,11 @@ Building leptonica
           back to makefile.static.]
 
        * You can customize for:
-         (a) Including Leptonica image I/O functions that depend on external
-             libraries, such as libpng.  Use environment variables in
-             src/environ.h, such as HAVE_LIBPNG.
-         (b) Disabling the GNU functions for redirecting formatted stream I/O
-             to memory.  By default, HAVE_FMEMOPEN is enabled in src/environ.h.
-         (c) Using special memory allocators (see src/environ.h).
-         (d) Changing compile and runtime defaults for messages to stderr.
-             The default in src/environ.h is to output info, warning and
-             error messages.
-         (e) Specifying the location of the object code.  By default it
+         (a) Including Leptonica I/O functions that depend on external
+             libraries [use flags in src/environ.h]
+         (b) Adding functions for redirecting formatted image stream
+             I/O to memory [use flag in src/environ.h]
+         (c) Specifying the location of the object code.  By default it
              goes into a tree whose root is also the parent of the src
              and prog directories.  This can be changed using the
              ROOT_DIR variable in makefile.
@@ -205,31 +192,35 @@ Building leptonica
                make xtractprotos
 
        * To use shared libraries, you need to include the location of
-         the shared libraries in your LD_LIBRARY_PATH.  For example,
-         after you have built programs with 'make SHARED=yes' in the
-         prog directory, you need to tell the programs where the shared
-         libraries are:
-             export LD_LIBRARY_PATH=../lib/shared:$LD_LIBRARY_PATH
+         the shared libraries in your LD_LIBRARY_PATH.
 
-       * Make the programs in prog/ (after you have make liblept):
-         - Customize the makefile by setting ALL_LIBS to link the
-           external image I/O libraries.  By default, ALL_LIBS assumes that
-           libtiff, libjpeg and libpng are available.
-         - To make an optimized version of all programs (in prog):
-               make
-         - To make a debug version of all programs (in prog):
-               make DEBUG=yes
-         - To make a shared library version of all programs (in prog):
-               make SHARED=yes
-         - To run the programs, be sure to set
-             export LD_LIBRARY_PATH=../lib/shared:$LD_LIBRARY_PATH
+       * To make the programs in the prog directory, first make liblept
+         in src.  Then in prog you can customize the makefile for linking
+         the external libraries:
+         Finally, do 'make' in the prog directory.
+
+       VERY IMPORTANT: the 240+ programs in the prog directory are
+       an integral part of this package.  These can be divided into
+       four groups:
+         (1) Programs that are useful applications for running on the
+             command line.  They can be installed from autoconf builds
+             using 'make install'.  Examples of these are the PostScript
+             and pdf conversion programs: converttopdf, converttops,
+             convertfilestopdf, convertfilestops, convertsegfilestopdf,
+             convertsegfilestops, printimage and printsplitimage.
+         (2) Programs that are used as regression tests in alltests_reg.
+             These are named *_reg, and 66 of them are invoked together
+             (alltests_reg).  The regression test framework has been
+             standardized, and regresstion tests are relatively easy
+             to write.  See regutils.h for details.
+         (3) Other regression tests, some of which have not (yet) been
+             put into the framework.  They are also named *_reg.
+         (4) Programs that were used to test library functions or
+             auto-generate library code.  These are useful for testing
+             the behavior of small sets of functions, and for
+             providing example code.
 
     (2) Building using autoconf  (Thanks to James Le Cuirot)
-
-       * If you downloaded from a release tar, it will be "configure ready".
-       * If you cloned from the git master tree, you need to make the
-         configure executable.  To do this, run
-            autogen.sh.
 
        Use the standard incantation, in the root directory (the
        directory with configure):
@@ -242,8 +233,7 @@ Building leptonica
                              This works even if you build in a different
                              place from the distribution. The -j parameter
                              should not exceed half the number of cores.
-                     NOTE: If the test fails, it's likely due to a race
-                           condition.  Rerun with 'make check']
+                             If the test fails, just run with 'make check']
 
        Configure supports installing in a local directory (e.g., one that
        doesn't require root access).  For example, to install in $HOME/local,
@@ -260,7 +250,7 @@ Building leptonica
             make install
 
        Configure also supports building in a separate directory from the
-       source.  Run "/(path-to)/leptonica-1.87.0/configure" and then "make"
+       source.  Run "/(path-to)/leptonica-1.74.3/configure" and then "make"
        from the desired build directory.
 
        Configure has a number of useful options; run "configure --help" for
@@ -296,56 +286,59 @@ Building leptonica
             mkdir build
             cd build
 
-       The default build (shared libraries, no debug, only the library)
-       is made with
-            cmake ..
-       For other options, you can use these flags on the cmake line:
-       * To make a static library:
-            cmake .. -DBUILD_SHARED_LIBS=OFF
-            make
-       * To make a dynamic library (default) and STATIC (or builtin) dependencies:
-            cmake .. -DSW_BUILD_SHARED_LIBS=0
-            make
-       * To build with debug:
-            cmake .. -DCMAKE_BUILD_TYPE=Debug
-            make
-       * To make both the library and the programs:
-            cmake .. -DBUILD_PROG=1
-            make
+       Then, there are two useful flags you can use on the cmake line to
+       determine what is built.
 
-       The programs are put in build/bin/
-       To run these (e.g., for testing), move them to the prog
-       directory and run them from there:
-          cd bin
-          mv * ../../prog/
-          cd ../../prog
-          alltests_reg generate
-          alltests_reg compare
+       * By default, cmake builds a shared library.  To make a static
+         library: 
+            cmake .. -DSTATIC=1
+
+       * By default, cmake only builds the library, not the programs.
+         To make both the library and the programs:
+            cmake .. -DBUILD_PROG=1
+         The programs are put in build/bin/
+         To run these (e.g., for testing), move them to the prog
+         directory and run them from there:
+            cd bin
+            mv * ../../prog/
+            cd ../../prog
+            alltests_reg generate
+            alltests_reg compare
 
        To build the library directly from the root directory instead of
        the build subdirectory:
-          mkdir build
-          cmake -H . -Bbuild   (-H means the source directory,
-                                -B means the directory for the build
-          make
+            mkdir build
+            cmake -H . -Bbuild   (-H means the source directory,
+                                  -B means the directory for the build
+            make
 
 3. Building on Windows
 
    (a) Building with Visual Studio
 
-       1. Download the latest SW
-              (Software Network https://software-network.org/)
-          client from https://software-network.org/client/
-       2. Unpack it, add to PATH.
-       3. Run once to perform cmake integration:
-          sw setup
-       4. Run:
-          git clone https://github.com/danbloomberg/leptonica
-          cd leptonica
-          mkdir build
-          cd build
-          cmake ..
-       5. Build a solution (leptonica.sin) in your Visual Studio version.
+       Tom Powers has provided a set of developer notes and project files
+       for building the library and applications under windows with VC++ 2008:
+     </pre>
+     <p style='margin-left:5em;'>
+        <A href="http://www.leptonica.org/vs2008doc/index.html">
+                http:///www.leptonica.org/vs2008doc/index.html</A><br>
+        <A href="http://www.leptonica.org/download.html#VS2008">
+                http:///www.leptonica.org/download.html#VS2008</A>
+     <pre>
+
+       He has also supplied a zip file that contains the entire 'lib'
+       and 'include' directories needed to build Windows-based programs
+       using static or dynamic versions of the leptonica library
+       (including static library versions of zlib, libpng, libjpeg,
+       libtiff, and giflib).
+       </pre>
+       <p style='margin-left:5em;'>
+      <A href="http://www.leptonica.org/source/leptonica-1.68-win32-lib-include-dirs.zip">
+              leptonica-1.68-win32-lib-include-dirs.zip</A>
+       <pre>
+
+       You can download Tom's vs2008 package either from the download
+       page or from code.google.com/p/leptonica.
 
    (b) Building for mingw32 with <a href="http://www.mingw.org/">MSYS</a>
        (Thanks to David Bryan)
@@ -386,78 +379,8 @@ Building leptonica
 
        Only the static library may be built this way; the autoconf method must
        be used if a shared (DLL) library is desired.
-
-4. Building and running oss-fuzz programs
-
-   The oss-fuzz programs are in prog/fuzzing/.  They are run by oss-fuzz
-   on a continual basis with random inputs.  They can also be built and
-   run locally.  On ubuntu 24.04, clang-18 is required to build these
-   programs. It can be installed using
-       sudo apt-get install clang-18
-   On 22.04, use clang-14.
-
-   Stefan Weil has provided this method for building the fuzzing programs.
-   From your github root:
-       ./autogen.sh    (to make configure)
-       mkdir -p bin/fuzzer
-       cd bin/fuzzer
-   Run configure to generate the Makefiles:
-     address sanitizer issue:
-       ../../configure CC=clang-18 CXX=clang++-18 CFLAGS="-g -O2 \
-       -D_GLIBCXX_DEBUG -fsanitize=fuzzer-no-link,address,undefined" \
-       CXXFLAGS="-g -O2 -D_GLIBCXX_DEBUG \
-       -fsanitize=fuzzer-no-link,address,undefined"
-     memory sanitizer issue:
-       ../../configure CC=clang-18 CXX=clang++-18 CFLAGS="-g -O2 \
-       -D_GLIBCXX_DEBUG -fsanitize=fuzzer-no-link,memory,undefined" \
-       CXXFLAGS="-g -O2 -D_GLIBCXX_DEBUG \
-       -fsanitize=fuzzer-no-link,memory,undefined"
-   Build:
-     address sanitizer issue:
-       make fuzzers CXX=clang++-18 CXXFLAGS="-g -O2 -D_GLIBCXX_DEBUG \
-       -fsanitize=fuzzer,address,undefined"
-     memory sanitizer issue:
-       make fuzzers CXX=clang++-18 CXXFLAGS="-g -O2 -D_GLIBCXX_DEBUG \
-       -fsanitize=fuzzer,memory,undefined"
-
-   When an oss-fuzz issue has been created, download the Reproducer
-   Testcase file (e.g, name it "/tmp/payload").  To run one of the
-   fuzzing executables in bin/fuzzer, e.g., pix4_fuzzer:
-       cd ../../prog/fuzzing
-       ../../bin/fuzzer/pix4_fuzzer /tmp/payload
-
-5. The 270+ programs in the prog directory are an integral part of this
-   package.  They can be divided into four groups:
-
-   (1) Programs that are useful applications for running on the
-       command line.  They can be installed from autoconf builds
-       using 'make install'.  Examples of these are the PostScript
-       and pdf conversion programs: converttopdf, converttops,
-       convertfilestopdf, convertfilestops, convertsegfilestopdf,
-       convertsegfilestops, imagetops, printimage and printsplitimage.
-
-   (2) Programs that are used as regression tests in alltests_reg.
-       These are named *_reg, and 100 of them are invoked together
-       (alltests_reg).  The regression test framework has been
-       standardized, and regresstion tests are relatively easy
-       to write.  See regutils.h for details.
-
-   (3) Other regression tests, some of which have not (yet) been
-       put into the framework.  They are also named *_reg.
-
-   (4) Programs that were used to test library functions or auto-generate
-       library code.  These are useful for testing the behavior of small
-       sets of functions and for providing example code.
-
-6. Sanitizers can be used on all the regression tests in alltests_reg.c.
-
-   First run autogen.sh to generate the configure script
-     autogen.sh
-   Then run configure to generate the Makefile with the address sanitizer
-     ./configure '--disable-shared' '--enable-debug' 'CFLAGS=-D_GLIBCXX_DEBUG -DDEBUG=1 -Wall -pedantic -g -O0 -fsanitize=address,undefined -fstack-protector-strong -ftrapv'
-   Make and run all the regression tests
-      make check
 </pre>
+
 
 <h2> <A NAME="DEPENDENCIES">
 I/O libraries leptonica is dependent on
@@ -465,13 +388,12 @@ I/O libraries leptonica is dependent on
 
 <pre>
    Leptonica is configured to handle image I/O using these external
-   libraries: libjpeg, libtiff, libpng, libz, libwebp, libgif, libopenjp2
+   libraries: libjpeg, libtiff, libpng, libz, libgif, libwebp, libopenjp2
 
    These libraries are easy to obtain.  For example, using the
    Debian package manager:
        sudo apt-get install <package>
-   where <package> = {libpng-dev, libjpeg62-turbo-dev, libtiff5-dev,
-                      libwebp-dev, libopenjp2-7-dev, libgif-dev}.
+   where <package> = {libpng12-dev, libjpeg62-dev, libtiff4-dev}.
 
    Leptonica also allows image I/O with bmp and pnm formats, for which
    we provide the serializers (encoders and decoders).  It also
@@ -521,34 +443,19 @@ I/O libraries leptonica is dependent on
           add that path to the LD_LIBRARY_PATH environment variable.
 
    To read and write jpeg2000 files:
-      (1) Download libopenjp2, version 2.3, from their distribution.
+      (1) Download libopenjp2, version 2.X, from their distribution.
       (2) #define HAVE_LIBJP2K   1  (in environ.h)
-      (2a) If you have version 2.X, X != 3, edit LIBJP2K_HEADER  (in environ.h)
+      (2a) If you have version 2.X, X != 1, edit LIBJP2K_HEADER  (in environ.h)
       (3) In prog/makefile, edit ALL_LIBS to include -lopenjp2
       (4) The library will be installed into /usr/local/lib.
 
    To read and write gif files:
-      (1) Download version giflib-5.1.X+ from souceforge
+      (1) Download version giflib-5.X.X from souceforge
       (2) #define  HAVE_LIBGIF   1  (in environ.h)
       (3) In prog/makefile, edit ALL_LIBS to include -lgif
       (4) The library will be installed into /usr/local/lib.
-</pre>
-
-
-<h2> <A NAME="DOXYGEN">
-Generating documentation using doxygen
-</h2>
-
-<pre>
-The source code is set up to allow generation of documentation using doxygen.
-To do this:
-(1) Download the Debian doxygen package:
-     sudo apt-get install doxygen
-(2) In the root client directory containing Doxyfile:
-     doxygen Doxyfile
-The documentation will be generated in a 'doc' subdirectory, accessible
-from this file (relative to the root)
-    ./doc/html/index.html
+      (5) Note: do not use giflib-4.1.4: binary comp and decomp
+          don't pack the pixel data and are ridiculously slow.
 </pre>
 
 
@@ -591,22 +498,7 @@ that you are using the static makefiles and customizing environ.h.
          in Linux.  The tar file is available at:
              www.leptonica.com/source/xtractlib-1.5.tar.gz
 
-2. Global parameter LeptDebugOK is used to enable development and testing
-
-   For security reasons, with the exception of the regression utility
-   (regutils.c), leptonica as shipped (starting with 1.77) does not allow:
-      * 'system(3)' fork/exec
-      * writes to temp files with compiled-in names
-   System calls are used either to run gnuplot or display an image on
-   the screen.  
-
-   This is enforced with a global parameter, LeptDebugOK, initialized to 0.
-   It can be overridden either at compile time by changing the initialization
-   (in writefile.c), or at runtime, using setLeptDebugOK().
-   The programs in the prog directory, which mostly test functions in
-   the library, are not subject to this restriction.
-
-3. GNU runtime functions for stream redirection to memory
+2. GNU runtime functions for stream redirection to memory
 
    There are two non-standard gnu functions, fmemopen() and open_memstream(),
    that only work on Linux and conveniently allow memory I/O with a file
@@ -621,18 +513,7 @@ that you are using the static makefiles and customizing environ.h.
    If you're building with the autoconf programs, these two functions are
    automatically enabled if available.
 
-4. Runtime functions not available on all platforms
-
-   Some functions are not available on all systems.  One example of such a
-   function is fstatat().  If possible, such functions will be replaced by
-   wrappers, stubs or behavioral equivalent functions.  By default, such
-   functions are disabled; enable them by setting #define HAVE_FUNC  1 (in
-   environ.h).
-
-   If you're building with the autoconf or cmake programs, these functions are
-   automatically enabled if available.
-
-5. Typedefs
+3. Typedefs
 
    A deficiency of C is that no standard has been universally
    adopted for typedefs of the built-in types.  As a result,
@@ -675,22 +556,18 @@ that you are using the static makefiles and customizing environ.h.
    necessary we use the typedefs in stdint.h to specify the pointer
    size (either 4 or 8 byte).
 
-6. Compile and runtime control over stderr output (see environ.h and utils1.c)
+4. Compile-time control over stderr output (see environ.h)
 
    Leptonica provides both compile-time and run-time control over
    messages and debug output (thanks to Dave Bryan).  Both compile-time
-   and run-time severity thresholds can be set.  The runtime threshold
+   and run-time severity thresholds can be set.  The run-time threshold
    can also be set by an environmental variable.  Messages are
    vararg-formatted and of 3 types: error, warning, informational.
    These are all macros, and can be further suppressed when
    NO_CONSOLE_IO is defined on the compile line.  For production code
    where no output is to go to stderr, compile with -DNO_CONSOLE_IO.
 
-   Runtime redirection of stderr output is also possible, using a
-   callback mechanism.  The callback function is registered using
-   leptSetStderrHandler().   See utils1.c for details.
-
-7. In-memory raster format (Pix)
+5. In-memory raster format (Pix)
 
    Unlike many other open source packages, Leptonica uses packed
    data for images with all bit/pixel (bpp) depths, allowing us
@@ -711,7 +588,7 @@ that you are using the static makefiles and customizing environ.h.
    and a DPix is provided for 2D arrays of doubles.  Converters
    between these and the Pix are given.
 
-8. Conversion between Pix and other in-memory raster formats
+6. Conversion between Pix and other in-memory raster formats
 
  . If you use Leptonica with other imaging libraries, you will need
    functions to convert between the Pix and other image data
@@ -720,7 +597,7 @@ that you are using the static makefiles and customizing environ.h.
    ordering and byte ordering on raster lines.  See the file pix.h
    for the specification of image data in the pix.
 
-9. Custom memory management
+7. Custom memory management
 
    Leptonica allows you to use custom memory management (allocator,
    deallocator).  For Pix, which tend to be large, the alloc/dealloc
@@ -740,8 +617,8 @@ What's in leptonica?
    This is a source for a clean, fast implementation of rasterops.
    You can find details starting at the Leptonica home page,
    and also by looking directly at the source code.
-   Some of the low-level code is in roplow.c, and an interface is
-   given in rop.c to the simple Pix image data structure.
+   The low-level code is in roplow.c and ropiplow.c, and an
+   interface is given in rop.c to the simple Pix image data structure.
 
 2. Binary morphology
 
@@ -807,7 +684,7 @@ What's in leptonica?
    Brick Sels are separable into linear horizontal and vertical elements.
    We use the van Herk/Gil-Werman algorithm, that performs the calculations
    in a time that is independent of the size of the Sels.  Implementations
-   of tophat and hdome are also given.
+   of tophat and hdome are also given.  The low-level code is in graymorphlow.c.
 
    We also provide grayscale rank order filters for brick filters.
    The rank order filter is a generalization of grayscale morphology,
@@ -825,7 +702,7 @@ What's in leptonica?
       - sampling
       - lowpass filtering followed by sampling,
       - area mapping
-      - linear interpolation
+      -  linear interpolation
 
    Scaling operations with antialiased sampling, area mapping,
    and linear interpolation are limited to 2, 4 and 8 bpp gray,
@@ -891,14 +768,16 @@ What's in leptonica?
      c.  Rotation by sampling.  This can be used on images of arbitrary
          depth, and done about an arbitrary point.  Colormaps are retained.
 
-   The area mapping rotations are slower and more accurate, because each
-   new pixel is composed using an average of four neighboring pixels
-   in the original image; this is sometimes also also called "antialiasing".
-   Very fast color area mapping rotation is provided.
+   The area mapping rotations are slower and more accurate,
+   because each new pixel is composed using an average of four
+   neighboring pixels in the original image; this is sometimes
+   also called "antialiasing".  Very fast color area mapping
+   rotation is provided.  The low-level code is in rotateamlow.c.
 
-   The shear rotations are much faster, and work on images of arbitrary
-   pixel depth, but they just move pixels around without doing any averaging.
-   The pixRotateShearIP() operates on the image in-place.
+   The shear rotations are much faster, and work on images
+   of arbitrary pixel depth, but they just move pixels
+   around without doing any averaging.  The pixRotateShearIP()
+   operates on the image in-place.
 
    We also provide orthogonal rotators (90, 180, 270 degree; left-right
    flip and top-bottom flip) for arbitrary image depth.
@@ -922,10 +801,10 @@ What's in leptonica?
 
 7. Image enhancement
 
-   Some simple image enhancement routines for grayscale and color
-   images have been provided.  These include intensity mapping with
-   gamma correction and contrast enhancement, histogram equalization,
-   edge sharpening, smoothing, and various color-shifting operations.
+   A few simple image enhancement routines for grayscale and
+   color images have been provided.  These include intensity mapping
+   with gamma correction and contrast enhancement, as well as edge
+   sharpening, smoothing, and hue and saturation modification.
 
 8. Convolution and cousins
 
@@ -971,9 +850,7 @@ What's in leptonica?
       text and line art images, but it does quite poorly for halftones.
       It has good and stable support by Leffler's open source library,
       which is clean and small.  Tiff also supports multipage
-      images through a directory structure.  Note: because jpeg is
-      a supported tiff compression mode, leptonica requires linking
-      both libtiff and libjpeg to read and write tiff.  See tiffio.c
+      images through a directory structure.  See tiffio.c
 
     - BMP has (until recently) had no compression.  It is a simple
       format with colormaps that requires no external libraries.
@@ -990,21 +867,21 @@ What's in leptonica?
       a video compression library.  It is rapidly growing in acceptance,
       and is supported natively in several browsers.  Leptonica provides
       an interface through webp into the underlying codec.  You need
-      to download libwebp.  See webpio.c.
+      to download libwebp.
 
-    - JP2 (jpeg2000) is a wavelet encoding method, that has clear
+    - JP2K (jpeg2000) is a wavelet encoding method, that has clear
       advantages over jpeg in compression and quality (especially when
       the image has sharp edges, such as scanned documents), but is
       only slowly growing in acceptance.  For it to be widely supported,
       it will require support on a major browser (as with webp).
       Leptonica provides an interface through openjpeg into the underlying
-      codec.  You need to download libopenjp2, version 2.X.  See jp2kio.c.
+      codec.  You need to download libopenjp2, version 2.X.
 
     - GIF is still widely used in the world.  With the expiration
       of the LZW patent, it is practical to add support for GIF files.
       The open source gif library is relatively incomplete and
       unsupported (because of the Sperry-Rand-Burroughs-Univac
-      patent history).  Leptonica supports versions 5.1+.  See gifio.c.
+      patent history).   See gifio.c.
 
    Here's a summary of compression support and limitations:
       - All formats except JPEG, WEBP and JP2K support 1 bpp binary.
@@ -1016,14 +893,14 @@ What's in leptonica?
       - PNG, JPEG, TIFF, WEBP, JP2K and GIF support image compression;
         PNM and BMP do not.
       - WEBP supports rgb color and rgba.
-      - JP2 supports 8 bpp grayscale, rgb color and rgba.
+      - JP2K supports 8 bpp grayscale, rgb color and rgba.
    Use prog/ioformats_reg for a regression test on all formats, including
    thorough testing on TIFF.
    For more thorough testing on other formats, use:
       - prog/pngio_reg for PNG.
       - prog/gifio_reg for GIF
       - prog/webpio_reg for WEBP
-      - prog/jp2kio_reg for JP2
+      - prog/jp2kio_reg for JP2K
 
    We provide generators for PS output, from all types of input images.
    The output can be either uncompressed or compressed with level 2
@@ -1033,10 +910,7 @@ What's in leptonica?
    See psio1.c for examples of how to output PS for different applications.
    As examples of usage, see:
      * prog/converttops.c for a general image --> PS conversion
-           for printing.  You can specify the PS compression level (1, 2, or 3).
-     * prog/imagetops.c for a special image --> PS conversion
-           for printing at maximum size on 8.5 x 11 paper.  You can
-           specify the PS compression level (1, 2, or 3).
+           for printing.  You can specify compression level (1, 2, or 3).
      * prog/convertfilestops.c to generate a multipage level 3 compressed
            PS file that can then be converted to pdf with ps2pdf.
      * prog/convertsegfilestops.c to generate a multipage, mixed raster,
@@ -1063,16 +937,13 @@ What's in leptonica?
          compile time, using the environment variables in environ.h.
 
    For all formatted reads and writes, we support read from memory
-   and write to memory.  The gnu C runtime library (glibc) supports
-   two I/O functions, open_memstream() and fmemopen(), which read
-   and write directly to memory as if writing to a file stream.
-     * On all platforms, leptonica supports direct read/write with memory
-       for TIFF, PNG, BMP, GIF and WEBP formats.
-     * On linux, leptonica uses the special gnu libraries to enable
-       direct read/write with memory for JPEG, PNM and JP2.
-     * On platforms without the gnu libraries, such as OSX, Windows
-       and Solaris, read/write with memory for JPEG, PNM and JP2 goes
-       through temp files.
+   and write to memory.  (We cheat with gif, using a file intermediary.)
+   For all formats except for TIFF, these memory I/O functions
+   are supported through open_memstream() and fmemopen(),
+   which only is available with the gnu C runtime library (glibc).
+   Therefore, except for TIFF, you will not be able to do memory
+   supported read/writes on these platforms:
+       OSX, Windows, Solaris
    To enable/disable memory I/O for image read/write, see environ.h.
 
    We also provide fast serialization and deserialization between a pix
@@ -1124,9 +995,7 @@ What's in leptonica?
    Byte arrays are implemented both as a wrapper around the actual
    array and as a queue.  The string arrays are particularly useful
    for both parsing and composing text.  Generic lists with
-   doubly-linked cons cells are also provided.  Other data structures
-   are provided for handling ordered sets and maps, as well as hash sets
-   and hash maps.
+   doubly-linked cons cells are also provided.
 
 14. Examples of programs that are easily built using the library:
 
@@ -1173,7 +1042,7 @@ What's in leptonica?
     - a utility that will dewarp images of text that were captured
       with a camera at close range.
 
-    - a sudoku solver and generator, including a good test for uniqueness
+    - a sudoku solver, including a pretty good test for uniqueness
 
     - see (13, above) for other document image applications.
 
@@ -1206,44 +1075,31 @@ What's in leptonica?
        src/makefile.static
        CMakeLists.txt
        configure.ac
-       allheaders_top.txt  (and propagated to allheaders.h)
+       allheaders_top.txt  (and consequently allheaders.h)
    All even versions from 1.42 to 1.60 were originally archived at
    http://code.google.com/p/leptonica, as well as all versions after 1.60.
    These have now been transferred by Egor Pugin to github:
        github.com/danbloomberg/leptonica
-   where all releases (1.42 - 1.87.0) are available; e.g.,
-       https://github.com/DanBloomberg/leptonica/releases/tag/1.87.0
-   The more recent releases, from 1.80, are also available at
+   where all releases (1.42 - 1.74.3) are available; e.g.,
+       https://github.com/DanBloomberg/leptonica/releases/tag/v1.74.3
+   Most recent releases from 1.67 are also available at
        leptonica.org/download.html
    Note that if you are downloading from github, the releases are more
    likely to be stable than the master.  Also, if you download from
-   the master and use autotools (e.g., Makefile.am), you must first run
-   autogen.sh to generate the configure program and the Makefiles.
+   the master you need to run the autobuild script to generate the
+   configure program and the Makefiles.
 
    The number of downloads of leptonica increased by nearly an order
    of magnitude with 1.69, due to bundling with tesseract and
    incorporation in ubuntu 12-04.  Jeff Breidenbach has built all
    the Debian releases, which require release version numbers.
-   The Debian binary release versions to date are:
+   The Debian binary release versions are:
         1.69 : 3.0.0
         1.70 : 4.0.0
         1.71 : 4.2.0
         1.72 : 4.3.0
         1.73 : 5.0.0
         1.74 : 5.1.0
-        1.75 : 5.2.0
-        1.76 : 5.3.0
-        1.77 : 5.3.0
-        1.78 : 5.3.0
-        1.79 : 5.4.0
-        1.80 : 5.4.0
-        1.81 : 5.4.0
-        1.82 : 5.4.0
-        1.83 : 6.0.0
-        1.84 : 6.0.0
-        1.85 : 6.0.0
-        1.86 : 6.0.0
-        1.87 : 6.0.0
 
    A brief version chronology is maintained in version-notes.html.
    Starting with gcc 4.3.3, error warnings (-Werror) are given for

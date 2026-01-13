@@ -29,10 +29,6 @@
  *
  */
 
-#ifdef HAVE_CONFIG_H
-#include <config_auto.h>
-#endif  /* HAVE_CONFIG_H */
-
 #include "allheaders.h"
 
 static void MakePtas(l_int32 i, PTA **pptas, PTA **pptad);
@@ -81,7 +77,7 @@ L_REGPARAMS  *rp;
 
 #if ALL
         /* Test invertability of sampling */
-    lept_stderr("Test invertability of sampling\n");
+    fprintf(stderr, "Test invertability of sampling\n");
     pixa = pixaCreate(0);
     for (i = 0; i < 3; i++) {
         pixb = pixAddBorder(pixsc, ADDED_BORDER_PIXELS, 0);
@@ -111,7 +107,7 @@ L_REGPARAMS  *rp;
 
 #if ALL
         /* Test invertability of interpolation on grayscale */
-    lept_stderr("Test invertability of grayscale interpolation\n");
+    fprintf(stderr, "Test invertability of grayscale interpolation\n");
     pixa = pixaCreate(0);
     pixg = pixScaleToGray(pixs, 0.2);
     for (i = 0; i < 2; i++) {
@@ -143,7 +139,7 @@ L_REGPARAMS  *rp;
 
 #if ALL
         /* Test invertability of interpolation on color */
-    lept_stderr("Test invertability of color interpolation\n");
+    fprintf(stderr, "Test invertability of color interpolation\n");
     pixa = pixaCreate(0);
     pixc = pixRead("test24.jpg");
     pixcs = pixScale(pixc, 0.3, 0.3);
@@ -176,9 +172,9 @@ L_REGPARAMS  *rp;
     pixaDestroy(&pixa);
 #endif
 
-#if ALL
+#if ALL 
        /* Comparison between sampling and interpolated */
-    lept_stderr("Compare sampling with interpolated\n");
+    fprintf(stderr, "Compare sampling with interpolated\n");
     MakePtas(3, &ptas, &ptad);
     pixa = pixaCreate(0);
     pixg = pixScaleToGray(pixs, 0.2);

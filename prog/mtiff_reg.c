@@ -33,10 +33,6 @@
  *       - writing special tiff tags to file [not tested here]
  */
 
-#ifdef HAVE_CONFIG_H
-#include <config_auto.h>
-#endif  /* HAVE_CONFIG_H */
-
 #include "allheaders.h"
 #include <string.h>
 
@@ -50,19 +46,15 @@ int main(int    argc,
 l_uint8      *data;
 char         *fname, *filename;
 const char   *str;
-char          buf[512];
+char          buffer[512];
 l_int32       i, n, npages, equal, success;
-size_t        offset, size;
+size_t        length, offset, size;
 FILE         *fp;
-PIX          *pix1, *pix2;
+NUMA         *naflags, *nasizes;
+PIX          *pix, *pix1, *pix2;
 PIXA         *pixa, *pixa1, *pixa2, *pixa3;
-SARRAY       *sa;
+SARRAY       *savals, *satypes, *sa;
 L_REGPARAMS  *rp;
-
-#if !defined(HAVE_LIBPNG)
-    L_ERROR("This test requires libpng to run.\n", "mtiff_reg");
-    exit(77);
-#endif
 
    if (regTestSetup(argc, argv, &rp))
         return 1;
@@ -101,10 +93,10 @@ L_REGPARAMS  *rp;
         if (!pix1) continue;
         pixaAddPix(pixa, pix1, L_INSERT);
         if (rp->display)
-             lept_stderr("offset = %ld\n", (unsigned long)offset);
+             fprintf(stderr, "offset = %ld\n", (unsigned long)offset);
         n++;
     } while (offset != 0);
-    if (rp->display) lept_stderr("Num images = %d\n", n);
+    if (rp->display) fprintf(stderr, "Num images = %d\n", n);
     pix1 = pixaDisplayTiledInRows(pixa, 32, 1200, 1.2, 0, 15, 4);
     regTestWritePixAndCheck(rp, pix1, IFF_PNG);  /* 4 */
     pixDisplayWithTitle(pix1, 0, 600, NULL, rp->display);
@@ -122,10 +114,10 @@ L_REGPARAMS  *rp;
         if (!pix1) continue;
         pixaAddPix(pixa, pix1, L_INSERT);
         if (rp->display)
-            lept_stderr("offset = %ld\n", (unsigned long)offset);
+            fprintf(stderr, "offset = %ld\n", (unsigned long)offset);
         n++;
     } while (offset != 0);
-    if (rp->display) lept_stderr("Num images = %d\n", n);
+    if (rp->display) fprintf(stderr, "Num images = %d\n", n);
     pix1 = pixaDisplayTiledInRows(pixa, 32, 1200, 1.2, 0, 15, 4);
     regTestWritePixAndCheck(rp, pix1, IFF_PNG);  /* 5 */
     pixDisplayWithTitle(pix1, 0, 800, NULL, rp->display);
@@ -151,8 +143,8 @@ L_REGPARAMS  *rp;
     regTestCheckFile(rp, "/tmp/lept/tiff/junkm.tif");  /* 8 */
     pixDestroy(&pix1);
     if (rp->display) {
-        lept_stderr("\n1000 image file: /tmp/lept/tiff/junkm.tif\n");
-        lept_stderr("Time to write 1000 images: %7.3f sec\n", stopTimer());
+        fprintf(stderr, "\n1000 image file: /tmp/lept/tiff/junkm.tif\n");
+        fprintf(stderr, "Time to write 1000 images: %7.3f sec\n", stopTimer());
     }
 
     startTimer();
@@ -162,17 +154,17 @@ L_REGPARAMS  *rp;
         pix1 = pixReadFromMultipageTiff("/tmp/lept/tiff/junkm.tif", &offset);
         if (!pix1) continue;
         if (rp->display && (n % 100 == 0))
-            lept_stderr("offset = %ld\n", (unsigned long)offset);
+            fprintf(stderr, "offset = %ld\n", (unsigned long)offset);
         pixDestroy(&pix1);
         n++;
     } while (offset != 0);
     regTestCompareValues(rp, 1000, n, 0);  /* 9 */
     if (rp->display)
-        lept_stderr("Time to read %d images: %6.3f sec\n", n, stopTimer());
+        fprintf(stderr, "Time to read %d images: %6.3f sec\n", n, stopTimer());
 
     startTimer();
     pixa = pixaReadMultipageTiff("/tmp/lept/tiff/junkm.tif");
-    lept_stderr("Time to read %d images and return a pixa: %6.3f sec\n",
+    fprintf(stderr, "Time to read %d images and return a pixa: %6.3f sec\n",
             pixaGetCount(pixa), stopTimer());
     pix1 = pixaDisplayTiledInRows(pixa, 8, 1500, 0.8, 0, 15, 4);
     regTestWritePixAndCheck(rp, pix1, IFF_PNG);  /* 10 */
@@ -203,7 +195,7 @@ L_REGPARAMS  *rp;
         n++;
     } while (offset != 0);
     regTestCompareValues(rp, 10, n, 0);  /* 12 */
-    if (rp->display) lept_stderr("\nRead %d images\n", n);
+    if (rp->display) fprintf(stderr, "\nRead %d images\n", n);
     lept_free(data);
     pixaWriteMemMultipageTiff(&data, &size, pixa2);  /* (4) */
     pixa3 = pixaReadMemMultipageTiff(data, size);  /* (5) */
@@ -211,7 +203,7 @@ L_REGPARAMS  *rp;
     regTestWritePixAndCheck(rp, pix1, IFF_PNG);  /* 13 */
     pixDestroy(&pix1);
     n = pixaGetCount(pixa3);
-    if (rp->display) lept_stderr("Write/read %d images\n", n);
+    if (rp->display) fprintf(stderr, "Write/read %d images\n", n);
     success = TRUE;
     for (i = 0; i < n; i++) {
         pix1 = pixaGetPix(pixa1, i, L_CLONE);
@@ -231,9 +223,9 @@ L_REGPARAMS  *rp;
         /* Read the files and generate a multipage tiff file of G4 images.
          * Then convert that to a G4 compressed and ascii85 encoded PS file. */
     sa = getSortedPathnamesInDirectory(".", "weasel4.", 0, 4);
-    if (rp->display) sarrayWriteStderr(sa);
+    if (rp->display) sarrayWriteStream(stderr, sa);
     sarraySort(sa, sa, L_SORT_INCREASING);
-    if (rp->display) sarrayWriteStderr(sa);
+    if (rp->display) sarrayWriteStream(stderr, sa);
     npages = sarrayGetCount(sa);
     for (i = 0; i < npages; i++) {
         fname = sarrayGetString(sa, i, L_NOCOPY);
@@ -252,13 +244,13 @@ L_REGPARAMS  *rp;
     regTestCheckFile(rp, "/tmp/lept/tiff/junkm2.tif");  /* 15 */
 
         /* Write it out as a PS file */
-    lept_stderr("Writing to: /tmp/lept/tiff/weasel4.ps\n");
+    fprintf(stderr, "Writing to: /tmp/lept/tiff/weasel4.ps\n");
     convertTiffMultipageToPS("/tmp/lept/tiff/weasel4",
                              "/tmp/lept/tiff/weasel4.ps", 0.95);
     regTestCheckFile(rp, "/tmp/lept/tiff/weasel4.ps");  /* 16 */
 
         /* Write it out as a pdf file */
-    lept_stderr("Writing to: /tmp/lept/tiff/weasel4.pdf\n");
+    fprintf(stderr, "Writing to: /tmp/lept/tiff/weasel4.pdf\n");
     l_pdfSetDateAndVersion(FALSE);
     convertTiffMultipageToPdf("/tmp/lept/tiff/weasel4",
                               "/tmp/lept/tiff/weasel4.pdf");
@@ -274,8 +266,8 @@ L_REGPARAMS  *rp;
     regTestCompareValues(rp, TRUE, success, 0);  /* 19 */
     if (success) {
         tiffGetCount(fp, &npages);
-        regTestCompareValues(rp, 5, npages, 0);  /* 20 */
-        lept_stderr(" Tiff: %d page\n", npages);
+        regTestCompareValues(rp, 4, npages, 0);  /* 20 */
+        fprintf(stderr, " Tiff: %d page\n", npages);
     }
     lept_fclose(fp);
 
@@ -283,15 +275,15 @@ L_REGPARAMS  *rp;
     for (i = 0; i < npages + 1; i++) {   /* read one beyond to catch error */
         pix1 = pixReadTiff(weasel_orig, i);
         if (!pix1) continue;
-        snprintf(buf, sizeof(buf), "/tmp/lept/tiff/%03d.tif", i);
-        pixWrite(buf, pix1, IFF_TIFF_ZIP);
+        sprintf(buffer, "/tmp/lept/tiff/%03d.tif", i);
+        pixWrite(buffer, pix1, IFF_TIFF_ZIP);
         pixDestroy(&pix1);
     }
 
         /* Read separate page files and write reversed file */
     for (i = npages - 1; i >= 0; i--) {
-        snprintf(buf, sizeof(buf), "/tmp/lept/tiff/%03d.tif", i);
-        pix1 = pixRead(buf);
+        sprintf(buffer, "/tmp/lept/tiff/%03d.tif", i);
+        pix1 = pixRead(buffer);
         if (!pix1) continue;
         if (i == npages - 1)
             pixWriteTiff(weasel_rev, pix1, IFF_TIFF_ZIP, "w+");
@@ -320,13 +312,8 @@ L_REGPARAMS  *rp;
     pixaDestroy(&pixa);
 
 
-#if 1    /* -----   test adding custom public tags to a tiff header ----- */
-{
-    size_t        length;
-    NUMA         *naflags, *nasizes;
-    SARRAY       *savals, *satypes;
-
-    pix1 = pixRead("feyn.tif");
+#if 0    /* -----   test adding custom public tags to a tiff header ----- */
+    pix = pixRead("feyn.tif");
     naflags = numaCreate(10);
     savals = sarrayCreate(10);
     satypes = sarrayCreate(10);
@@ -336,42 +323,41 @@ L_REGPARAMS  *rp;
     numaAddNumber(naflags, 700);
     str = "<xmp>This is a Fake XMP packet</xmp>\n<text>Guess what ...?</text>";
     length = strlen(str);
-    sarrayAddString(savals, str, L_COPY);
-    sarrayAddString(satypes, "char*", L_COPY);
+    sarrayAddString(savals, (char *)str, L_COPY);
+    sarrayAddString(satypes, (char *)"char*", L_COPY);
     numaAddNumber(nasizes, length);  /* get it all */
 
     numaAddNumber(naflags, 269);  /* DOCUMENTNAME */
-    sarrayAddString(savals, "One silly title", L_COPY);
-    sarrayAddString(satypes, "const char*", L_COPY);
+    sarrayAddString(savals, (char *)"One silly title", L_COPY);
+    sarrayAddString(satypes, (char *)"const char*", L_COPY);
     numaAddNumber(naflags, 270);  /* IMAGEDESCRIPTION */
-    sarrayAddString(savals, "One page of text", L_COPY);
-    sarrayAddString(satypes, "const char*", L_COPY);
+    sarrayAddString(savals, (char *)"One page of text", L_COPY);
+    sarrayAddString(satypes, (char *)"const char*", L_COPY);
         /* the max sample is used by rendering programs
          * to scale the dynamic range */
     numaAddNumber(naflags, 281);  /* MAXSAMPLEVALUE */
-    sarrayAddString(savals, "4", L_COPY);
-    sarrayAddString(satypes, "l_uint16", L_COPY);
+    sarrayAddString(savals, (char *)"4", L_COPY);
+    sarrayAddString(satypes, (char *)"l_uint16", L_COPY);
         /* note that date is required to be a 20 byte string */
     numaAddNumber(naflags, 306);  /* DATETIME */
-    sarrayAddString(savals, "2004:10:11 09:35:15", L_COPY);
-    sarrayAddString(satypes, "const char*", L_COPY);
+    sarrayAddString(savals, (char *)"2004:10:11 09:35:15", L_COPY);
+    sarrayAddString(satypes, (char *)"const char*", L_COPY);
         /* note that page number requires 2 l_uint16 input */
     numaAddNumber(naflags, 297);  /* PAGENUMBER */
-    sarrayAddString(savals, "1-412", L_COPY);
-    sarrayAddString(satypes, "l_uint16-l_uint16", L_COPY);
-    pixWriteTiffCustom("/tmp/lept/tiff/tags.tif", pix1, IFF_TIFF_G4, "w", naflags,
+    sarrayAddString(savals, (char *)"1-412", L_COPY);
+    sarrayAddString(satypes, (char *)"l_uint16-l_uint16", L_COPY);
+    pixWriteTiffCustom("/tmp/lept/tiff/tags.tif", pix, IFF_TIFF_G4, "w", naflags,
                        savals, satypes, nasizes);
-    fprintTiffInfo(stderr, "/tmp/lept/tiff/tags.tif");
-    lept_stderr("num flags = %d\n", numaGetCount(naflags));
-    lept_stderr("num sizes = %d\n", numaGetCount(nasizes));
-    lept_stderr("num vals = %d\n", sarrayGetCount(savals));
-    lept_stderr("num types = %d\n", sarrayGetCount(satypes));
+    fprintTiffInfo(stderr, (char *)"/tmp/lept/tiff/tags.tif");
+    fprintf(stderr, "num flags = %d\n", numaGetCount(naflags));
+    fprintf(stderr, "num sizes = %d\n", numaGetCount(nasizes));
+    fprintf(stderr, "num vals = %d\n", sarrayGetCount(savals));
+    fprintf(stderr, "num types = %d\n", sarrayGetCount(satypes));
     numaDestroy(&naflags);
     numaDestroy(&nasizes);
     sarrayDestroy(&savals);
     sarrayDestroy(&satypes);
-    pixDestroy(&pix1);
-}
+    pixDestroy(&pix);
 #endif
 
     return regTestCleanup(rp);

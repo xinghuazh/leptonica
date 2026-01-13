@@ -30,10 +30,6 @@
  *   Regression test for sobel edge filter.
  */
 
-#ifdef HAVE_CONFIG_H
-#include <config_auto.h>
-#endif  /* HAVE_CONFIG_H */
-
 #include "allheaders.h"
 
 int main(int    argc,
@@ -58,7 +54,8 @@ L_REGPARAMS  *rp;
         pixDestroy(&pix2);
     }
     pixGetDimensions(pixs, &w, &h, NULL);
-    lept_stderr("Sobel edge MPix/sec: %7.3f\n", 0.0001 * w * h / stopTimer());
+    fprintf(stderr, "Sobel edge MPix/sec: %7.3f\n",
+            0.0001 * w * h / stopTimer());
 
         /* Horiz and vert sobel edges (1 bpp) */
     pix1 = pixSobelEdgeFilter(pixs, L_HORIZONTAL_EDGES);

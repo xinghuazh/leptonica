@@ -145,7 +145,7 @@
  *      done in-place and word parallel; arbitrary scaling is
  *      mostly pixel-wise.
  *
- *      Suppose that we are transforming image 1 to correspond to image 2.
+ *      Suppose that we are tranforming image 1 to correspond to image 2.
  *      We have a set of three points, describing the coordinate space
  *      embedded in image 1, and we need to transform image 1 until
  *      those three points exactly correspond to the new coordinate space
@@ -231,9 +231,6 @@
  * </pre>
  */
 
-#ifdef HAVE_CONFIG_H
-#include <config_auto.h>
-#endif  /* HAVE_CONFIG_H */
 
 #include <string.h>
 #include <math.h>
@@ -245,16 +242,17 @@ extern l_float32  AlphaMaskBorderVals[2];
 #define  DEBUG     0
 #endif  /* ~NO_CONSOLE_IO */
 
+
 /*-------------------------------------------------------------*
  *               Sampled affine image transformation           *
  *-------------------------------------------------------------*/
 /*!
  * \brief   pixAffineSampledPta()
  *
- * \param[in]    pixs      all depths
- * \param[in]    ptad      3 pts of final coordinate space
- * \param[in]    ptas      3 pts of initial coordinate space
- * \param[in]    incolor   L_BRING_IN_WHITE, L_BRING_IN_BLACK
+ * \param[in]    pixs all depths
+ * \param[in]    ptad  3 pts of final coordinate space
+ * \param[in]    ptas  3 pts of initial coordinate space
+ * \param[in]    incolor L_BRING_IN_WHITE, L_BRING_IN_BLACK
  * \return  pixd, or NULL on error
  *
  * <pre>
@@ -287,18 +285,20 @@ pixAffineSampledPta(PIX     *pixs,
 l_float32  *vc;
 PIX        *pixd;
 
+    PROCNAME("pixAffineSampledPta");
+
     if (!pixs)
-        return (PIX *)ERROR_PTR("pixs not defined", __func__, NULL);
+        return (PIX *)ERROR_PTR("pixs not defined", procName, NULL);
     if (!ptas)
-        return (PIX *)ERROR_PTR("ptas not defined", __func__, NULL);
+        return (PIX *)ERROR_PTR("ptas not defined", procName, NULL);
     if (!ptad)
-        return (PIX *)ERROR_PTR("ptad not defined", __func__, NULL);
+        return (PIX *)ERROR_PTR("ptad not defined", procName, NULL);
     if (incolor != L_BRING_IN_WHITE && incolor != L_BRING_IN_BLACK)
-        return (PIX *)ERROR_PTR("invalid incolor", __func__, NULL);
+        return (PIX *)ERROR_PTR("invalid incolor", procName, NULL);
     if (ptaGetCount(ptas) != 3)
-        return (PIX *)ERROR_PTR("ptas count not 3", __func__, NULL);
+        return (PIX *)ERROR_PTR("ptas count not 3", procName, NULL);
     if (ptaGetCount(ptad) != 3)
-        return (PIX *)ERROR_PTR("ptad count not 3", __func__, NULL);
+        return (PIX *)ERROR_PTR("ptad count not 3", procName, NULL);
 
         /* Get backwards transform from dest to src, and apply it */
     getAffineXformCoeffs(ptad, ptas, &vc);
@@ -312,9 +312,9 @@ PIX        *pixd;
 /*!
  * \brief   pixAffineSampled()
  *
- * \param[in]    pixs      all depths
- * \param[in]    vc        vector of 6 coefficients for affine transformation
- * \param[in]    incolor   L_BRING_IN_WHITE, L_BRING_IN_BLACK
+ * \param[in]    pixs all depths
+ * \param[in]    vc  vector of 6 coefficients for affine transformation
+ * \param[in]    incolor L_BRING_IN_WHITE, L_BRING_IN_BLACK
  * \return  pixd, or NULL on error
  *
  * <pre>
@@ -337,15 +337,17 @@ l_uint32   *datas, *datad, *lines, *lined;
 PIX        *pixd;
 PIXCMAP    *cmap;
 
+    PROCNAME("pixAffineSampled");
+
     if (!pixs)
-        return (PIX *)ERROR_PTR("pixs not defined", __func__, NULL);
+        return (PIX *)ERROR_PTR("pixs not defined", procName, NULL);
     if (!vc)
-        return (PIX *)ERROR_PTR("vc not defined", __func__, NULL);
+        return (PIX *)ERROR_PTR("vc not defined", procName, NULL);
     if (incolor != L_BRING_IN_WHITE && incolor != L_BRING_IN_BLACK)
-        return (PIX *)ERROR_PTR("invalid incolor", __func__, NULL);
+        return (PIX *)ERROR_PTR("invalid incolor", procName, NULL);
     pixGetDimensions(pixs, &w, &h, &d);
     if (d != 1 && d != 2 && d != 4 && d != 8 && d != 32)
-        return (PIX *)ERROR_PTR("depth not 1, 2, 4, 8 or 16", __func__, NULL);
+        return (PIX *)ERROR_PTR("depth not 1, 2, 4, 8 or 16", procName, NULL);
 
         /* Init all dest pixels to color to be brought in from outside */
     pixd = pixCreateTemplate(pixs);
@@ -405,10 +407,10 @@ PIXCMAP    *cmap;
 /*!
  * \brief   pixAffinePta()
  *
- * \param[in]    pixs      all depths; colormap ok
- * \param[in]    ptad      3 pts of final coordinate space
- * \param[in]    ptas      3 pts of initial coordinate space
- * \param[in]    incolor   L_BRING_IN_WHITE, L_BRING_IN_BLACK
+ * \param[in]    pixs all depths; colormap ok
+ * \param[in]    ptad  3 pts of final coordinate space
+ * \param[in]    ptas  3 pts of initial coordinate space
+ * \param[in]    incolor L_BRING_IN_WHITE, L_BRING_IN_BLACK
  * \return  pixd, or NULL on error
  *
  * <pre>
@@ -427,18 +429,20 @@ l_int32   d;
 l_uint32  colorval;
 PIX      *pixt1, *pixt2, *pixd;
 
+    PROCNAME("pixAffinePta");
+
     if (!pixs)
-        return (PIX *)ERROR_PTR("pixs not defined", __func__, NULL);
+        return (PIX *)ERROR_PTR("pixs not defined", procName, NULL);
     if (!ptas)
-        return (PIX *)ERROR_PTR("ptas not defined", __func__, NULL);
+        return (PIX *)ERROR_PTR("ptas not defined", procName, NULL);
     if (!ptad)
-        return (PIX *)ERROR_PTR("ptad not defined", __func__, NULL);
+        return (PIX *)ERROR_PTR("ptad not defined", procName, NULL);
     if (incolor != L_BRING_IN_WHITE && incolor != L_BRING_IN_BLACK)
-        return (PIX *)ERROR_PTR("invalid incolor", __func__, NULL);
+        return (PIX *)ERROR_PTR("invalid incolor", procName, NULL);
     if (ptaGetCount(ptas) != 3)
-        return (PIX *)ERROR_PTR("ptas count not 3", __func__, NULL);
+        return (PIX *)ERROR_PTR("ptas count not 3", procName, NULL);
     if (ptaGetCount(ptad) != 3)
-        return (PIX *)ERROR_PTR("ptad count not 3", __func__, NULL);
+        return (PIX *)ERROR_PTR("ptad count not 3", procName, NULL);
 
     if (pixGetDepth(pixs) == 1)
         return pixAffineSampledPta(pixs, ptad, ptas, incolor);
@@ -474,9 +478,9 @@ PIX      *pixt1, *pixt2, *pixd;
 /*!
  * \brief   pixAffine()
  *
- * \param[in]    pixs      all depths; colormap ok
- * \param[in]    vc        vector of 6 coefficients for affine transformation
- * \param[in]    incolor   L_BRING_IN_WHITE, L_BRING_IN_BLACK
+ * \param[in]    pixs all depths; colormap ok
+ * \param[in]    vc  vector of 6 coefficients for affine transformation
+ * \param[in]    incolor L_BRING_IN_WHITE, L_BRING_IN_BLACK
  * \return  pixd, or NULL on error
  *
  * <pre>
@@ -494,10 +498,12 @@ l_int32   d;
 l_uint32  colorval;
 PIX      *pixt1, *pixt2, *pixd;
 
+    PROCNAME("pixAffine");
+
     if (!pixs)
-        return (PIX *)ERROR_PTR("pixs not defined", __func__, NULL);
+        return (PIX *)ERROR_PTR("pixs not defined", procName, NULL);
     if (!vc)
-        return (PIX *)ERROR_PTR("vc not defined", __func__, NULL);
+        return (PIX *)ERROR_PTR("vc not defined", procName, NULL);
 
     if (pixGetDepth(pixs) == 1)
         return pixAffineSampled(pixs, vc, incolor);
@@ -533,10 +539,10 @@ PIX      *pixt1, *pixt2, *pixd;
 /*!
  * \brief   pixAffinePtaColor()
  *
- * \param[in]    pixs       32 bpp
- * \param[in]    ptad       3 pts of final coordinate space
- * \param[in]    ptas       3 pts of initial coordinate space
- * \param[in]    colorval   e.g.: 0 to bring in BLACK, 0xffffff00 for WHITE
+ * \param[in]    pixs 32 bpp
+ * \param[in]    ptad  3 pts of final coordinate space
+ * \param[in]    ptas  3 pts of initial coordinate space
+ * \param[in]    colorval e.g., 0 to bring in BLACK, 0xffffff00 for WHITE
  * \return  pixd, or NULL on error
  */
 PIX *
@@ -548,18 +554,20 @@ pixAffinePtaColor(PIX      *pixs,
 l_float32  *vc;
 PIX        *pixd;
 
+    PROCNAME("pixAffinePtaColor");
+
     if (!pixs)
-        return (PIX *)ERROR_PTR("pixs not defined", __func__, NULL);
+        return (PIX *)ERROR_PTR("pixs not defined", procName, NULL);
     if (!ptas)
-        return (PIX *)ERROR_PTR("ptas not defined", __func__, NULL);
+        return (PIX *)ERROR_PTR("ptas not defined", procName, NULL);
     if (!ptad)
-        return (PIX *)ERROR_PTR("ptad not defined", __func__, NULL);
+        return (PIX *)ERROR_PTR("ptad not defined", procName, NULL);
     if (pixGetDepth(pixs) != 32)
-        return (PIX *)ERROR_PTR("pixs must be 32 bpp", __func__, NULL);
+        return (PIX *)ERROR_PTR("pixs must be 32 bpp", procName, NULL);
     if (ptaGetCount(ptas) != 3)
-        return (PIX *)ERROR_PTR("ptas count not 3", __func__, NULL);
+        return (PIX *)ERROR_PTR("ptas count not 3", procName, NULL);
     if (ptaGetCount(ptad) != 3)
-        return (PIX *)ERROR_PTR("ptad count not 3", __func__, NULL);
+        return (PIX *)ERROR_PTR("ptad count not 3", procName, NULL);
 
         /* Get backwards transform from dest to src, and apply it */
     getAffineXformCoeffs(ptad, ptas, &vc);
@@ -573,9 +581,9 @@ PIX        *pixd;
 /*!
  * \brief   pixAffineColor()
  *
- * \param[in]    pixs       32 bpp
- * \param[in]    vc         vector of 6 coefficients for affine transformation
- * \param[in]    colorval   e.g.: 0 to bring in BLACK, 0xffffff00 for WHITE
+ * \param[in]    pixs 32 bpp
+ * \param[in]    vc  vector of 6 coefficients for affine transformation
+ * \param[in]    colorval e.g., 0 to bring in BLACK, 0xffffff00 for WHITE
  * \return  pixd, or NULL on error
  */
 PIX *
@@ -589,13 +597,15 @@ l_uint32  *datas, *datad, *lined;
 l_float32  x, y;
 PIX       *pix1, *pix2, *pixd;
 
+    PROCNAME("pixAffineColor");
+
     if (!pixs)
-        return (PIX *)ERROR_PTR("pixs not defined", __func__, NULL);
+        return (PIX *)ERROR_PTR("pixs not defined", procName, NULL);
     pixGetDimensions(pixs, &w, &h, &d);
     if (d != 32)
-        return (PIX *)ERROR_PTR("pixs must be 32 bpp", __func__, NULL);
+        return (PIX *)ERROR_PTR("pixs must be 32 bpp", procName, NULL);
     if (!vc)
-        return (PIX *)ERROR_PTR("vc not defined", __func__, NULL);
+        return (PIX *)ERROR_PTR("vc not defined", procName, NULL);
 
     datas = pixGetData(pixs);
     wpls = pixGetWpl(pixs);
@@ -632,10 +642,10 @@ PIX       *pix1, *pix2, *pixd;
 /*!
  * \brief   pixAffinePtaGray()
  *
- * \param[in]    pixs      8 bpp
- * \param[in]    ptad      3 pts of final coordinate space
- * \param[in]    ptas      3 pts of initial coordinate space
- * \param[in]    grayval   e.g.: 0 to bring in BLACK, 255 for WHITE
+ * \param[in]    pixs 8 bpp
+ * \param[in]    ptad  3 pts of final coordinate space
+ * \param[in]    ptas  3 pts of initial coordinate space
+ * \param[in]    grayval 0 to bring in BLACK, 255 for WHITE
  * \return  pixd, or NULL on error
  */
 PIX *
@@ -647,18 +657,20 @@ pixAffinePtaGray(PIX     *pixs,
 l_float32  *vc;
 PIX        *pixd;
 
+    PROCNAME("pixAffinePtaGray");
+
     if (!pixs)
-        return (PIX *)ERROR_PTR("pixs not defined", __func__, NULL);
+        return (PIX *)ERROR_PTR("pixs not defined", procName, NULL);
     if (!ptas)
-        return (PIX *)ERROR_PTR("ptas not defined", __func__, NULL);
+        return (PIX *)ERROR_PTR("ptas not defined", procName, NULL);
     if (!ptad)
-        return (PIX *)ERROR_PTR("ptad not defined", __func__, NULL);
+        return (PIX *)ERROR_PTR("ptad not defined", procName, NULL);
     if (pixGetDepth(pixs) != 8)
-        return (PIX *)ERROR_PTR("pixs must be 8 bpp", __func__, NULL);
+        return (PIX *)ERROR_PTR("pixs must be 8 bpp", procName, NULL);
     if (ptaGetCount(ptas) != 3)
-        return (PIX *)ERROR_PTR("ptas count not 3", __func__, NULL);
+        return (PIX *)ERROR_PTR("ptas count not 3", procName, NULL);
     if (ptaGetCount(ptad) != 3)
-        return (PIX *)ERROR_PTR("ptad count not 3", __func__, NULL);
+        return (PIX *)ERROR_PTR("ptad count not 3", procName, NULL);
 
         /* Get backwards transform from dest to src, and apply it */
     getAffineXformCoeffs(ptad, ptas, &vc);
@@ -673,9 +685,9 @@ PIX        *pixd;
 /*!
  * \brief   pixAffineGray()
  *
- * \param[in]    pixs      8 bpp
- * \param[in]    vc        vector of 6 coefficients for affine transformation
- * \param[in]    grayval   e.g.: 0 to bring in BLACK, 255 for WHITE
+ * \param[in]    pixs 8 bpp
+ * \param[in]    vc  vector of 6 coefficients for affine transformation
+ * \param[in]    grayval 0 to bring in BLACK, 255 for WHITE
  * \return  pixd, or NULL on error
  */
 PIX *
@@ -688,13 +700,15 @@ l_uint32  *datas, *datad, *lined;
 l_float32  x, y;
 PIX       *pixd;
 
+    PROCNAME("pixAffineGray");
+
     if (!pixs)
-        return (PIX *)ERROR_PTR("pixs not defined", __func__, NULL);
+        return (PIX *)ERROR_PTR("pixs not defined", procName, NULL);
     pixGetDimensions(pixs, &w, &h, NULL);
     if (pixGetDepth(pixs) != 8)
-        return (PIX *)ERROR_PTR("pixs must be 8 bpp", __func__, NULL);
+        return (PIX *)ERROR_PTR("pixs must be 8 bpp", procName, NULL);
     if (!vc)
-        return (PIX *)ERROR_PTR("vc not defined", __func__, NULL);
+        return (PIX *)ERROR_PTR("vc not defined", procName, NULL);
 
     datas = pixGetData(pixs);
     wpls = pixGetWpl(pixs);
@@ -724,13 +738,13 @@ PIX       *pixd;
 /*!
  * \brief   pixAffinePtaWithAlpha()
  *
- * \param[in]    pixs     32 bpp rgb
- * \param[in]    ptad     3 pts of final coordinate space
- * \param[in]    ptas     3 pts of initial coordinate space
- * \param[in]    pixg     [optional] 8 bpp, can be null
- * \param[in]    fract    between 0.0 and 1.0, with 0.0 fully transparent
- *                        and 1.0 fully opaque
- * \param[in]    border   of pixels added to capture transformed source pixels
+ * \param[in]    pixs 32 bpp rgb
+ * \param[in]    ptad  3 pts of final coordinate space
+ * \param[in]    ptas  3 pts of initial coordinate space
+ * \param[in]    pixg [optional] 8 bpp, can be null
+ * \param[in]    fract between 0.0 and 1.0, with 0.0 fully transparent
+ *                     and 1.0 fully opaque
+ * \param[in]    border of pixels added to capture transformed source pixels
  * \return  pixd, or NULL on error
  *
  * <pre>
@@ -776,26 +790,28 @@ l_int32  ws, hs, d;
 PIX     *pixd, *pixb1, *pixb2, *pixg2, *pixga;
 PTA     *ptad2, *ptas2;
 
+    PROCNAME("pixAffinePtaWithAlpha");
+
     if (!pixs)
-        return (PIX *)ERROR_PTR("pixs not defined", __func__, NULL);
+        return (PIX *)ERROR_PTR("pixs not defined", procName, NULL);
     pixGetDimensions(pixs, &ws, &hs, &d);
     if (d != 32 && pixGetColormap(pixs) == NULL)
-        return (PIX *)ERROR_PTR("pixs not cmapped or 32 bpp", __func__, NULL);
+        return (PIX *)ERROR_PTR("pixs not cmapped or 32 bpp", procName, NULL);
     if (pixg && pixGetDepth(pixg) != 8) {
         L_WARNING("pixg not 8 bpp; using 'fract' transparent alpha\n",
-                  __func__);
+                  procName);
         pixg = NULL;
     }
     if (!pixg && (fract < 0.0 || fract > 1.0)) {
-        L_WARNING("invalid fract; using 1.0 (fully transparent)\n", __func__);
+        L_WARNING("invalid fract; using 1.0 (fully transparent)\n", procName);
         fract = 1.0;
     }
     if (!pixg && fract == 0.0)
-        L_WARNING("fully opaque alpha; image will not be blended\n", __func__);
+        L_WARNING("fully opaque alpha; image will not be blended\n", procName);
     if (!ptad)
-        return (PIX *)ERROR_PTR("ptad not defined", __func__, NULL);
+        return (PIX *)ERROR_PTR("ptad not defined", procName, NULL);
     if (!ptas)
-        return (PIX *)ERROR_PTR("ptas not defined", __func__, NULL);
+        return (PIX *)ERROR_PTR("ptas not defined", procName, NULL);
 
         /* Add border; the color doesn't matter */
     pixb1 = pixAddBorder(pixs, border, 0);
@@ -843,9 +859,9 @@ PTA     *ptad2, *ptas2;
 /*!
  * \brief   getAffineXformCoeffs()
  *
- * \param[in]    ptas    source 3 points; unprimed
- * \param[in]    ptad    transformed 3 points; primed
- * \param[out]   pvc     vector of coefficients of transform
+ * \param[in]    ptas  source 3 points; unprimed
+ * \param[in]    ptad  transformed 3 points; primed
+ * \param[out]   pvc   vector of coefficients of transform
  * \return  0 if OK; 1 on error
  *
  * <pre>
@@ -911,7 +927,7 @@ PTA     *ptad2, *ptas2;
  *  !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
  * </pre>
  */
-l_ok
+l_int32
 getAffineXformCoeffs(PTA         *ptas,
                      PTA         *ptad,
                      l_float32  **pvc)
@@ -921,14 +937,17 @@ l_float32   x1, y1, x2, y2, x3, y3;
 l_float32  *b;   /* rhs vector of primed coords X'; coeffs returned in *pvc */
 l_float32  *a[6];  /* 6x6 matrix A  */
 
-    if (!ptas)
-        return ERROR_INT("ptas not defined", __func__, 1);
-    if (!ptad)
-        return ERROR_INT("ptad not defined", __func__, 1);
-    if (!pvc)
-        return ERROR_INT("&vc not defined", __func__, 1);
+    PROCNAME("getAffineXformCoeffs");
 
-    b = (l_float32 *)LEPT_CALLOC(6, sizeof(l_float32));
+    if (!ptas)
+        return ERROR_INT("ptas not defined", procName, 1);
+    if (!ptad)
+        return ERROR_INT("ptad not defined", procName, 1);
+    if (!pvc)
+        return ERROR_INT("&vc not defined", procName, 1);
+
+    if ((b = (l_float32 *)LEPT_CALLOC(6, sizeof(l_float32))) == NULL)
+        return ERROR_INT("b not made", procName, 1);
     *pvc = b;
 
     ptaGetPt(ptas, 0, &x1, &y1);
@@ -939,7 +958,9 @@ l_float32  *a[6];  /* 6x6 matrix A  */
     ptaGetPt(ptad, 2, &b[4], &b[5]);
 
     for (i = 0; i < 6; i++)
-        a[i] = (l_float32 *)LEPT_CALLOC(6, sizeof(l_float32));
+        if ((a[i] = (l_float32 *)LEPT_CALLOC(6, sizeof(l_float32))) == NULL)
+            return ERROR_INT("a[i] not made", procName, 1);
+
     a[0][0] = x1;
     a[0][1] = y1;
     a[0][2] = 1.;
@@ -971,8 +992,8 @@ l_float32  *a[6];  /* 6x6 matrix A  */
 /*!
  * \brief   affineInvertXform()
  *
- * \param[in]    vc     vector of 6 coefficients
- * \param[out]   pvci   inverted transform
+ * \param[in]    vc vector of 6 coefficients
+ * \param[out]   pvci inverted transform
  * \return  0 if OK; 1 on error
  *
  * <pre>
@@ -999,7 +1020,7 @@ l_float32  *a[6];  /* 6x6 matrix A  */
  *
  * </pre>
  */
-l_ok
+l_int32
 affineInvertXform(l_float32   *vc,
                   l_float32  **pvci)
 {
@@ -1008,11 +1029,13 @@ l_float32  *vci;
 l_float32  *a[3];
 l_float32   b[3] = {1.0, 1.0, 1.0};   /* anything; results ignored */
 
+    PROCNAME("affineInvertXform");
+
     if (!pvci)
-        return ERROR_INT("&vci not defined", __func__, 1);
+        return ERROR_INT("&vci not defined", procName, 1);
     *pvci = NULL;
     if (!vc)
-        return ERROR_INT("vc not defined", __func__, 1);
+        return ERROR_INT("vc not defined", procName, 1);
 
 #if 1
     for (i = 0; i < 3; i++)
@@ -1069,8 +1092,8 @@ l_float32   b[3] = {1.0, 1.0, 1.0};   /* anything; results ignored */
 /*!
  * \brief   affineXformSampledPt()
  *
- * \param[in]    vc         vector of 6 coefficients
- * \param[in]    x, y       initial point
+ * \param[in]    vc vector of 6 coefficients
+ * \param[in]    x, y  initial point
  * \param[out]   pxp, pyp   transformed point
  * \return  0 if OK; 1 on error
  *
@@ -1080,15 +1103,17 @@ l_float32   b[3] = {1.0, 1.0, 1.0};   /* anything; results ignored */
  *      (2) It does not check ptrs for returned data!
  * </pre>
  */
-l_ok
+l_int32
 affineXformSampledPt(l_float32  *vc,
                      l_int32     x,
                      l_int32     y,
                      l_int32    *pxp,
                      l_int32    *pyp)
 {
+    PROCNAME("affineXformSampledPt");
+
     if (!vc)
-        return ERROR_INT("vc not defined", __func__, 1);
+        return ERROR_INT("vc not defined", procName, 1);
 
     *pxp = (l_int32)(vc[0] * x + vc[1] * y + vc[2] + 0.5);
     *pyp = (l_int32)(vc[3] * x + vc[4] * y + vc[5] + 0.5);
@@ -1099,8 +1124,8 @@ affineXformSampledPt(l_float32  *vc,
 /*!
  * \brief   affineXformPt()
  *
- * \param[in]    vc         vector of 6 coefficients
- * \param[in]    x, y       initial point
+ * \param[in]    vc vector of 6 coefficients
+ * \param[in]    x, y  initial point
  * \param[out]   pxp, pyp   transformed point
  * \return  0 if OK; 1 on error
  *
@@ -1110,15 +1135,17 @@ affineXformSampledPt(l_float32  *vc,
  *      (2) It does not check ptrs for returned data!
  * </pre>
  */
-l_ok
+l_int32
 affineXformPt(l_float32  *vc,
               l_int32     x,
               l_int32     y,
               l_float32  *pxp,
               l_float32  *pyp)
 {
+    PROCNAME("affineXformPt");
+
     if (!vc)
-        return ERROR_INT("vc not defined", __func__, 1);
+        return ERROR_INT("vc not defined", procName, 1);
 
     *pxp = vc[0] * x + vc[1] * y + vc[2];
     *pyp = vc[3] * x + vc[4] * y + vc[5];
@@ -1132,14 +1159,14 @@ affineXformPt(l_float32  *vc,
 /*!
  * \brief   linearInterpolatePixelColor()
  *
- * \param[in]    datas      ptr to beginning of image data
- * \param[in]    wpls       32-bit word/line for this data array
- * \param[in]    w, h       of image
- * \param[in]    x, y       floating pt location for evaluation
- * \param[in]    colorval   color brought in from the outside when the
- *                          input x,y location is outside the image;
- *                          in 0xrrggbb00 format)
- * \param[out]   pval       interpolated color value
+ * \param[in]    datas ptr to beginning of image data
+ * \param[in]    wpls 32-bit word/line for this data array
+ * \param[in]    w, h of image
+ * \param[in]    x, y floating pt location for evaluation
+ * \param[in]    colorval color brought in from the outside when the
+ *                        input x,y location is outside the image;
+ *                        in 0xrrggbb00 format)
+ * \param[out]   pval interpolated color value
  * \return  0 if OK, 1 on error
  *
  * <pre>
@@ -1149,7 +1176,7 @@ affineXformPt(l_float32  *vc,
  *          avoids "jaggies" when rendering sharp edges.
  * </pre>
  */
-l_ok
+l_int32
 linearInterpolatePixelColor(l_uint32  *datas,
                             l_int32    wpls,
                             l_int32    w,
@@ -1164,11 +1191,13 @@ l_int32    rval, gval, bval;
 l_uint32   word00, word01, word10, word11;
 l_uint32  *lines;
 
+    PROCNAME("linearInterpolatePixelColor");
+
     if (!pval)
-        return ERROR_INT("&val not defined", __func__, 1);
+        return ERROR_INT("&val not defined", procName, 1);
     *pval = colorval;
     if (!datas)
-        return ERROR_INT("datas not defined", __func__, 1);
+        return ERROR_INT("datas not defined", procName, 1);
 
         /* Skip if x or y are invalid. (x,y) must be in the source image.
          * Failure to detect an invalid point will cause a mem address fault.
@@ -1188,7 +1217,7 @@ l_uint32  *lines;
 
 #if  DEBUG
     if (xf < 0 || yf < 0)
-        lept_stderr("xp = %d, yp = %d, xf = %d, yf = %d\n", xp, yp, xf, yf);
+        fprintf(stderr, "xp = %d, yp = %d, xf = %d, yf = %d\n", xp, yp, xf, yf);
 #endif  /* DEBUG */
 
         /* Do area weighting (eqiv. to linear interpolation) */
@@ -1209,7 +1238,8 @@ l_uint32  *lines;
         xf * (16 - yf) * ((word10 >> L_BLUE_SHIFT) & 0xff) +
         (16 - xf) * yf * ((word01 >> L_BLUE_SHIFT) & 0xff) +
         xf * yf * ((word11 >> L_BLUE_SHIFT) & 0xff)) / 256;
-    composeRGBPixel(rval, gval, bval, pval);
+    *pval = (rval << L_RED_SHIFT) | (gval << L_GREEN_SHIFT) |
+          (bval << L_BLUE_SHIFT);
     return 0;
 }
 
@@ -1217,13 +1247,13 @@ l_uint32  *lines;
 /*!
  * \brief   linearInterpolatePixelGray()
  *
- * \param[in]    datas     ptr to beginning of image data
- * \param[in]    wpls      32-bit word/line for this data array
- * \param[in]    w, h      of image
- * \param[in]    x, y      floating pt location for evaluation
- * \param[in]    grayval   color brought in from the outside when the
- *                         input x,y location is outside the image
- * \param[out]   pval      interpolated gray value
+ * \param[in]    datas ptr to beginning of image data
+ * \param[in]    wpls 32-bit word/line for this data array
+ * \param[in]    w, h of image
+ * \param[in]    x, y floating pt location for evaluation
+ * \param[in]    grayval color brought in from the outside when the
+ *                       input x,y location is outside the image
+ * \param[out]   pval interpolated gray value
  * \return  0 if OK, 1 on error
  *
  * <pre>
@@ -1233,7 +1263,7 @@ l_uint32  *lines;
  *          avoids "jaggies" when rendering sharp edges.
  * </pre>
  */
-l_ok
+l_int32
 linearInterpolatePixelGray(l_uint32  *datas,
                            l_int32    wpls,
                            l_int32    w,
@@ -1246,11 +1276,13 @@ linearInterpolatePixelGray(l_uint32  *datas,
 l_int32    valid, xpm, ypm, xp, xp2, yp, xf, yf, v00, v10, v01, v11;
 l_uint32  *lines;
 
+    PROCNAME("linearInterpolatePixelGray");
+
     if (!pval)
-        return ERROR_INT("&val not defined", __func__, 1);
+        return ERROR_INT("&val not defined", procName, 1);
     *pval = grayval;
     if (!datas)
-        return ERROR_INT("datas not defined", __func__, 1);
+        return ERROR_INT("datas not defined", procName, 1);
 
         /* Skip if x or y is invalid. (x,y) must be in the source image.
          * Failure to detect an invalid point will cause a mem address fault.
@@ -1270,7 +1302,7 @@ l_uint32  *lines;
 
 #if  DEBUG
     if (xf < 0 || yf < 0)
-        lept_stderr("xp = %d, yp = %d, xf = %d, yf = %d\n", xp, yp, xf, yf);
+        fprintf(stderr, "xp = %d, yp = %d, xf = %d, yf = %d\n", xp, yp, xf, yf);
 #endif  /* DEBUG */
 
         /* Interpolate by area weighting. */
@@ -1293,9 +1325,9 @@ l_uint32  *lines;
 /*!
  * \brief   gaussjordan()
  *
- * \param[in]    a     n x n matrix
- * \param[in]    b     n x 1 right-hand side column vector
- * \param[in]    n     dimension
+ * \param[in]    a  n x n matrix
+ * \param[in]    b  n x 1 right-hand side column vector
+ * \param[in]    n  dimension
  * \return  0 if ok, 1 on error
  *
  * <pre>
@@ -1319,17 +1351,19 @@ l_int32    i, icol, irow, j, k, col, row, success;
 l_int32   *indexc, *indexr, *ipiv;
 l_float32  maxval, val, pivinv, temp;
 
+    PROCNAME("gaussjordan");
+
     if (!a)
-        return ERROR_INT("a not defined", __func__, 1);
+        return ERROR_INT("a not defined", procName, 1);
     if (!b)
-        return ERROR_INT("b not defined", __func__, 1);
+        return ERROR_INT("b not defined", procName, 1);
 
     success = TRUE;
     indexc = (l_int32 *)LEPT_CALLOC(n, sizeof(l_int32));
     indexr = (l_int32 *)LEPT_CALLOC(n, sizeof(l_int32));
     ipiv = (l_int32 *)LEPT_CALLOC(n, sizeof(l_int32));
     if (!indexc || !indexr || !ipiv) {
-        L_ERROR("array not made\n", __func__);
+        L_ERROR("array not made\n", procName);
         success = FALSE;
         goto cleanup_arrays;
     }
@@ -1347,7 +1381,7 @@ l_float32  maxval, val, pivinv, temp;
                             icol = k;
                         }
                     } else if (ipiv[k] > 1) {
-                        L_ERROR("singular matrix\n", __func__);
+                        L_ERROR("singular matrix\n", procName);
                         success = FALSE;
                         goto cleanup_arrays;
                     }
@@ -1365,7 +1399,7 @@ l_float32  maxval, val, pivinv, temp;
         indexr[i] = irow;
         indexc[i] = icol;
         if (a[icol][icol] == 0.0) {
-            L_ERROR("singular matrix\n", __func__);
+            L_ERROR("singular matrix\n", procName);
             success = FALSE;
             goto cleanup_arrays;
         }
@@ -1408,10 +1442,10 @@ cleanup_arrays:
  * \brief   pixAffineSequential()
  *
  * \param[in]    pixs
- * \param[in]    ptad   3 pts of final coordinate space
- * \param[in]    ptas   3 pts of initial coordinate space
- * \param[in]    bw     pixels of additional border width during computation
- * \param[in]    bh     pixels of additional border height during computation
+ * \param[in]    ptad  3 pts of final coordinate space
+ * \param[in]    ptas  3 pts of initial coordinate space
+ * \param[in]    bw    pixels of additional border width during computation
+ * \param[in]    bh    pixels of additional border height during computation
  * \return  pixd, or NULL on error
  *
  * <pre>
@@ -1444,22 +1478,22 @@ l_int32    x1p, y1p, x2p, y2p, x3p, y3p;   /* ptad */
 l_int32    x1sc, y1sc;  /* scaled origin */
 l_float32  x2s, x2sp, scalex, scaley;
 l_float32  th3, th3p, ph2, ph2p;
-#if  DEBUG
 l_float32  rad2deg;
-#endif  /* DEBUG */
 PIX       *pix1, *pix2, *pixd;
 
+    PROCNAME("pixAffineSequential");
+
     if (!pixs)
-        return (PIX *)ERROR_PTR("pixs not defined", __func__, NULL);
+        return (PIX *)ERROR_PTR("pixs not defined", procName, NULL);
     if (!ptas)
-        return (PIX *)ERROR_PTR("ptas not defined", __func__, NULL);
+        return (PIX *)ERROR_PTR("ptas not defined", procName, NULL);
     if (!ptad)
-        return (PIX *)ERROR_PTR("ptad not defined", __func__, NULL);
+        return (PIX *)ERROR_PTR("ptad not defined", procName, NULL);
 
     if (ptaGetCount(ptas) != 3)
-        return (PIX *)ERROR_PTR("ptas count not 3", __func__, NULL);
+        return (PIX *)ERROR_PTR("ptas count not 3", procName, NULL);
     if (ptaGetCount(ptad) != 3)
-        return (PIX *)ERROR_PTR("ptad count not 3", __func__, NULL);
+        return (PIX *)ERROR_PTR("ptad count not 3", procName, NULL);
     ptaGetIPt(ptas, 0, &x1, &y1);
     ptaGetIPt(ptas, 1, &x2, &y2);
     ptaGetIPt(ptas, 2, &x3, &y3);
@@ -1467,12 +1501,13 @@ PIX       *pix1, *pix2, *pixd;
     ptaGetIPt(ptad, 1, &x2p, &y2p);
     ptaGetIPt(ptad, 2, &x3p, &y3p);
 
+    rad2deg = 180. / 3.1415926535;
     pix1 = pix2 = pixd = NULL;
 
     if (y1 == y3)
-        return (PIX *)ERROR_PTR("y1 == y3!", __func__, NULL);
+        return (PIX *)ERROR_PTR("y1 == y3!", procName, NULL);
     if (y1p == y3p)
-        return (PIX *)ERROR_PTR("y1p == y3p!", __func__, NULL);
+        return (PIX *)ERROR_PTR("y1p == y3p!", procName, NULL);
 
     if (bw != 0 || bh != 0) {
             /* resize all points and add border to pixs */
@@ -1490,7 +1525,7 @@ PIX       *pix1, *pix2, *pixd;
         y3p = y3p + bh;
 
         if ((pix1 = pixAddBorderGeneral(pixs, bw, bw, bh, bh, 0)) == NULL)
-            return (PIX *)ERROR_PTR("pix1 not made", __func__, NULL);
+            return (PIX *)ERROR_PTR("pix1 not made", procName, NULL);
     } else {
         pix1 = pixCopy(NULL, pixs);
     }
@@ -1510,7 +1545,7 @@ PIX       *pix1, *pix2, *pixd;
     th3 = atan2((l_float64)(x1 - x3), (l_float64)(y1 - y3));
     x2s = (l_float32)(x2 - ((l_float32)(y1 - y2) * (x3 - x1)) / (y1 - y3));
     if (x2s == (l_float32)x1) {
-        L_ERROR("x2s == x1!\n", __func__);
+        L_ERROR("x2s == x1!\n", procName);
         goto cleanup_pix;
     }
     ph2 = atan2((l_float64)(y1 - y2), (l_float64)(x2s - x1));
@@ -1523,7 +1558,7 @@ PIX       *pix1, *pix2, *pixd;
     x2sp = (l_float32)(x2p -
                        ((l_float32)(y1p - y2p) * (x3p - x1p)) / (y1p - y3p));
     if (x2sp == (l_float32)x1p) {
-        L_ERROR("x2sp == x1p!\n", __func__);
+        L_ERROR("x2sp == x1p!\n", procName);
         goto cleanup_pix;
     }
     ph2p = atan2((l_float64)(y1p - y2p), (l_float64)(x2sp - x1p));
@@ -1540,17 +1575,16 @@ PIX       *pix1, *pix2, *pixd;
     scalex = (l_float32)(x2sp - x1p) / (x2s - x1);
     scaley = (l_float32)(y3p - y1p) / (y3 - y1);
     if ((pix2 = pixScale(pix1, scalex, scaley)) == NULL) {
-        L_ERROR("pix2 not made\n", __func__);
+        L_ERROR("pix2 not made\n", procName);
         goto cleanup_pix;
     }
 
 #if  DEBUG
-    rad2deg = 180. / 3.1415926535;
-    lept_stderr("th3 = %5.1f deg, ph2 = %5.1f deg\n",
-                rad2deg * th3, rad2deg * ph2);
-    lept_stderr("th3' = %5.1f deg, ph2' = %5.1f deg\n",
-                rad2deg * th3p, rad2deg * ph2p);
-    lept_stderr("scalex = %6.3f, scaley = %6.3f\n", scalex, scaley);
+    fprintf(stderr, "th3 = %5.1f deg, ph2 = %5.1f deg\n",
+            rad2deg * th3, rad2deg * ph2);
+    fprintf(stderr, "th3' = %5.1f deg, ph2' = %5.1f deg\n",
+            rad2deg * th3p, rad2deg * ph2p);
+    fprintf(stderr, "scalex = %6.3f, scaley = %6.3f\n", scalex, scaley);
 #endif  /* DEBUG */
 
     /*-------------------------------------------------------------*
@@ -1575,7 +1609,7 @@ PIX       *pix1, *pix2, *pixd;
 
     if (bw != 0 || bh != 0) {
         if ((pixd = pixRemoveBorderGeneral(pix2, bw, bw, bh, bh)) == NULL)
-            L_ERROR("pixd not made\n", __func__);
+            L_ERROR("pixd not made\n", procName);
     } else {
         pixd = pixClone(pix2);
     }
