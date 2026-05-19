@@ -18,19 +18,21 @@ set_target_properties(
   leptonica
   PROPERTIES
     VERSION 6.0.0
-    SOVERSION 6
-    OUTPUT_NAME
-    "leptonica$<$<BOOL:${MSVC}>:-${PROJECT_VERSION}$<$<CONFIG:DEBUG>:d>>")
+    SOVERSION 6)
 
 if(MINGW)
   set_target_properties(
     leptonica PROPERTIES SUFFIX
-                         "-${PROJECT_VERSION}${CMAKE_SHARED_LIBRARY_SUFFIX}")
+                         "")
 endif(MINGW)
 
 if(BUILD_SHARED_LIBS)
   target_compile_definitions(leptonica PRIVATE -DLIBLEPT_EXPORTS)
 endif()
+
+target_include_directories(leptonica PRIVATE 
+    ${CMAKE_INSTALL_PREFIX}/include
+  )
 
 if(GIF_LIBRARIES)
   target_include_directories(leptonica PRIVATE ${GIF_INCLUDE_DIR})

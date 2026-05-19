@@ -575,6 +575,12 @@ l_float32  twopi, invtwopi, findex, diff;
  *            pixSetAllArbitrary(pixg, 128);
  *            pixd = pixBlendWithGrayMask(pixrs, pixc, pixg, 0, 0);
  * </pre>
+ * 
+ * -- 中间凹陷效果 -- zhang 
+ * pixd = pixWarpStereoscopic(pix1, 0, 0, 0, -30, 30, 1);
+ * -- 中间突起效果
+ * pixd = pixWarpStereoscopic(pix1, 0, 0, 0, 30, -30, 1);
+ * 
  */
 PIX *
 pixWarpStereoscopic(PIX     *pixs,

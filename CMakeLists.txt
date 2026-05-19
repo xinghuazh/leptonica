@@ -26,7 +26,7 @@ endif()
 
 set(CMAKE_MODULE_PATH "${CMAKE_MODULE_PATH};${CMAKE_CURRENT_SOURCE_DIR}/cmake")
 
-set(EXECUTABLE_OUTPUT_PATH "${CMAKE_CURRENT_BINARY_DIR}/bin")
+set(EXECUTABLE_OUTPUT_PATH "${CMAKE_INSTALL_PREFIX}/bin")
 set(CMAKE_RUNTIME_OUTPUT_DIRECTORY "${EXECUTABLE_OUTPUT_PATH}")
 
 # Use solution folders.
@@ -41,8 +41,7 @@ set_property(GLOBAL PROPERTY PREDEFINED_TARGETS_FOLDER "CMake Targets")
 
 project(
   leptonica
-  LANGUAGES C
-  VERSION 1.88.0)
+  LANGUAGES C)
 set(CMAKE_C_STANDARD 11)
 set(CMAKE_C_STANDARD_REQUIRED ON)
 
@@ -208,6 +207,8 @@ endif(${CMAKE_SYSTEM_NAME} MATCHES "kFreeBSD.*|DragonFly.*|FreeBSD")
 if(CMAKE_C_COMPILER_ID MATCHES "Clang")
   set(CLANG 1)
 endif()
+
+set(CMAKE_DEBUG_POSTFIX "")
 
 if(NOT CMAKE_BUILD_TYPE)
   message(STATUS "Setting build type to 'Release' as none was specified.")
